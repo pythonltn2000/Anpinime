@@ -184,8 +184,7 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
         revealTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self, weak webView] _ in
             Task { @MainActor in
                 guard let self, let webView, webView === self.fallbackWebView, webView.isHidden else { return }
-                self.loadingLabel.text = "Không thể tách riêng video — hãy chọn phát trên trang"
-                webView.isHidden = false
+                self.loadingLabel.text = "Không tìm thấy luồng phát cho tập này"
             }
         }
     }
