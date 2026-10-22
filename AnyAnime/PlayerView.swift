@@ -298,6 +298,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             playerController?.view.removeFromSuperview()
             playerController?.removeFromParent()
             playerController = nil
+            playback.loading = true
+            playback.buffering = false
             startFallback()
             return
         }

@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import MediaPlayer
 
 @MainActor
 final class PlaybackState: ObservableObject {
@@ -26,7 +27,6 @@ final class PlaybackState: ObservableObject {
 struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var service: AnimeService
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var playback = PlaybackState()
     let episode: Episode
     let title: String
@@ -41,7 +41,6 @@ struct PlayerView: View {
     @State private var scrubTime = 0.0
     @State private var scrubbing = false
     @State private var hideTask: Task<Void, Never>?
-    @State private var pulse = false
     @State private var brightness = Double(UIScreen.main.brightness)
     @State private var originalBrightness = UIScreen.main.brightness
     @AppStorage("AnPinime.autoNext") private var autoNext = true
@@ -123,7 +122,6 @@ struct PlayerView: View {
             originalBrightness = UIScreen.main.brightness
             UIApplication.shared.isIdleTimerDisabled = true
             playback.rate = rememberSpeed ? savedRate : 1
-            pulse = true
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--ui-preview") {
                 if ["episodes", "settings"].contains(InterfacePreview.mode) { openPanel(InterfacePreview.mode) }
@@ -156,11 +154,7 @@ struct PlayerView: View {
             LinearGradient(colors: [.black.opacity(0.2), .black.opacity(0.1), .black.opacity(0.95)], startPoint: .top, endPoint: .bottom)
             VStack(spacing: 18) {
                 Text("ANPINIME").font(.system(size: 11, weight: .bold, design: .rounded)).tracking(6).foregroundColor(.white.opacity(0.65))
-                Text(title).font(.system(size: size.width > 600 ? 40 : 30, weight: .heavy, design: .rounded))
-                    .multilineTextAlignment(.center).lineLimit(3)
-                    .shadow(color: .black.opacity(0.6), radius: 20)
-                    .opacity(reduceMotion ? 1 : (pulse ? 1 : 0.4))
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulse)
+                PulsingMovieTitle(title: title, size: size.width > 600 ? 40 : 30)
                 Text(current.title).font(.subheadline.weight(.medium)).foregroundColor(.white.opacity(0.7))
                 HStack(spacing: 9) {
                     ProgressView().tint(.white.opacity(0.8))
@@ -323,7 +317,7 @@ struct PlayerView: View {
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Âm lượng phim", systemImage: "speaker.wave.2")
-                    Slider(value: $playback.volume, in: 0...1).onChange(of: playback.volume) { playback.send("volume", $0) }
+                    SystemVolumeSlider().frame(height: 32)
                 }
                 Button { closePanel(); retry() } label: { Label("Tải lại luồng phát", systemImage: "arrow.clockwise") }
             }.font(.subheadline).padding(.bottom, 8)
@@ -358,4 +352,30 @@ struct PlayerView: View {
         if seconds >= 3600 { return String(format: "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60) }
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
+}
+
+private struct PulsingMovieTitle: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var glowing = false
+    let title: String
+    let size: CGFloat
+    var body: some View {
+        Text(title).font(.system(size: size, weight: .heavy, design: .rounded))
+            .multilineTextAlignment(.center).lineLimit(3)
+            .shadow(color: .black.opacity(0.6), radius: 20)
+            .opacity(reduceMotion ? 1 : (glowing ? 1 : 0.4))
+            .animation(reduceMotion ? nil : .easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: glowing)
+            .onAppear { glowing = true }
+    }
+}
+
+/// System volume works for both AVPlayer and iOS WebKit media.
+private struct SystemVolumeSlider: UIViewRepresentable {
+    func makeUIView(context: Context) -> MPVolumeView {
+        let view = MPVolumeView(frame: .zero)
+        view.showsRouteButton = false
+        view.tintColor = UIColor(Color.anpinimeAccent)
+        return view
+    }
+    func updateUIView(_ uiView: MPVolumeView, context: Context) { }
 }

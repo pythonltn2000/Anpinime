@@ -120,7 +120,16 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
 struct VerificationGate: View {
     @ObservedObject var browser: WebsiteSession
     var body: some View {
-        Color.clear.frame(width: 0, height: 0)
+        Group {
+            if !browser.needsInteraction {
+                VerificationWebView(browser: browser)
+                    .frame(width: 390, height: 720)
+                    .frame(width: 1, height: 1).clipped().opacity(0.001)
+                    .allowsHitTesting(false).accessibilityHidden(true)
+            } else {
+                Color.clear.frame(width: 1, height: 1)
+            }
+        }
             .sheet(isPresented: $browser.needsInteraction) {
                 NavigationView {
                     VerificationWebView(browser: browser)
