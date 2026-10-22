@@ -12,6 +12,7 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     private var deadline = Date()
     private var inspecting = false
     private var targetURL: URL?
+    private var generation = UUID()
 
     override init() {
         let configuration = WKWebViewConfiguration()
@@ -35,6 +36,7 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         let request = queue.removeFirst()
         pending = request.1
         targetURL = request.0
+        generation = UUID()
         deadline = Date().addingTimeInterval(45)
         webView.load(URLRequest(url: request.0, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 40))
         timer = Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { [weak self] _ in
@@ -50,16 +52,17 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         }
         guard !webView.isLoading else { return }
         inspecting = true
+        let requestGeneration = generation
         webView.evaluateJavaScript(Self.pageInspection) { [weak self] result, _ in
             guard let self else { return }
             self.inspecting = false
-            guard self.pending != nil, let page = result as? [String: Any],
+            guard self.generation == requestGeneration, self.pending != nil, let page = result as? [String: Any],
                   let html = page["html"] as? String, let url = self.webView.url,
                   url.scheme == "https", !html.isEmpty else { return }
             if !HTMLParser.containsVerification(html) {
                 Task { @MainActor in
                     await self.copyCookies()
-                    guard self.pending != nil else { return }
+                    guard self.generation == requestGeneration, self.pending != nil else { return }
                     self.finish(.success((html, url)))
                 }
             } else if (page["interactive"] as? Bool) == true, !self.needsInteraction {

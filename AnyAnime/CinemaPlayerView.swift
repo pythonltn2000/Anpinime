@@ -214,7 +214,8 @@ struct PlayerView: View {
                     HStack(spacing: 12) {
                         smallButton("Danh sách tập", "rectangle.stack") { openPanel("episodes") }
                         if let next = nextEpisode {
-                            smallButton("Tập tiếp", "forward.end.fill") { select(next) }
+                            if size.width > 500 { smallButton("Tập tiếp", "forward.end.fill") { select(next) } }
+                            else { controlButton("forward.end.fill", "Tập tiếp") { select(next) } }
                         }
                         Spacer(minLength: 0)
                         controlButton("lock.open", "Khóa điều khiển") { locked = true; controlsVisible = false }
