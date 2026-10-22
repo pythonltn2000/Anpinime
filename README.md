@@ -1,38 +1,36 @@
-# AnyAnime AutoRedirect (iOS 15+)
+# AnyAnime Rewrite (iOS 15+)
 
-Đây là **một bản dựng lại phần truy cập phim**, không phải bản vá nguyên vẹn mã Swift của IPA gốc. Nó dùng `WKWebView` để hiển thị website, nên nội dung, điều hướng và trình phát phụ thuộc trực tiếp vào website. Thiết kế giao diện gốc của AnyAnime không được giữ nguyên.
+Ứng dụng iOS native được viết lại từ hành vi quan sát được của IPA cũ, không sử dụng mã nguồn gốc. Giao diện gồm Trang chủ, Tìm kiếm, Thể loại, Chi tiết anime, Danh sách tập, Trình phát và Giới thiệu.
 
-## Tính năng
+## Cơ chế tên miền động
 
-- Mở `https://bit.ly/animevietsubtv` như trình duyệt iOS. Theo HTTP redirect, JS redirect trong WKWebView.
-- Có các nguồn dự phòng, gồm `https://www.animevietsub.sale/` (đã đọc được danh sách qua công cụ kiểm tra 22/10/2026).
-- Lưu cookie trong chính app, hỗ trợ trang xác minh có tương tác (không tự động vượt CAPTCHA).
-- Ghi nhật ký URL, HTTP status, tiêu đề, số link/phần tử HTML để chẩn đoán.
-- Có nút chọn nguồn, trang chủ, tiến/lùi, tải lại.
-- Tùy chọn nhập URL cấu hình JSON riêng trên HTTPS để thay danh sách nguồn về sau, không cần build lại.
+Nguồn chuẩn là `https://bit.ly/animevietsubtv`. `DomainResolver` thực hiện request với redirect, lấy URL phản hồi cuối cùng và chỉ giữ `scheme://host`. Domain hợp lệ được cache để lần mở tiếp theo nhanh hơn. Nếu shortlink tạm thời lỗi, app thử domain đã cache rồi mới dùng danh sách dự phòng.
 
-## Build IPA bằng GitHub Actions
+App không khóa dữ liệu vào `animevietsub.vip`, `.sale` hay `.xyz`; mọi URL ảnh, danh sách, tìm kiếm, chi tiết và tập đều được chuẩn hóa tương đối theo domain vừa resolve.
 
-1. Tạo một repository GitHub mới và tải **toàn bộ nội dung thư mục dự án** vào root repository, bao gồm thư mục `.github/workflows`.
-2. Vào tab **Actions** → workflow **Build AnyAnime AutoRedirect IPA** → **Run workflow**.
-3. Khi workflow hoàn tất, lấy Artifact `AnyAnime_AutoRedirect_UNSIGNED` (trong đó có IPA chưa ký).
-4. Dùng **ESign** ký file IPA với chứng chỉ/profile còn hiệu lực, rồi cài lên thiết bị.
-5. Nếu thiết bị đã cài AnyAnime cũ cùng Bundle ID `com.34306.anyani`, cần lưu lại dữ liệu cần thiết trước khi cài bản mới hoặc đổi Bundle ID trong `project.yml`.
+## Cloudflare/CAPTCHA
 
-## Cập nhật domain từ xa
+Khi request dữ liệu gặp HTTP 403 hoặc trang xác minh, app mở WKWebView dùng kho cookie bền vững. Người dùng hoàn tất CAPTCHA và bấm **Đã xác minh — thử lại**. Cookie sau đó được đồng bộ sang `HTTPCookieStorage` để các màn hình native tiếp tục lấy HTML. App không tự động vượt CAPTCHA.
 
-Tải `config.sample.json` lên GitHub Pages hoặc một HTTPS endpoint mà bạn kiểm soát. Trong app bấm **Nguồn phim** → **Cấu hình nguồn từ xa** rồi nhập URL JSON. App cập nhật danh sách nguồn từ JSON khi khởi chạy; bạn có thể chỉnh domain trong JSON khi website thay đổi.
+## Dữ liệu và trình phát
 
-Nếu không nhập cấu hình, app vẫn có URL Bitly và fallback mặc định. Bản này không bảo đảm tự động tìm được một domain không nằm trong chuỗi redirect hoặc danh sách fallback.
+- Danh sách được đọc từ HTML công khai bằng nhiều selector dự phòng (`TPost`, `ml-item`, `film-item`, `movie-item`).
+- Tìm kiếm dùng `/tim-kiem/{từ-khóa}/`.
+- Thể loại và trạng thái dùng các path quan sát được từ app cũ.
+- Trình phát ưu tiên cơ chế native: đọc `filmID` và `data-hash`, POST `/ajax/player`, giải AES-CBC bằng khóa SHA-256 rồi giải nén dữ liệu. Nếu cơ chế đó thay đổi hoặc lỗi, app tự chuyển sang trình phát WKWebView và dò URL video để mở bằng AVPlayer.
 
-## Giới hạn & kiểm thử
+## Build IPA
 
-- Môi trường tạo file ở đây **không có Xcode hoặc iOS SDK**, nên chưa build/kiểm thử IPA mới trên iPhone. Mã Swift đã được kiểm tra cú pháp; GitHub Actions là bước build thật.
-- Bản mới là trình duyệt tích hợp; **không kế thừa** giao diện/phân tích danh sách phim gốc hay tính năng ngoại tuyến.
-- Safari và WKWebView có cookies riêng; có thể phải xác minh lại trên app.
-- Một số web chống bot, DRM, chính sách bảo mật và phát video có thể giới hạn WKWebView.
-- Mặc dù dùng Bitly và JSON động, vẫn phải thay code khi website thay đổi tính năng lớn, chính sách đăng nhập hoặc phát video.
+Workflow `.github/workflows/build-ipa.yml` tạo IPA chưa ký:
 
-## Khác với bản sửa trực tiếp IPA gốc
+1. Mở tab **Actions** của repository.
+2. Chạy **Build AnyAnime IPA**, hoặc push vào nhánh `main`.
+3. Tải artifact `AnyAnime_Rewrite_UNSIGNED`.
+4. Ký IPA bằng ESign/chứng chỉ hợp lệ trước khi cài.
 
-File `AnyAnime_sale_direct_ESign.ipa` riêng biệt chỉ đổi 2 địa chỉ URL đã mã hóa trong executable ARM64 của app gốc: URL chính thành `https://www.animevietsub.sale/`, URL dự phòng thành `https://bit.ly/animevietsubtv`. Bản này giữ thiết kế cũ nhưng không bổ sung WKWebView vào DomainResolver/AnimeService, nên **không được coi là sửa triệt để**.
+Bundle ID mặc định là `com.34306.anyani`. Dự án không đưa IPA tham chiếu vào Git; `*.ipa` đã được thêm vào `.gitignore`.
+
+## Giới hạn
+
+Website nguồn có thể thay HTML, player hoặc chính sách chống bot bất kỳ lúc nào. Resolver xử lý việc đổi domain, nhưng selector và cơ chế player vẫn cần cập nhật nếu website thay đổi cấu trúc lớn.
+

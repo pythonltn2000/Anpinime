@@ -15,10 +15,9 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: AnyAnime/AnyAnimeApp.swift
-      - path: AnyAnime/AnimeBrowserModel.swift
-      - path: AnyAnime/BrowserScreen.swift
-      - path: AnyAnime/Assets.xcassets
+      - path: AnyAnime
+        excludes:
+          - Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.34306.anyani
@@ -38,3 +37,4 @@ schemes:
       config: Debug
     archive:
       config: Release
+

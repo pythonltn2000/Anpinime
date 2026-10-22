@@ -1,17 +1,22 @@
-name: Build AnyAnime AutoRedirect IPA
+name: Build AnyAnime IPA
+
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [main]
+
 jobs:
   build-ios:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
       - name: Generate Xcode project
-        run: |
-          brew install xcodegen
-          xcodegen generate
+        run: xcodegen generate
+
       - name: Build unsigned iPhone app
         run: |
           xcodebuild \
@@ -23,13 +28,16 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             clean build
-      - name: Assemble unsigned IPA for ESign
+
+      - name: Assemble unsigned IPA
         run: |
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/AnyAnime.app Payload/AnyAnime.app
-          zip -q -r AnyAnime_AutoRedirect_UNSIGNED.ipa Payload
+          zip -q -r AnyAnime_Rewrite_UNSIGNED.ipa Payload
+
       - uses: actions/upload-artifact@v4
         with:
-          name: AnyAnime_AutoRedirect_UNSIGNED
-          path: AnyAnime_AutoRedirect_UNSIGNED.ipa
+          name: AnyAnime_Rewrite_UNSIGNED
+          path: AnyAnime_Rewrite_UNSIGNED.ipa
           retention-days: 14
+

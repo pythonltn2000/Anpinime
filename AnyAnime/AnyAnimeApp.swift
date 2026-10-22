@@ -2,12 +2,14 @@ import SwiftUI
 
 @main
 struct AnyAnimeApp: App {
-    @StateObject private var browser = AnimeBrowserModel()
+    @StateObject private var service = AnimeService()
 
     var body: some Scene {
         WindowGroup {
-            BrowserScreen()
-                .environmentObject(browser)
+            RootView()
+                .environmentObject(service)
+                .preferredColorScheme(.dark)
         }
     }
 }
+
