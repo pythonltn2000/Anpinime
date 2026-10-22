@@ -265,6 +265,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         fallbackTimer?.invalidate()
         nativeSource = url
         nativeStartedAt = Date()
+        playback.loading = true
         playback.error = nil
         let headers = ["User-Agent": AnimeService.userAgent, "Referer": (referer ?? episodeURL).absoluteString]
         let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
