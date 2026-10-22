@@ -59,6 +59,19 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             loadingLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
         playback.command = { [weak self] name, value in self?.perform(name, value: value) }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-preview") {
+            Task { @MainActor in
+                if InterfacePreview.mode != "loading" {
+                    self.playback.loading = false
+                    self.playback.duration = 1440
+                    self.playback.currentTime = 325
+                    self.playback.playing = true
+                }
+            }
+            return
+        }
+        #endif
         attemptDirectPlayer()
     }
 

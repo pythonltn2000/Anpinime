@@ -6,10 +6,19 @@ struct AnyAnimeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(service)
-                .preferredColorScheme(.dark)
+            appContent.environmentObject(service).preferredColorScheme(.dark)
         }
     }
-}
 
+    @ViewBuilder private var appContent: some View {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-preview") {
+            InterfacePreview()
+        } else {
+            RootView()
+        }
+        #else
+        RootView()
+        #endif
+    }
+}

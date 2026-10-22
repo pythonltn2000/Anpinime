@@ -2,6 +2,11 @@ name: Build AnPinime IPA
 
 on:
   workflow_dispatch:
+    inputs:
+      preview:
+        description: 'Capture simulator UI previews'
+        type: boolean
+        default: false
   push:
     branches: [main]
 
@@ -46,4 +51,33 @@ jobs:
         with:
           name: AnPinime_UNSIGNED
           path: AnPinime_UNSIGNED.ipa
+          retention-days: 14
+
+  preview:
+    if: github.event_name == 'workflow_dispatch' && inputs.preview
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Build simulator app
+        run: |
+          xcodebuild -quiet -project AnyAnime.xcodeproj -scheme AnyAnime -configuration Debug -sdk iphonesimulator -derivedDataPath build-simulator CODE_SIGNING_ALLOWED=NO build
+      - name: Capture interface previews
+        run: |
+          ANPINIME_SIMULATOR_ID=$(xcrun simctl list devices available -j | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{const d=Object.values(JSON.parse(s).devices).flat().find(d=>d.name.includes("iPhone")&&d.isAvailable);if(!d)process.exit(1);process.stdout.write(d.udid)})')
+          xcrun simctl boot "$ANPINIME_SIMULATOR_ID"
+          xcrun simctl bootstatus "$ANPINIME_SIMULATOR_ID" -b
+          xcrun simctl install "$ANPINIME_SIMULATOR_ID" build-simulator/Build/Products/Debug-iphonesimulator/anpinime.app
+          xcrun simctl ui "$ANPINIME_SIMULATOR_ID" appearance dark
+          mkdir -p previews
+          for scene in loading player episodes settings list app-settings; do
+            xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime --ui-preview "$scene"
+            sleep 4
+            xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot "previews/$scene.png"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnPinime_Interface_Previews
+          path: previews/*.png
           retention-days: 14

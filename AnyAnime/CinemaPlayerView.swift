@@ -124,6 +124,11 @@ struct PlayerView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             playback.rate = rememberSpeed ? savedRate : 1
             pulse = true
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--ui-preview") {
+                if ["episodes", "settings"].contains(InterfacePreview.mode) { openPanel(InterfacePreview.mode) }
+            }
+            #endif
         }
         .onDisappear {
             hideTask?.cancel()
@@ -337,6 +342,9 @@ struct PlayerView: View {
     private func retry() { playback.send("pause"); playback.reset(); attempt += 1; controlsVisible = true }
     private func scheduleHide() {
         hideTask?.cancel()
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-preview") { return }
+        #endif
         guard playback.playing, !playback.loading, panel == nil, !scrubbing else { return }
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 4_000_000_000)
