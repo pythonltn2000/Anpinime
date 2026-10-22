@@ -67,7 +67,8 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
         attemptDirectPlayer()
     }
 
-    deinit {
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
         fallbackTimer?.invalidate()
         directWebView?.configuration.userContentController.removeScriptMessageHandler(forName: "videoFound")
         fallbackWebView?.configuration.userContentController.removeScriptMessageHandler(forName: "videoFound")
