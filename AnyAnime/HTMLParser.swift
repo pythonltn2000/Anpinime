@@ -117,9 +117,14 @@ enum HTMLParser {
 
     static func containsVerification(_ html: String) -> Bool {
         let value = html.lowercased()
-        return value.contains("cf-chl-") || value.contains("challenge-platform") ||
-            value.contains("xác minh bảo mật") || value.contains("verify you are human") ||
-            value.contains("checking your browser")
+        // A normal page can contain Cloudflare scripts without asking for verification.
+        let title = first(#"(?is)<title[^>]*>(.*?)</title>"#, in: value) ?? ""
+        let challengeTitle = ["just a moment", "xác minh an toàn", "xác minh bảo mật", "attention required", "verify you are human", "checking your browser"].contains { title.contains($0) }
+        let hasContent = value.range(of: #"class=["'][^"']*(?:tpost|ml-item|film-item|movie-item|btn-episode)[^"']*["']"#, options: .regularExpression) != nil
+            || value.contains("filminfo.filmid")
+        if hasContent && !challengeTitle { return false }
+        return challengeTitle || value.contains("id=\"challenge-form\"") || value.contains("id='challenge-form'")
+            || value.contains("cf-turnstile") || value.contains("g-recaptcha") || value.contains("h-captcha")
     }
 
     static func playerParameters(from html: String) -> (filmID: String, hash: String)? {
@@ -133,7 +138,12 @@ enum HTMLParser {
 
     private static func uniqueSections(_ sections: [AnimeSection]) -> [AnimeSection] {
         var names = Set<String>()
-        return sections.filter { !$0.items.isEmpty && names.insert($0.title.lowercased()).inserted }
+        var itemSets = Set<Set<String>>()
+        return sections.filter { section in
+            let title = section.title.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi"))
+            let key = title.contains("cap nhat") ? "latest-updates" : title
+            return !section.items.isEmpty && names.insert(key).inserted && itemSets.insert(Set(section.items.map(\.id))).inserted
+        }
     }
 
     private static func absoluteURL(_ value: String, relativeTo baseURL: URL) -> URL? {
@@ -168,4 +178,3 @@ enum HTMLParser {
         return (text as NSString).substring(with: range)
     }
 }
-

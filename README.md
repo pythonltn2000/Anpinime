@@ -1,6 +1,6 @@
-# AnyAnime Rewrite (iOS 15+)
+# AnPinime (iOS 15+)
 
-Ứng dụng iOS native được viết lại từ hành vi quan sát được của IPA cũ, không sử dụng mã nguồn gốc. Giao diện gồm Trang chủ, Tìm kiếm, Thể loại, Chi tiết anime, Danh sách tập, Trình phát và Giới thiệu.
+Ứng dụng xem anime với danh sách phim, tìm kiếm, thể loại và trình phát toàn màn hình. Màn hình chờ phim dùng ảnh nền và tên phim nhấp nháy; trình phát có danh sách tập, tua, tốc độ, tỉ lệ hình, khóa chạm, độ sáng và tự phát tập tiếp theo.
 
 ## Cơ chế tên miền động
 
@@ -10,13 +10,13 @@ App không khóa dữ liệu vào `animevietsub.vip`, `.sale` hay `.xyz`; mọi 
 
 ## Cloudflare/CAPTCHA
 
-Khi request dữ liệu gặp HTTP 403 hoặc trang xác minh, app mở WKWebView dùng kho cookie bền vững. Người dùng hoàn tất CAPTCHA và bấm **Đã xác minh — thử lại**. Cookie sau đó được đồng bộ sang `HTTPCookieStorage` để các màn hình native tiếp tục lấy HTML. App không tự động vượt CAPTCHA.
+Khi request dữ liệu gặp HTTP 403 hoặc trang xác minh, app thử lại bằng phiên WebKit ở nền. Trang đã có dữ liệu được đọc trực tiếp, đồng bộ cookie và tiếp tục đúng yêu cầu đang chờ. Chỉ khi phát hiện phần xác minh có thể tương tác mới mở cửa sổ; cửa sổ tự đóng sau khi website cho truy cập. Trang thông thường chứa script Cloudflare không bị xem là CAPTCHA.
 
 ## Dữ liệu và trình phát
 
 - Danh sách được đọc từ HTML công khai bằng nhiều selector dự phòng (`TPost`, `ml-item`, `film-item`, `movie-item`).
 - Tìm kiếm dùng `/tim-kiem/{từ-khóa}/`.
-- Thể loại và trạng thái dùng các path quan sát được từ app cũ.
+- Thể loại và trạng thái dùng các đường dẫn của website nguồn.
 - Trình phát ưu tiên cơ chế native: đọc `filmID` và `data-hash`, POST `/ajax/player`, giải AES-CBC bằng khóa SHA-256 rồi giải nén dữ liệu. Nếu cơ chế đó thay đổi hoặc lỗi, app tự chuyển sang trình phát WKWebView và dò URL video để mở bằng AVPlayer.
 
 ## Build IPA
@@ -24,13 +24,14 @@ Khi request dữ liệu gặp HTTP 403 hoặc trang xác minh, app mở WKWebVie
 Workflow `.github/workflows/build-ipa.yml` tạo IPA chưa ký:
 
 1. Mở tab **Actions** của repository.
-2. Chạy **Build AnyAnime IPA**, hoặc push vào nhánh `main`.
-3. Tải artifact `AnyAnime_Rewrite_UNSIGNED`.
+2. Chạy **Build AnPinime IPA**, hoặc push vào nhánh `main`.
+3. Tải artifact `AnPinime_UNSIGNED`.
 4. Ký IPA bằng ESign/chứng chỉ hợp lệ trước khi cài.
 
-Bundle ID mặc định là `com.34306.anyani`. Dự án không đưa IPA tham chiếu vào Git; `*.ipa` đã được thêm vào `.gitignore`.
+Bundle ID: `com.xemphim.aipinime`. Tên hiển thị: `AnPinime`. Gói ứng dụng: `anpinime.app`. Các IPA tham chiếu không được đưa lên Git.
+
+Logo sử dụng `logo.png`. Animation `Code_Generated_Image.gif` chỉ dùng khi tải danh sách, tìm kiếm và chi tiết; phần nền đen được hòa bằng screen blending trên nền tối. Màn hình chờ phát phim dùng ảnh phim riêng.
 
 ## Giới hạn
 
 Website nguồn có thể thay HTML, player hoặc chính sách chống bot bất kỳ lúc nào. Resolver xử lý việc đổi domain, nhưng selector và cơ chế player vẫn cần cập nhật nếu website thay đổi cấu trúc lớn.
-

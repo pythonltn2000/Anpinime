@@ -24,7 +24,9 @@ struct AnimeDetailView: View {
         .task { await load() }
         .onChange(of: service.verificationGeneration) { _ in Task { await load() } }
         .fullScreenCover(item: $selectedEpisode) { episode in
-            PlayerView(episode: episode)
+            PlayerView(episode: episode, title: detail?.title ?? anime.title,
+                       artworkURL: detail?.bannerURL ?? detail?.posterURL ?? anime.imageURL,
+                       episodes: detail?.episodes ?? [episode])
                 .environmentObject(service)
         }
     }
@@ -122,4 +124,3 @@ struct AnimeDetailView: View {
         }
     }
 }
-

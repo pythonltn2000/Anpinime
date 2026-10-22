@@ -2,42 +2,32 @@ import SwiftUI
 import WebKit
 import AVKit
 
-struct PlayerView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var service: AnimeService
-    let episode: Episode
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            PlayerControllerView(episodeURL: episode.url, baseURL: service.baseURL)
-                .ignoresSafeArea()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 34))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .black.opacity(0.7))
-            }
-            .padding(.top, 10).padding(.trailing, 14)
-        }
-        .background(Color.black.ignoresSafeArea())
-    }
-}
-
-private struct PlayerControllerView: UIViewControllerRepresentable {
+struct PlayerControllerView: UIViewControllerRepresentable {
     let episodeURL: URL
     let baseURL: URL
+    let playback: PlaybackState
 
     func makeUIViewController(context: Context) -> AnimePlayerViewController {
-        AnimePlayerViewController(episodeURL: episodeURL, baseURL: baseURL)
+        AnimePlayerViewController(episodeURL: episodeURL, baseURL: baseURL, playback: playback)
     }
 
     func updateUIViewController(_ uiViewController: AnimePlayerViewController, context: Context) { }
+    static func dismantleUIViewController(_ uiViewController: AnimePlayerViewController, coordinator: ()) {
+        uiViewController.shutdown()
+    }
 }
 
 @MainActor
-private final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     private let episodeURL: URL
     private let baseURL: URL
+    private let playback: PlaybackState
+    private var active = true
+    private var requestTask: Task<Void, Never>?
+    private var nativeTimer: Timer?
+    private var endedObserver: NSObjectProtocol?
+    private var webEnded = false
+    private var verificationTimer: Timer?
     private var directWebView: WKWebView?
     private var fallbackWebView: WKWebView?
     private var playerController: AVPlayerViewController?
@@ -46,9 +36,10 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
     private var fallbackLoadedURL: URL?
     private let loadingLabel = UILabel()
 
-    init(episodeURL: URL, baseURL: URL) {
+    init(episodeURL: URL, baseURL: URL, playback: PlaybackState) {
         self.episodeURL = episodeURL
         self.baseURL = baseURL
+        self.playback = playback
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -60,23 +51,57 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
         loadingLabel.text = "Đang tải thông tin video…"
         loadingLabel.textColor = .white
         loadingLabel.textAlignment = .center
+        loadingLabel.isHidden = true
         loadingLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(loadingLabel)
         NSLayoutConstraint.activate([
             loadingLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             loadingLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
+        playback.command = { [weak self] name, value in self?.perform(name, value: value) }
         attemptDirectPlayer()
     }
 
-    override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
+    func shutdown() {
+        guard active else { return }
+        active = false
+        requestTask?.cancel()
         fallbackTimer?.invalidate()
         revealTimer?.invalidate()
+        nativeTimer?.invalidate()
+        verificationTimer?.invalidate()
+        if let endedObserver { NotificationCenter.default.removeObserver(endedObserver) }
+        playerController?.player?.pause()
+        playerController?.player?.replaceCurrentItem(with: nil)
         for webView in [directWebView, fallbackWebView] {
-            ["videoFound", "iframeFound", "playerReady", "playerError"].forEach {
+            webView?.evaluateJavaScript("document.querySelectorAll('video').forEach(v=>v.pause())")
+            webView?.stopLoading()
+            webView?.navigationDelegate = nil
+            ["videoFound", "iframeFound", "playerReady", "playerError", "mediaState"].forEach {
                 webView?.configuration.userContentController.removeScriptMessageHandler(forName: $0)
             }
+        }
+    }
+
+    private func perform(_ name: String, value: Double) {
+        guard active else { return }
+        if let player = playerController?.player {
+            switch name {
+            case "play": player.playImmediately(atRate: Float(playback.rate))
+            case "pause": player.pause()
+            case "seek":
+                let target = min(max(0, value), max(0, playback.duration))
+                player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+            case "rate": if player.rate != 0 { player.rate = Float(value) }
+            case "volume": player.volume = Float(value)
+            case "fit": playerController?.videoGravity = value == 1 ? .resizeAspectFill : .resizeAspect
+            default: break
+            }
+        } else {
+            let payload: [String: Any] = ["type": "AnPinimeCommand", "name": name, "value": value]
+            guard let data = try? JSONSerialization.data(withJSONObject: payload),
+                  let json = String(data: data, encoding: .utf8) else { return }
+            fallbackWebView?.evaluateJavaScript("window.postMessage(\(json),'*')")
         }
     }
 
@@ -85,13 +110,14 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
         request.setValue(AnimeService.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue(baseURL.absoluteString, forHTTPHeaderField: "Referer")
 
-        Task { [weak self] in
+        requestTask = Task { [weak self] in
             guard let self else { return }
             do {
                 let configuration = URLSessionConfiguration.default
                 configuration.httpCookieStorage = .shared
                 configuration.httpShouldSetCookies = true
                 let (data, response) = try await URLSession(configuration: configuration).data(for: request)
+                guard self.active, !Task.isCancelled else { return }
                 guard let http = response as? HTTPURLResponse, (200..<400).contains(http.statusCode),
                       let html = String(data: data, encoding: .utf8),
                       let values = HTMLParser.playerParameters(from: html) else {
@@ -100,12 +126,14 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
                 }
                 self.startDirect(parameters: PlayerParameters(filmID: values.filmID, hash: values.hash))
             } catch {
+                guard self.active, !Task.isCancelled else { return }
                 self.startFallback()
             }
         }
     }
 
     private func startDirect(parameters: PlayerParameters) {
+        guard active else { return }
         loadingLabel.text = "Đang giải mã luồng phát…"
         let configuration = playerConfiguration(injectFallbackScript: false)
         let webView = WKWebView(frame: .zero, configuration: configuration)
@@ -129,8 +157,11 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
     }
 
     private func startFallback(url requestedURL: URL? = nil) {
-        guard playerController == nil else { return }
+        guard active, playerController == nil else { return }
         fallbackTimer?.invalidate()
+        ["videoFound", "iframeFound", "playerReady", "playerError", "mediaState"].forEach {
+            directWebView?.configuration.userContentController.removeScriptMessageHandler(forName: $0)
+        }
         directWebView?.stopLoading()
         directWebView?.removeFromSuperview()
         directWebView = nil
@@ -139,7 +170,6 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
         if let webView = fallbackWebView {
             guard fallbackLoadedURL?.absoluteString != targetURL.absoluteString else { return }
             fallbackLoadedURL = targetURL
-            loadingLabel.isHidden = false
             loadingLabel.text = "Đang mở trình phát toàn màn hình…"
             webView.isHidden = true
             webView.load(playerRequest(for: targetURL))
@@ -167,6 +197,9 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         fallbackWebView = webView
+        verificationTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.inspectVerification() }
+        }
         fallbackLoadedURL = targetURL
         webView.load(playerRequest(for: targetURL))
         scheduleFallbackReveal(for: webView)
@@ -181,10 +214,11 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
 
     private func scheduleFallbackReveal(for webView: WKWebView) {
         revealTimer?.invalidate()
-        revealTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self, weak webView] _ in
+        revealTimer = Timer.scheduledTimer(withTimeInterval: 35, repeats: false) { [weak self, weak webView] _ in
             Task { @MainActor in
-                guard let self, let webView, webView === self.fallbackWebView, webView.isHidden else { return }
-                self.loadingLabel.text = "Không tìm thấy luồng phát cho tập này"
+                guard let self, let webView, self.active, webView === self.fallbackWebView,
+                      self.playback.loading, !self.playback.verification else { return }
+                self.playback.error = "Chưa thể phát tập này. Hãy thử tải lại luồng phát."
             }
         }
     }
@@ -194,7 +228,7 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
         configuration.websiteDataStore = .default()
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
-        ["videoFound", "iframeFound", "playerReady", "playerError"].forEach {
+        ["videoFound", "iframeFound", "playerReady", "playerError", "mediaState"].forEach {
             configuration.userContentController.add(self, name: $0)
         }
         if injectFallbackScript {
@@ -208,12 +242,16 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
     }
 
     private func showNativePlayer(url: URL) {
+        guard active, playerController == nil else { return }
         fallbackTimer?.invalidate()
         let headers = ["User-Agent": AnimeService.userAgent, "Referer": episodeURL.absoluteString]
         let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let player = AVPlayer(playerItem: AVPlayerItem(asset: asset))
         let controller = AVPlayerViewController()
         controller.player = player
+        controller.showsPlaybackControls = false
+        controller.videoGravity = playback.fill ? .resizeAspectFill : .resizeAspect
+        player.volume = Float(playback.volume)
         addChild(controller)
         controller.view.frame = view.bounds
         controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -224,23 +262,77 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
         revealTimer?.invalidate()
         directWebView?.removeFromSuperview()
         fallbackWebView?.isHidden = true
-        player.play()
+        player.playImmediately(atRate: Float(playback.rate))
+        endedObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.active else { return }
+                self.playback.playing = false
+                self.playback.endCount += 1
+            }
+        }
+        nativeTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.updateNativeState() }
+        }
+    }
+
+    private func updateNativeState() {
+        guard active, let player = playerController?.player, let item = player.currentItem else { return }
+        if item.status == .failed {
+            nativeTimer?.invalidate()
+            if let endedObserver { NotificationCenter.default.removeObserver(endedObserver); self.endedObserver = nil }
+            player.pause()
+            playerController?.willMove(toParent: nil)
+            playerController?.view.removeFromSuperview()
+            playerController?.removeFromParent()
+            playerController = nil
+            startFallback()
+            return
+        }
+        let duration = item.duration.seconds
+        let time = player.currentTime().seconds
+        if duration.isFinite { playback.duration = max(0, duration) }
+        if time.isFinite { playback.currentTime = max(0, time) }
+        playback.playing = player.timeControlStatus == .playing
+        playback.buffering = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+        if item.status == .readyToPlay { playback.loading = false; playback.error = nil }
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard active else { return }
         switch message.name {
         case "videoFound":
+            // Keep a working web stream in its authenticated browser session.
+            guard message.webView === directWebView else { return }
             guard let value = message.body as? String, let url = resolvedURL(from: value) else { return }
             showNativePlayer(url: url)
         case "iframeFound":
             guard let value = message.body as? String, let url = resolvedURL(from: value) else { return }
             startFallback(url: url)
         case "playerReady":
-            revealTimer?.invalidate()
+            guard playerController == nil else { return }
             fallbackWebView?.isHidden = false
-            loadingLabel.isHidden = true
+        case "mediaState":
+            guard playerController == nil, let state = message.body as? [String: Any] else { return }
+            if let time = state["time"] as? Double, time.isFinite { playback.currentTime = max(0, time) }
+            if let duration = state["duration"] as? Double, duration.isFinite { playback.duration = max(0, duration) }
+            playback.playing = (state["paused"] as? Bool) == false
+            playback.buffering = (state["buffering"] as? Bool) == true
+            if (state["ready"] as? Bool) == true {
+                let wasLoading = playback.loading
+                playback.loading = false; playback.verification = false; playback.error = nil
+                revealTimer?.invalidate()
+                fallbackWebView?.isHidden = false
+                if wasLoading {
+                    perform("rate", value: playback.rate)
+                    perform("volume", value: playback.volume)
+                    perform("fit", value: playback.fill ? 1 : 0)
+                }
+            }
+            let ended = (state["ended"] as? Bool) == true
+            if ended && !webEnded { playback.endCount += 1 }
+            webEnded = ended
         case "playerError":
-            if let detail = message.body as? String { print("[AnyAnime Player] \(detail)") }
+            if let detail = message.body as? String { print("[AnPinime Player] \(detail)") }
             startFallback()
         default:
             break
@@ -258,35 +350,36 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard webView === fallbackWebView else { return }
-        webView.evaluateJavaScript("window.__anyanimeFocusPlayer ? window.__anyanimeFocusPlayer() : false") { [weak self, weak webView] result, _ in
-            Task { @MainActor in
-                guard let self, let webView, webView === self.fallbackWebView else { return }
-                if (result as? Bool) == true {
-                    self.revealTimer?.invalidate()
-                    webView.isHidden = false
-                    self.loadingLabel.isHidden = true
-                } else {
-                    webView.evaluateJavaScript("/cloudflare|captcha|verify you are human|checking your browser/i.test(document.title+' '+(document.body&&document.body.innerText||''))") { result, _ in
-                        Task { @MainActor in
-                            if (result as? Bool) == true {
-                                webView.isHidden = false
-                                self.loadingLabel.isHidden = true
-                            }
-                        }
-                    }
-                }
+        webView.evaluateJavaScript("window.__anyanimeFocusPlayer && window.__anyanimeFocusPlayer()")
+        inspectVerification()
+    }
+
+    private func inspectVerification() {
+        guard active, playerController == nil, let webView = fallbackWebView, !webView.isLoading else { return }
+        webView.evaluateJavaScript(WebsiteSession.pageInspection) { [weak self, weak webView] result, _ in
+            guard let self, self.active, let webView, let page = result as? [String: Any], let html = page["html"] as? String else { return }
+            let challenge = HTMLParser.containsVerification(html)
+            if challenge && (page["interactive"] as? Bool) == true {
+                self.playback.verification = true
+                webView.isHidden = false
+                webView.scrollView.isScrollEnabled = true
+            } else if !challenge && self.playback.verification {
+                self.playback.verification = false
+                webView.scrollView.isScrollEnabled = false
+                self.scheduleFallbackReveal(for: webView)
+                webView.evaluateJavaScript("window.__anyanimeFocusPlayer && window.__anyanimeFocusPlayer()")
             }
         }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        guard active, (error as NSError).code != NSURLErrorCancelled else { return }
         if webView === directWebView { startFallback() }
-        else { loadingLabel.text = "Không tải được video: \(error.localizedDescription)" }
+        else { playback.error = "Không tải được video: \(error.localizedDescription)" }
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        if webView === directWebView { startFallback() }
-        else { loadingLabel.text = "Không kết nối được trình phát" }
+        self.webView(webView, didFail: navigation, withError: error)
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
@@ -361,8 +454,32 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
           if(window.__anyanimeInstalled)return; window.__anyanimeInstalled=true;
           var hidden=['.Adv','.ad-center','.ads','.advertisement','[class*="ads"]','[class*="banner"]','[id*="ads"]','iframe[src*="ads"]','.popup','.modal-backdrop','.header-ads-pc','.Adv.ad-center-header','header','footer','.footer','.header','.sidebar','.breadcrumb','.comments','.film-info','.heading-film','.list-episode-box','.server-list','.film-thumb','.film-desc','.film-buttons','.category-heading','.block-film','nav','.navbar','.menu'];
           var reportedFrames={};
+          var activeVideo=null;
           function send(name,value){try{window.webkit.messageHandlers[name].postMessage(value);}catch(e){}}
-          function important(el,key,value){if(el)el.style.setProperty(key,value,'important');}
+          function important(el,key,value){if(el&&(el.style.getPropertyValue(key)!==value||el.style.getPropertyPriority(key)!=='important'))el.style.setProperty(key,value,'important');}
+          function challenge(){return /just a moment|xác minh an toàn|xác minh bảo mật|verify you are human|checking your browser/i.test(document.title)||!!document.querySelector('#challenge-form');}
+          function state(){
+            var v=activeVideo;if(!v)return;
+            send('mediaState',{time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3,ready:v.readyState>=2,ended:v.ended});
+          }
+          window.addEventListener('message',function(event){
+            var c=event.data;if(!c||c.type!=='AnPinimeCommand')return;
+            var v=activeVideo||document.querySelector('video');
+            if(v){
+              try{
+                switch(c.name){
+                  case 'play':var p=v.play();if(p&&p.catch)p.catch(function(){});break;
+                  case 'pause':v.pause();break;
+                  case 'seek':if(isFinite(v.duration))v.currentTime=Math.max(0,Math.min(Number(c.value)||0,v.duration));break;
+                  case 'rate':v.playbackRate=Math.max(0.5,Math.min(Number(c.value)||1,2));break;
+                  case 'volume':v.volume=Math.max(0,Math.min(Number(c.value)||0,1));break;
+                  case 'fit':v.__anpinimeFill=c.value===1;important(v,'object-fit',v.__anpinimeFill?'cover':'contain');break;
+                }
+                state();
+              }catch(e){}
+            }
+            document.querySelectorAll('iframe').forEach(function(f){try{f.contentWindow.postMessage(c,'*');}catch(e){}});
+          });
           function hideChrome(){
             hidden.forEach(function(s){try{document.querySelectorAll(s).forEach(function(e){important(e,'display','none');});}catch(e){}});
             important(document.documentElement,'margin','0'); important(document.documentElement,'padding','0');
@@ -396,13 +513,14 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
           }
           function watch(v){
             if(!v)return false;
-            isolate(v); important(v,'object-fit','contain'); v.setAttribute('playsinline','');
+            activeVideo=v;
+            isolate(v); important(v,'object-fit',v.__anpinimeFill?'cover':'contain'); v.setAttribute('playsinline','');v.controls=false;
             if(!v.__aa){
               v.__aa=true;
-              ['playing','loadeddata','canplay'].forEach(function(name){v.addEventListener(name,function(){var s=mediaURL(v);if(/^https?:/i.test(s))send('videoFound',s);});});
+              ['playing','loadeddata','canplay','pause','waiting','ended','durationchange'].forEach(function(name){v.addEventListener(name,state);});
+              var p=v.play();if(p&&p.catch)p.catch(function(){});
             }
-            var s=mediaURL(v); if(/^https?:/i.test(s))send('videoFound',s);
-            var p=v.play(); if(p&&p.catch)p.catch(function(){});
+            state();
             return true;
           }
           function usefulFrame(frame){
@@ -412,6 +530,7 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
             return rect.width>=240&&rect.height>=120;
           }
           function focus(){
+            if(challenge())return false;
             hideChrome();
             var videos=document.querySelectorAll('video');
             if(videos.length)return watch(videos[0]);
@@ -433,10 +552,11 @@ private final class AnimePlayerViewController: UIViewController, WKNavigationDel
           window.__anyanimeFocusPlayer=focus;
           function install(){
             if(!document.documentElement){setTimeout(install,20);return;}
-            hideChrome(); focus();
+            focus();
             new MutationObserver(function(){focus();}).observe(document.documentElement,{childList:true,subtree:true});
             var tries=0,timer=setInterval(function(){focus();if(++tries>120)clearInterval(timer);},500);
-            setTimeout(function(){var b=document.querySelector('.jw-icon-playback,.play-btn,[class*="play-button"],button[aria-label*="Play"],button[title*="Play"]');if(b)b.click();focus();},1800);
+            setInterval(state,500);
+            setTimeout(function(){if(activeVideo||challenge())return;var b=document.querySelector('.jw-icon-playback,.play-btn,[class*="play-button"],button[aria-label*="Play"],button[title*="Play"]');if(b)b.click();focus();},1800);
           }
           if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
         })();

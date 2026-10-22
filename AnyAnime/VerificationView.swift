@@ -1,121 +1,141 @@
 import SwiftUI
 import WebKit
 
-struct VerificationView: View {
-    @Environment(\.dismiss) private var dismiss
-    let url: URL
-    let onVerified: (URL?) -> Void
-    @StateObject private var browser = VerificationBrowser()
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    Image(systemName: "shield.lefthalf.filled").foregroundColor(.orange)
-                    Text(browser.status).font(.caption).lineLimit(2)
-                    Spacer()
-                }
-                .padding(10)
-                .background(Color.secondary.opacity(0.12))
-
-                VerificationWebView(browser: browser)
-
-                HStack {
-                    Button { browser.reload() } label: { Label("Tải lại", systemImage: "arrow.clockwise") }
-                    Spacer()
-                    Button("Đã xác minh — thử lại") {
-                        Task {
-                            let finalURL = await browser.copyCookiesAndCurrentURL()
-                            onVerified(finalURL)
-                            dismiss()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                }
-                .padding()
-            }
-            .navigationTitle("Xác minh website")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Đóng") { dismiss() }
-                }
-            }
-        }
-        .onAppear { browser.start(url) }
-    }
-}
-
-private struct VerificationWebView: UIViewRepresentable {
-    @ObservedObject var browser: VerificationBrowser
-    func makeUIView(context: Context) -> WKWebView { browser.webView }
-    func updateUIView(_ uiView: WKWebView, context: Context) { }
-}
-
+/// Ordinary browser pages stay hidden; only interactive challenges are shown.
 @MainActor
-private final class VerificationBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
-    @Published var status = "Hoàn tất ô xác minh của AnimeVietsub bên dưới"
+final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
+    @Published var needsInteraction = false
     let webView: WKWebView
-    private var started = false
+    private var pending: CheckedContinuation<(String, URL), Error>?
+    private var queue: [(URL, CheckedContinuation<(String, URL), Error>)] = []
+    private var timer: Timer?
+    private var deadline = Date()
+    private var inspecting = false
+    private var targetURL: URL?
 
     override init() {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
-        configuration.allowsInlineMediaPlayback = true
-        webView = WKWebView(frame: .zero, configuration: configuration)
+        webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 720), configuration: configuration)
         super.init()
         webView.customUserAgent = AnimeService.userAgent
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        webView.allowsBackForwardNavigationGestures = true
     }
 
-    func start(_ url: URL) {
-        guard !started else { return }
-        started = true
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 45)
-        request.setValue("vi-VN,vi;q=0.9,en;q=0.8", forHTTPHeaderField: "Accept-Language")
-        webView.load(request)
+    func load(_ url: URL) async throws -> (String, URL) {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.append((url, continuation))
+            startNext()
+        }
     }
 
-    func reload() { webView.reload() }
+    private func startNext() {
+        guard pending == nil, !queue.isEmpty else { return }
+        let request = queue.removeFirst()
+        pending = request.1
+        targetURL = request.0
+        deadline = Date().addingTimeInterval(45)
+        webView.load(URLRequest(url: request.0, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 40))
+        timer = Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.inspectPage() }
+        }
+    }
 
-    func copyCookiesAndCurrentURL() async -> URL? {
+    private func inspectPage() {
+        guard pending != nil, !inspecting else { return }
+        if Date() > deadline {
+            finish(.failure(AnimeServiceError.http(403)))
+            return
+        }
+        guard !webView.isLoading else { return }
+        inspecting = true
+        webView.evaluateJavaScript(Self.pageInspection) { [weak self] result, _ in
+            guard let self else { return }
+            self.inspecting = false
+            guard self.pending != nil, let page = result as? [String: Any],
+                  let html = page["html"] as? String, let url = self.webView.url,
+                  url.scheme == "https", !html.isEmpty else { return }
+            if !HTMLParser.containsVerification(html) {
+                Task { @MainActor in
+                    await self.copyCookies()
+                    guard self.pending != nil else { return }
+                    self.finish(.success((html, url)))
+                }
+            } else if (page["interactive"] as? Bool) == true, !self.needsInteraction {
+                self.deadline = Date().addingTimeInterval(180)
+                self.needsInteraction = true
+            }
+        }
+    }
+
+    func copyCookies() async {
         let cookies: [HTTPCookie] = await withCheckedContinuation { continuation in
             webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { continuation.resume(returning: $0) }
         }
         for cookie in cookies { HTTPCookieStorage.shared.setCookie(cookie) }
-        return webView.url
     }
 
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        status = "Đang tải trang xác minh…"
+    func cancel() { finish(.failure(CancellationError())) }
+
+    private func finish(_ result: Result<(String, URL), Error>) {
+        timer?.invalidate()
+        timer = nil
+        webView.stopLoading()
+        needsInteraction = false
+        let continuation = pending
+        pending = nil
+        continuation?.resume(with: result)
+        startNext()
     }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        status = "Hoàn tất CAPTCHA nếu có, sau đó bấm “Đã xác minh”"
-    }
-
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { inspectPage() }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        status = "Lỗi tải: \(error.localizedDescription)"
+        if (error as NSError).code != NSURLErrorCancelled { finish(.failure(error)) }
     }
-
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        status = "Lỗi kết nối: \(error.localizedDescription)"
+        self.webView(webView, didFail: navigation, withError: error)
     }
-
-    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
-                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
-        let alert = UIAlertController(title: "AnimeVietsub", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
-        topViewController()?.present(alert, animated: true)
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard navigationAction.targetFrame?.isMainFrame == true else { decisionHandler(.allow); return }
+        let host = navigationAction.request.url?.host?.lowercased() ?? ""
+        let allowed = host == targetURL?.host || host.hasPrefix("animevietsub.") || host.hasPrefix("www.animevietsub.")
+        decisionHandler(allowed ? .allow : .cancel)
     }
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
 
-    private func topViewController() -> UIViewController? {
-        var root = webView.window?.rootViewController
-        while let presented = root?.presentedViewController { root = presented }
-        return root
+    static let pageInspection = """
+    (() => {
+      const visible = e => { const r=e.getBoundingClientRect(); const s=getComputedStyle(e); return r.width>10 && r.height>10 && s.display!=='none' && s.visibility!=='hidden'; };
+      return {html:document.documentElement.outerHTML, interactive:Array.from(document.querySelectorAll('iframe[src*="challenges.cloudflare.com"],iframe[src*="recaptcha"],iframe[src*="hcaptcha"],.cf-turnstile,.g-recaptcha,.h-captcha,#challenge-stage input[type="checkbox"]')).some(visible)};
+    })()
+    """
+}
+
+struct VerificationGate: View {
+    @ObservedObject var browser: WebsiteSession
+    var body: some View {
+        Color.clear.frame(width: 0, height: 0)
+            .sheet(isPresented: $browser.needsInteraction) {
+                NavigationView {
+                    VerificationWebView(browser: browser)
+                        .navigationTitle("Xác minh kết nối")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Đóng") { browser.cancel() }
+                            }
+                        }
+                }
+                .interactiveDismissDisabled()
+            }
     }
 }
 
+private struct VerificationWebView: UIViewRepresentable {
+    let browser: WebsiteSession
+    func makeUIView(context: Context) -> WKWebView { browser.webView }
+    func updateUIView(_ uiView: WKWebView, context: Context) { }
+}

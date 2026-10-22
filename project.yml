@@ -18,10 +18,14 @@ targets:
       - path: AnyAnime
         excludes:
           - Info.plist
+      - path: logo.png
+        buildPhase: resources
+      - path: Code_Generated_Image.gif
+        buildPhase: resources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.34306.anyani
-        PRODUCT_NAME: AnyAnime
+        PRODUCT_BUNDLE_IDENTIFIER: com.xemphim.aipinime
+        PRODUCT_NAME: anpinime
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: AnyAnime/Info.plist
         TARGETED_DEVICE_FAMILY: '1,2'
@@ -37,4 +41,3 @@ schemes:
       config: Debug
     archive:
       config: Release
-

@@ -14,18 +14,11 @@ struct RootView: View {
             NavigationView { BrowseView() }
                 .tabItem { Label("Thể loại", systemImage: "square.grid.2x2.fill") }
 
-            NavigationView { AboutView() }
-                .tabItem { Label("Giới thiệu", systemImage: "info.circle.fill") }
+            NavigationView { AppSettingsView() }
+                .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
         }
-        .tint(.red)
-        .sheet(isPresented: $service.needsVerification) {
-            VerificationView(url: service.verificationURL) { finalURL in
-                Task {
-                    await service.verificationCompleted(at: finalURL)
-                    await service.loadHome(forceDomainRefresh: false)
-                }
-            }
-        }
+        .tint(.anpinimeAccent)
+        .background(VerificationGate(browser: service.website))
     }
 }
 
@@ -56,7 +49,7 @@ struct HomeView: View {
                 .refreshable { await service.loadHome(forceDomainRefresh: true) }
             }
         }
-        .navigationTitle("AnyAnime")
+        .navigationTitle("AnPinime")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { Task { await service.loadHome(forceDomainRefresh: true) } } label: {
@@ -243,34 +236,49 @@ struct AnimeSearchView: View {
     }
 }
 
-struct AboutView: View {
+struct AppSettingsView: View {
     @EnvironmentObject private var service: AnimeService
+    @AppStorage("AnPinime.autoNext") private var autoNext = true
+    @AppStorage("AnPinime.rememberSpeed") private var rememberSpeed = true
+    @AppStorage("AnPinime.skipSeconds") private var skipSeconds = 10
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                Image(systemName: "play.rectangle.fill")
-                    .font(.system(size: 72))
-                    .foregroundColor(.red)
-                Text("AnyAnime").font(.largeTitle.bold())
-                Text("Phiên bản viết lại native cho iOS 15+")
-                    .foregroundColor(.secondary)
-                Divider()
-                Text("Ứng dụng đọc dữ liệu công khai từ AnimeVietsub. Tên miền được xác định lại từ shortlink mỗi khi cần, nên không bị khóa vào một domain cố định.")
-                    .multilineTextAlignment(.center)
-                DomainStatusView()
-                Link("Mở shortlink nguồn", destination: URL(string: "https://bit.ly/animevietsubtv")!)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                Text("Nội dung và máy chủ phát thuộc website nguồn. Ứng dụng không tự động vượt CAPTCHA; khi website yêu cầu, bạn cần xác minh trong cửa sổ trình duyệt tích hợp.")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+        Form {
+            Section {
+                VStack(spacing: 10) {
+                    Image("logo").resizable().scaledToFit().frame(width: 112, height: 112).cornerRadius(26)
+                    Text("AnPinime").font(.largeTitle.bold())
+                    Text("Một thế giới anime. Một nơi dành cho bạn.")
+                        .font(.subheadline).foregroundColor(.secondary).multilineTextAlignment(.center)
+                }.frame(maxWidth: .infinity).padding(.vertical, 16)
             }
-            .padding(24)
+            Section("Trải nghiệm xem") {
+                Toggle("Tự phát tập tiếp theo", isOn: $autoNext)
+                Toggle("Ghi nhớ tốc độ phát", isOn: $rememberSpeed)
+                Picker("Tua nhanh / tua lại", selection: $skipSeconds) {
+                    ForEach([5, 10, 15, 30], id: \.self) { Text("\($0) giây").tag($0) }
+                }
+            }
+            Section("Kết nối") {
+                LabeledContentCompat(title: "Máy chủ", value: service.baseURL.host ?? "Đang kết nối")
+                Button("Làm mới danh sách và kết nối") { Task { await service.loadHome(forceDomainRefresh: true) } }
+                    .disabled(service.homeLoading)
+            }
+            Section("Giới thiệu") {
+                LabeledContentCompat(title: "Ứng dụng", value: "AnPinime")
+                LabeledContentCompat(title: "Phiên bản", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.1.0")
+                Text("Khám phá anime, chọn tập yêu thích và tận hưởng từng khung hình.")
+                    .font(.footnote).foregroundColor(.secondary)
+            }
         }
-        .navigationTitle("Giới thiệu")
+        .navigationTitle("Cài đặt")
     }
+}
+
+private struct LabeledContentCompat: View {
+    let title: String
+    let value: String
+    var body: some View { HStack { Text(title); Spacer(); Text(value).foregroundColor(.secondary) } }
 }
 
 private struct SearchResultRow: View {
@@ -356,8 +364,13 @@ struct Badge: View {
 struct LoadingView: View {
     let text: String
     var body: some View {
-        VStack(spacing: 12) { ProgressView(); Text(text).foregroundColor(.secondary) }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+            Color(red: 0.025, green: 0.02, blue: 0.055).ignoresSafeArea()
+            VStack(spacing: 12) {
+                AnimatedListLoader().frame(width: 210, height: 210).blendMode(.screen)
+                Text(text).font(.subheadline).foregroundColor(.white.opacity(0.65))
+            }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -381,4 +394,3 @@ struct EmptyStateView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
-

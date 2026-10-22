@@ -8,9 +8,8 @@ final class AnimeService: ObservableObject {
     @Published private(set) var homeSections: [AnimeSection] = []
     @Published private(set) var homeLoading = false
     @Published private(set) var status = "Đang xác định máy chủ AnimeVietsub…"
-    @Published var needsVerification = false
-    @Published private(set) var verificationURL = URL(string: "https://bit.ly/animevietsubtv")!
     @Published private(set) var verificationGeneration = 0
+    let website = WebsiteSession()
 
     let categories: [AnimeCategory] = [
         .init(title: "TV/Series", path: "/anime-bo/"),
@@ -116,22 +115,7 @@ final class AnimeService: ObservableObject {
     }
 
     func register(_ error: Error) {
-        if case AnimeServiceError.verificationRequired(let url) = error {
-            verificationURL = url
-            needsVerification = true
-            status = "Cần xác minh website để tiếp tục"
-        } else {
-            status = error.localizedDescription
-        }
-    }
-
-    func verificationCompleted(at url: URL?) async {
-        if let url, let accepted = await resolver.acceptResolvedURL(url) {
-            baseURL = accepted
-        }
-        needsVerification = false
-        verificationGeneration += 1
-        status = "Đã xác minh, đang tải lại dữ liệu…"
+        status = error is CancellationError ? "Kết nối đã tạm dừng. Bạn có thể thử lại." : error.localizedDescription
     }
 
     private func fetchHTML(url: URL) async throws -> String {
@@ -146,7 +130,9 @@ final class AnimeService: ObservableObject {
             ?? ""
 
         if http.statusCode == 403 || HTMLParser.containsVerification(html) {
-            throw AnimeServiceError.verificationRequired(responseURL)
+            let (browserHTML, browserURL) = try await website.load(responseURL)
+            if let accepted = await resolver.acceptResolvedURL(browserURL) { baseURL = accepted }
+            return browserHTML
         }
         guard (200..<400).contains(http.statusCode) else { throw AnimeServiceError.http(http.statusCode) }
         guard !html.isEmpty else { throw AnimeServiceError.emptyData }
@@ -165,4 +151,3 @@ final class AnimeService: ObservableObject {
         return url
     }
 }
-
