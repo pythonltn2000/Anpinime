@@ -12,7 +12,7 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +55,7 @@ jobs:
 
   preview:
     if: github.event_name == 'workflow_dispatch' && inputs.preview
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - run: brew install xcodegen
@@ -71,6 +71,22 @@ jobs:
           xcrun simctl install "$ANPINIME_SIMULATOR_ID" build-simulator/Build/Products/Debug-iphonesimulator/anpinime.app
           xcrun simctl ui "$ANPINIME_SIMULATOR_ID" appearance dark
           mkdir -p previews
+          python3 Tests/serve_player.py > "$RUNNER_TEMP/anpinime-media-server.log" 2>&1 &
+          ANPINIME_SERVER_PID=$!
+          trap 'kill "$ANPINIME_SERVER_PID"' EXIT
+          ANPINIME_APP_DATA=$(xcrun simctl get_app_container "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime data)
+          for backend in native web; do
+            flag=--playback-smoke
+            if [ "$backend" = web ]; then flag=--web-playback-smoke; fi
+            xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime "$flag"
+            for attempt in $(seq 1 45); do
+              if [ -f "$ANPINIME_APP_DATA/Documents/playback-$backend.json" ]; then break; fi
+              sleep 1
+            done
+            test -f "$ANPINIME_APP_DATA/Documents/playback-$backend.json"
+            cp "$ANPINIME_APP_DATA/Documents/playback-$backend.json" "previews/playback-$backend.json"
+            xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot "previews/playback-$backend.png"
+          done
           for scene in loading player episodes settings list app-settings; do
             xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime --ui-preview "$scene"
             sleep 7
@@ -79,5 +95,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: AnPinime_Interface_Previews
-          path: previews/*.png
+          path: previews/*
           retention-days: 14

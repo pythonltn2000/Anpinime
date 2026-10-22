@@ -47,7 +47,7 @@ enum HTMLParser {
             let lowerPath = pageURL.path.lowercased()
             guard lowerPath.contains("phim") || lowerPath.hasSuffix(".html") else { continue }
 
-            let imageValue = first(#"(?is)(?:data-original|data-src|src)\s*=\s*[\"']([^\"']+)[\"']"#, in: block)
+            let imageValue = imageSource(in: block)
             let titleValue = first(#"(?is)<h2[^>]*class=[\"'][^\"']*Title[^\"']*[\"'][^>]*>(.*?)</h2>"#, in: block)
                 ?? first(#"(?is)<div[^>]*class=[\"'][^\"']*Title[^\"']*[\"'][^>]*>(.*?)</div>"#, in: block)
                 ?? first(#"(?is)(?:alt|title)\s*=\s*[\"']([^\"']+)[\"']"#, in: block)
@@ -125,6 +125,20 @@ enum HTMLParser {
         if hasContent && !challengeTitle { return false }
         return challengeTitle || value.contains("id=\"challenge-form\"") || value.contains("id='challenge-form'")
             || value.contains("cf-turnstile") || value.contains("g-recaptcha") || value.contains("h-captcha")
+    }
+
+    static func imageSource(in html: String) -> String? {
+        guard let tag = first(#"(?is)(<img\b[^>]*>)"#, in: html) else { return nil }
+        for attribute in ["data-original", "data-src", "data-lazy-src", "data-lazy", "src"] {
+            if let value = first("(?is)(?:^|\\s)" + attribute + #"\s*=\s*["']([^"']+)["']"#, in: tag),
+               !value.isEmpty, !value.lowercased().hasPrefix("data:"), !value.lowercased().contains("blank.gif") {
+                return value
+            }
+        }
+        if let srcset = first(#"(?is)(?:data-srcset|srcset)\s*=\s*["']([^"']+)["']"#, in: tag) {
+            return srcset.split(separator: ",").last?.split(whereSeparator: \.isWhitespace).first.map(String.init)
+        }
+        return nil
     }
 
     static func playerParameters(from html: String) -> (filmID: String, hash: String)? {

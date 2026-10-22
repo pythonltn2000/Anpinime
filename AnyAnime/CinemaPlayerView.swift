@@ -105,8 +105,7 @@ struct PlayerView: View {
                             playerPanel(panel)
                                 .frame(width: min(360, geometry.size.width - 24))
                                 .frame(maxHeight: min(geometry.size.height - 16, 620))
-                                .background(Color(red: 0.075, green: 0.06, blue: 0.11), in: RoundedRectangle(cornerRadius: 24))
-                                .overlay(RoundedRectangle(cornerRadius: 24).stroke(.white.opacity(0.09)))
+                                .cinemaGlass(cornerRadius: 28)
                                 .padding(12)
                         }
                     }
@@ -117,6 +116,7 @@ struct PlayerView: View {
             .foregroundColor(.white)
             .tint(.anpinimeAccent)
         }
+        .background(LandscapePresentation().frame(width: 0, height: 0))
         .statusBar(hidden: !playback.verification)
         .onAppear {
             originalBrightness = UIScreen.main.brightness
@@ -144,10 +144,9 @@ struct PlayerView: View {
 
     private func loadingBackdrop(size: CGSize) -> some View {
         ZStack {
-            AsyncImage(url: artworkURL) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
-                Image("AppLogo").resizable().scaledToFill()
+            Group {
+                if artworkURL != nil { RemoteImage(url: artworkURL) }
+                else { Image("AppLogo").resizable().scaledToFill() }
             }
             .frame(width: size.width, height: size.height).clipped()
             .overlay(Color.black.opacity(0.44))
@@ -160,7 +159,7 @@ struct PlayerView: View {
                     ProgressView().tint(.white.opacity(0.8))
                     Text("Đang chuẩn bị phim của bạn").font(.caption).foregroundColor(.white.opacity(0.65))
                 }
-            }.padding(.horizontal, 36)
+            }.padding(.horizontal, 36).opacity(playback.duration > 0 ? 0 : 1)
         }.ignoresSafeArea().allowsHitTesting(false)
     }
 
@@ -180,7 +179,7 @@ struct PlayerView: View {
                     controlButton("gearshape", "Cài đặt phát") { openPanel("settings") }
                 }
                 Spacer(minLength: 0)
-                if !playback.loading && playback.error == nil {
+                if (!playback.loading || playback.duration > 0) && playback.error == nil {
                     HStack(spacing: size.width > 600 ? 65 : 36) {
                         skipButton(forward: false)
                         Button {
@@ -189,8 +188,7 @@ struct PlayerView: View {
                         } label: {
                             Image(systemName: playback.playing ? "pause.fill" : "play.fill")
                                 .font(.system(size: 32, weight: .semibold)).frame(width: 72, height: 72)
-                                .background(.white.opacity(0.15), in: Circle())
-                                .overlay(Circle().stroke(.white.opacity(0.25)))
+                                .cinemaGlass(cornerRadius: 36, interactive: true)
                         }.accessibilityLabel(playback.playing ? "Tạm dừng" : "Phát")
                         skipButton(forward: true)
                     }
@@ -229,12 +227,14 @@ struct PlayerView: View {
 
     private func controlButton(_ icon: String, _ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: icon).font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44) }
+            .cinemaGlass(cornerRadius: 22, interactive: true)
             .accessibilityLabel(label)
     }
     private func smallButton(_ title: String, _ icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon).font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                .padding(.horizontal, 12).frame(minHeight: 44).background(.white.opacity(0.1), in: Capsule())
+                .padding(.horizontal, 12).frame(minHeight: 44)
+                .cinemaGlass(cornerRadius: 22, interactive: true)
         }
     }
     private func skipButton(forward: Bool) -> some View {

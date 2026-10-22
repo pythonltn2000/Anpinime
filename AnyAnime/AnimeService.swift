@@ -9,6 +9,7 @@ final class AnimeService: ObservableObject {
     @Published private(set) var homeLoading = false
     @Published private(set) var status = "Đang xác định máy chủ AnimeVietsub…"
     @Published private(set) var verificationGeneration = 0
+    @Published private(set) var imageGeneration = 0
     let website = WebsiteSession()
 
     let categories: [AnimeCategory] = [
@@ -82,6 +83,7 @@ final class AnimeService: ObservableObject {
 
             guard !parsed.isEmpty else { throw AnimeServiceError.emptyData }
             homeSections = parsed
+            imageGeneration += 1
             status = "Đã kết nối \(baseURL.host ?? "AnimeVietsub")"
         } catch {
             register(error)
@@ -132,6 +134,7 @@ final class AnimeService: ObservableObject {
         if http.statusCode == 403 || HTMLParser.containsVerification(html) {
             let (browserHTML, browserURL) = try await website.load(responseURL)
             if let accepted = await resolver.acceptResolvedURL(browserURL) { baseURL = accepted }
+            imageGeneration += 1
             return browserHTML
         }
         guard (200..<400).contains(http.statusCode) else { throw AnimeServiceError.http(http.statusCode) }

@@ -325,16 +325,17 @@ struct DomainStatusView: View {
 }
 
 struct RemoteImage: View {
+    @EnvironmentObject private var service: AnimeService
+    @StateObject private var loader = ArtworkLoader()
     let url: URL?
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image): image.resizable().scaledToFill()
-            case .failure: placeholder
-            case .empty: ZStack { placeholder; ProgressView() }
-            @unknown default: placeholder
-            }
+        Group {
+            if let image = loader.image { Image(uiImage: image).resizable().scaledToFill() }
+            else { ZStack { placeholder; if loader.loading { ProgressView() } } }
+        }
+        .task(id: "\(url?.absoluteString ?? "")|\(service.baseURL)|\(service.imageGeneration)") {
+            await loader.load(url, baseURL: service.baseURL, revision: service.imageGeneration)
         }
     }
 

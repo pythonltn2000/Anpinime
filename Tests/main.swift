@@ -16,3 +16,5 @@ let sections = HTMLParser.sections(from: html, baseURL: URL(string: "https://ani
 check(sections.count == 1, "Duplicate updated-anime row is removed")
 check(sections.first?.items.first?.url.absoluteString == "https://animevietsub.example/phim/example-a1/", "Catalog links resolve on current domain")
 print("All parser regressions passed")
+check(HTMLParser.imageSource(in: "<img src='data:image/gif;base64,AAA' data-src='/real-poster.jpg'>") == "/real-poster.jpg", "Lazy poster URL takes priority over inline placeholder")
+check(HTMLParser.imageSource(in: "<img src='/blank.gif' data-original='https://cdn.example/poster.webp'>") == "https://cdn.example/poster.webp", "Original artwork takes priority over placeholder src")
