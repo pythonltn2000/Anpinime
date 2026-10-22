@@ -246,7 +246,7 @@ struct AppSettingsView: View {
         Form {
             Section {
                 VStack(spacing: 10) {
-                    Image("logo").resizable().scaledToFit().frame(width: 112, height: 112).cornerRadius(26)
+                    Image("AppLogo").resizable().scaledToFit().frame(width: 112, height: 112).cornerRadius(26)
                     Text("AnPinime").font(.largeTitle.bold())
                     Text("Một thế giới anime. Một nơi dành cho bạn.")
                         .font(.subheadline).foregroundColor(.secondary).multilineTextAlignment(.center)

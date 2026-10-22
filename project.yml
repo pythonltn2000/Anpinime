@@ -18,8 +18,6 @@ targets:
       - path: AnyAnime
         excludes:
           - Info.plist
-      - path: logo.png
-        buildPhase: resources
       - path: Code_Generated_Image.gif
         buildPhase: resources
     settings:

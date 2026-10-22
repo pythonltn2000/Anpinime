@@ -3,4 +3,4 @@ build/
 DerivedData/
 Payload/
 .DS_Store
-
+dist/

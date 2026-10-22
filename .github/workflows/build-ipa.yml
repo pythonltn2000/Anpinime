@@ -73,7 +73,7 @@ jobs:
           mkdir -p previews
           for scene in loading player episodes settings list app-settings; do
             xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime --ui-preview "$scene"
-            sleep 4
+            sleep 7
             xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot "previews/$scene.png"
           done
       - uses: actions/upload-artifact@v4

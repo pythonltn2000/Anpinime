@@ -4,8 +4,8 @@ import SwiftUI
 /// Deterministic simulator-only screenshots; never included in Release IPA.
 struct InterfacePreview: View {
     static var mode: String { ProcessInfo.processInfo.arguments.last ?? "loading" }
-    private let episodes = (1...24).map {
-        Episode(title: "Tập \($0)", url: URL(string: "https://preview.invalid/phim/tap-\($0)")!, number: $0, season: "Phần 1")
+    private let episodes = (1...24).map { (number: Int) -> Episode in
+        Episode(title: "Tập \(number)", url: URL(string: "https://preview.invalid/phim/tap-\(number)")!, number: number, season: "Phần 1")
     }
     var body: some View {
         if Self.mode == "list" {

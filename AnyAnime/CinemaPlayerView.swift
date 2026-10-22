@@ -147,7 +147,7 @@ struct PlayerView: View {
             AsyncImage(url: artworkURL) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
-                Image("logo").resizable().scaledToFill()
+                Image("AppLogo").resizable().scaledToFill()
             }
             .frame(width: size.width, height: size.height).clipped()
             .overlay(Color.black.opacity(0.44))
