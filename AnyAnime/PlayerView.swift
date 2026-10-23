@@ -167,7 +167,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 self.providerHeaders = resolved.headers
                 self.providerWebURL = resolved.webURL
                 if resolved.isWeb { self.startFallback(url: resolved.url) }
-                else if self.episode.source == .film4k && resolved.url.pathExtension == "m3u8" {
+                else if self.episode.source.isMovie && (resolved.url.pathExtension.lowercased() == "m3u8" || resolved.url.path.hasSuffix("/stream/hls")) {
                     self.filmRelay?.stop()
                     let relay = FilmMediaRelay(origin: self.baseURL, headers: resolved.headers)
                     relay.onQualities = { [weak self] options in
@@ -440,7 +440,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             playback.loading = false; playback.error = nil
         }
         #if DEBUG
-        PlaybackSmokeTest.record(time: time, backend: "native", size: view.bounds.size)
+        PlaybackSmokeTest.record(time: time, backend: "native", size: view.bounds.size, playback: playback)
         #endif
     }
 

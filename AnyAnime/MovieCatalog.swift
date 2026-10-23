@@ -139,7 +139,7 @@ enum MovieCatalog {
     }
 
     static func legacyStream(_ row: Object, base: URL) -> (url: URL, web: Bool)? {
-        for field in ["link_m3u8", "m3u8", "stream_url", "video_url", "link_embed", "embed"] {
+        for field in ["link_m3u8", "m3u8", "stream_url", "video_url", "link", "link_embed", "embed"] {
             if let url = url(row[field], base: base) { return (url, field.contains("embed")) }
         }
         return nil
@@ -152,7 +152,7 @@ enum Phim4KFormat: String, CaseIterable, Identifiable {
     case free1, free2
     var id: String { rawValue }
     var title: String { self == .free1 ? "Kiểu API A" : "Kiểu API B" }
-    var defaultURL: URL { URL(string: self == .free1 ? "https://free1.phim4k.lol" : "https://free2.phim4k.lol")! }
+    var defaultURL: URL { URL(string: self == .free1 ? "https://free.cryboiz.workers.dev" : "https://free2.p4k.dpdns.org")! }
     var listPath: String { self == .free1 ? "danh-sach/phim-moi-cap-nhat-v3" : "api/films/phim-moi-cap-nhat" }
     var detailPath: String { self == .free1 ? "phim/" : "api/film/" }
     var searchPath: String { self == .free1 ? "v1/api/tim-kiem" : "api/films/search" }

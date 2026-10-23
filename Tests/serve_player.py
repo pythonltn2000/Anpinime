@@ -57,8 +57,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             name = path.removeprefix("/wrapped/")
             if name == "master.m3u8":
-                data = b'#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=500000,CODECS="avc1.42c00c,mp4a.40.2"\nmedia.m3u8\n'
+                data = b'#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",LANGUAGE="en",AUTOSELECT=YES,URI="en.m3u8"\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Vietnamese",LANGUAGE="vi",AUTOSELECT=YES,URI="vi.m3u8"\n#EXT-X-STREAM-INF:BANDWIDTH=500000,RESOLUTION=320x180,CODECS="avc1.42c00c,mp4a.40.2",SUBTITLES="subs"\nmedia.m3u8\n'
                 content_type = "application/vnd.apple.mpegurl"
+            elif name in ("en.m3u8", "vi.m3u8"):
+                data = (f'#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:8\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:8,\n{name[:2]}.vtt\n#EXT-X-ENDLIST\n').encode()
+                content_type = "application/vnd.apple.mpegurl"
+            elif name in ("en.vtt", "vi.vtt"):
+                data = ("WEBVTT\nX-TIMESTAMP-MAP=MPEGTS:0,LOCAL:00:00:00.000\n\n00:00:00.000 --> 00:00:08.000\n" + ("Phụ đề kiểm thử" if name == "vi.vtt" else "Subtitle test") + "\n").encode()
+                content_type = "text/vtt"
             elif name == "media.m3u8":
                 data = Path(__file__).with_name("wrapped-hls").joinpath(name).read_bytes()
                 content_type = "application/vnd.apple.mpegurl"

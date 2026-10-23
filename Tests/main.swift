@@ -45,6 +45,10 @@ check(free1Detail.episodes.first?.source == .phim4k, "Free1 detail maps episodes
 let free2 = try MovieCatalog.object(Data(#"{"movie":{"name":"Legacy film","episodes":[{"server_name":"Server A","items":[{"name":"01","embed":"https://embed.example/b"}]}]}}"#.utf8))
 let free2Detail = try MovieCatalog.legacyDetail(free2, anime: legacy)
 check(free2Detail.episodes.count == 1, "Free2 nested episodes and embed links are supported")
+let runtimeDetail = try MovieCatalog.object(Data(#"{"movie":{"name":"Runtime movie"},"episodes":[{"server_name":"Vietsub","server_data":[{"name":"01","link":"https://stream.example/api/content/stream/hls?movie=test&server=Vietsub&slug=01"}]},{"server_name":"Lồng tiếng","server_data":[{"name":"01","link":"https://stream.example/api/content/stream/hls?movie=test&server=Dub&slug=01"}]}]}"#.utf8))
+let runtimeEpisodes = try MovieCatalog.legacyDetail(runtimeDetail, anime: legacy).episodes
+check(runtimeEpisodes.count == 2 && runtimeEpisodes[0].season != runtimeEpisodes[1].season, "Runtime API link fields preserve separate subtitled/dubbed servers")
+check(MovieCatalog.legacyStream(["link":"https://stream.example/api/content/stream/hls?movie=test"], base: legacyBase)?.web == false, "Extensionless HLS resolver links use native playback rather than a website")
 check(MovieCatalog.url("javascript:alert(1)", base: filmBase) == nil, "Provider metadata cannot become executable URL schemes")
 var otherSource = film
 otherSource.source = .phim4k

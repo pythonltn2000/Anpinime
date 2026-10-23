@@ -110,6 +110,19 @@ jobs:
           xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot previews/film4k-live.png
           test -f "$ANPINIME_APP_DATA/Documents/playback-film4k-live.json"
           cp "$ANPINIME_APP_DATA/Documents/playback-film4k-live.json" previews/
+      - name: Check live source 2 playback
+        continue-on-error: true
+        run: |
+          ANPINIME_SIMULATOR_ID=$(xcrun simctl list devices booted -j | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(Object.values(JSON.parse(s).devices).flat()[0].udid))')
+          ANPINIME_APP_DATA=$(xcrun simctl get_app_container "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime data)
+          xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime --phim4k-live-smoke
+          for attempt in $(seq 1 90); do
+            if [ -f "$ANPINIME_APP_DATA/Documents/playback-phim4k-live.json" ]; then break; fi
+            sleep 1
+          done
+          xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot previews/phim4k-live.png
+          test -f "$ANPINIME_APP_DATA/Documents/playback-phim4k-live.json"
+          cp "$ANPINIME_APP_DATA/Documents/playback-phim4k-live.json" previews/
       - uses: actions/upload-artifact@v4
         if: always()
         with:

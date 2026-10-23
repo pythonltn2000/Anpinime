@@ -47,7 +47,11 @@ final class MovieProvider {
             }
             candidates = [(url, selected)]
         } else {
-            candidates = Phim4KFormat.allCases.map { ($0.defaultURL, $0) }
+            #if DEBUG
+            candidates = PlaybackSmokeTest.providerFixture ? [] : await MovieSourceDirectory.candidates(session: session)
+            #else
+            candidates = await MovieSourceDirectory.candidates(session: session)
+            #endif
         }
         #if DEBUG
         if PlaybackSmokeTest.providerFixture { candidates = [(URL(string: "http://127.0.0.1:8765")!, .free1)] }

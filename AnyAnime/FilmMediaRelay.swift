@@ -86,7 +86,7 @@ final class FilmMediaRelay {
 
     private func localURL(_ url: URL) -> URL {
         if let key = identifiers[url] { return endpoint!.appendingPathComponent(key) }
-        let suffix = url.pathExtension == "m3u8" ? "m3u8" : "bin"
+        let suffix = url.pathExtension == "m3u8" || url.path.hasSuffix("/stream/hls") ? "m3u8" : "bin"
         let key = "\(secret)/\(UUID().uuidString).\(suffix)"
         identifiers[url] = key; urls[key] = url
         return endpoint!.appendingPathComponent(key)
