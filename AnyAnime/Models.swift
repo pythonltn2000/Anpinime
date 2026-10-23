@@ -13,8 +13,8 @@ enum ContentSource: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .anime: return "Anime"
-        case .film4k: return "Film4k.net"
-        case .phim4k: return "Phim4K"
+        case .film4k: return "Nguồn phim 1"
+        case .phim4k: return "Nguồn phim 2"
         }
     }
     var isMovie: Bool { self != .anime }
@@ -31,6 +31,20 @@ struct ResolvedPlayback {
     let headers: [String: String]
     let webURL: URL?
     let isWeb: Bool
+}
+
+struct PlaybackChoice: Identifiable, Hashable {
+    let id: String
+    let title: String
+}
+
+struct PlaybackQuality: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let bandwidth: Double
+    let width: Double
+    let height: Double
+    static let automatic = PlaybackQuality(id: "auto", title: "Tự động", bandwidth: 0, width: 0, height: 0)
 }
 
 struct Anime: Identifiable, Hashable {

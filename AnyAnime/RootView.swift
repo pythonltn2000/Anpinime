@@ -3,6 +3,10 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var service: AnimeService
     @State private var enteredLibrary = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var introVisible = true
+    @State private var transition: (from: String, to: String)?
+    @State private var transitionTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -10,13 +14,39 @@ struct RootView: View {
                 library
             } else {
                 LibraryChoiceView { source in
-                    service.selectSource(source)
-                    enteredLibrary = true
+                    chooseLibrary(source)
                 }
             }
         }
         .tint(.anpinimeAccent)
         .background(VerificationGate(browser: service.website))
+        .overlay {
+            if introVisible { LibraryTransition(from: "AppLogo", to: "MovieLogo", intro: true).transition(.opacity) }
+            else if let transition { LibraryTransition(from: transition.from, to: transition.to, intro: false).transition(.opacity) }
+        }
+        .task {
+            guard introVisible else { return }
+            try? await Task.sleep(nanoseconds: reduceMotion ? 350_000_000 : 1_850_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.22)) { introVisible = false }
+        }
+        .onDisappear { transitionTask?.cancel() }
+    }
+
+    private func chooseLibrary(_ source: ContentSource) {
+        guard transition == nil else { return }
+        let old = service.source.isMovie ? "MovieLogo" : "AppLogo"
+        let new = source.isMovie ? "MovieLogo" : "AppLogo"
+        if old == new { service.selectSource(source); enteredLibrary = true; return }
+        transition = (old, new)
+        transitionTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: reduceMotion ? 150_000_000 : 400_000_000)
+            guard !Task.isCancelled else { return }
+            service.selectSource(source); enteredLibrary = true
+            try? await Task.sleep(nanoseconds: reduceMotion ? 200_000_000 : 700_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.18)) { transition = nil }
+        }
     }
 
     private var library: some View {
@@ -124,13 +154,13 @@ struct HomeView: View {
             ToolbarItem(placement: .navigationBarLeading) {
                 HStack(spacing: 10) {
                     Button { onChooseLibrary?() } label: {
-                        Image("AppLogo").resizable().scaledToFit().frame(width: 32, height: 32).cornerRadius(9)
+                        Image(service.source.isMovie ? "MovieLogo" : "AppLogo").resizable().scaledToFit().frame(width: 32, height: 32).cornerRadius(9)
                     }.accessibilityLabel("Chọn Anime hoặc Phim")
                     if service.source.isMovie {
                         Menu {
                             ForEach([ContentSource.film4k, .phim4k]) { source in
                                 Button { service.selectSource(source) } label: {
-                                    Label("\(source.title) · \(source.subtitle)", systemImage: source == service.source ? "checkmark.circle.fill" : "circle")
+                                    Label(source.title, systemImage: source == service.source ? "checkmark.circle.fill" : "circle")
                                 }
                             }
                         } label: {
@@ -376,7 +406,7 @@ struct AppSettingsView: View {
             }
             Section("Kết nối") {
                 LabeledContentCompat(title: "Nguồn đang chọn", value: service.source.subtitle)
-                LabeledContentCompat(title: "Máy chủ", value: service.baseURL.host ?? "Đang kết nối")
+                if !service.source.isMovie { LabeledContentCompat(title: "Máy chủ", value: service.baseURL.host ?? "Đang kết nối") }
                 Button("Làm mới danh sách và kết nối") { Task { await service.loadHome(forceDomainRefresh: true) } }
                     .disabled(service.homeLoading)
             }
@@ -402,8 +432,8 @@ struct AppSettingsView: View {
                         if service.source == .phim4k { Task { await service.loadHome(forceDomainRefresh: true) } }
                     }.disabled(service.homeLoading)
                     if !sourceMessage.isEmpty { Text(sourceMessage).font(.footnote).foregroundStyle(.secondary) }
-                } header: { Text("Nguồn phim 2 · Phim4K") }
-                  footer: { Text("Để trống để dùng máy chủ Free1/Free2 của Phim4K. Khi nhà cung cấp đổi địa chỉ, bạn có thể nhập địa chỉ API mới ở đây.") }
+                } header: { Text("Nguồn phim 2") }
+                  footer: { Text("Để trống để dùng kết nối mặc định. Khi nguồn đổi địa chỉ, bạn có thể nhập địa chỉ API mới ở đây.") }
             }
             Section("Giới thiệu") {
                 LabeledContentCompat(title: "Ứng dụng", value: "AnPinime")
@@ -478,8 +508,10 @@ struct DomainStatusView: View {
             Image(systemName: "checkmark.shield.fill").foregroundColor(.green)
             VStack(alignment: .leading, spacing: 2) {
                 Text(service.status).font(.caption.weight(.semibold))
-                Text(service.baseURL.host ?? service.baseURL.absoluteString)
-                    .font(.caption2).foregroundColor(.secondary)
+                if !service.source.isMovie {
+                    Text(service.baseURL.host ?? service.baseURL.absoluteString)
+                        .font(.caption2).foregroundColor(.secondary)
+                }
             }
             Spacer()
         }
@@ -529,12 +561,13 @@ struct Badge: View {
 }
 
 struct LoadingView: View {
+    @EnvironmentObject private var service: AnimeService
     let text: String
     var body: some View {
         ZStack {
             Color(red: 0.025, green: 0.02, blue: 0.055).ignoresSafeArea()
             VStack(spacing: 12) {
-                AnimatedListLoader().frame(width: 210, height: 210).blendMode(.screen)
+                AnimatedListLoader(movie: service.source.isMovie).frame(width: 210, height: 210).blendMode(.screen)
                 Text(text).font(.subheadline).foregroundColor(.white.opacity(0.65))
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity)

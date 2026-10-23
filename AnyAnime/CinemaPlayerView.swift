@@ -15,17 +15,23 @@ final class PlaybackState: ObservableObject {
     @Published var rate = 1.0
     @Published var fill = false
     @Published var volume = 1.0
-    @Published var audioTracks: [String] = []
-    @Published var subtitleTracks: [String] = []
-    @Published var audioTrack = 0
-    @Published var subtitleTrack = 0
+    @Published var audioTracks: [PlaybackChoice] = []
+    @Published var subtitleTracks: [PlaybackChoice] = []
+    @Published var audioTrack = ""
+    @Published var subtitleTrack = "off"
+    @Published var qualities: [PlaybackQuality] = [.automatic]
+    @Published var quality = "auto"
+    @Published var subtitleSize = 100.0
+    @Published var subtitleBackground = false
+    var chooseOption: ((String, String) -> Void)?
     var command: ((String, Double) -> Void)?
 
     func send(_ name: String, _ value: Double = 0) { command?(name, value) }
     func reset() {
         loading = true; buffering = false; playing = false
         currentTime = 0; duration = 0; error = nil; verification = false
-        audioTracks = []; subtitleTracks = []; audioTrack = 0; subtitleTrack = 0
+        audioTracks = []; subtitleTracks = []; audioTrack = ""; subtitleTrack = "off"
+        qualities = [.automatic]; quality = "auto"
     }
 }
 
@@ -129,7 +135,7 @@ struct PlayerView: View {
             playback.rate = rememberSpeed ? savedRate : 1
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--ui-preview") {
-                if ["episodes", "settings"].contains(InterfacePreview.mode) { openPanel(InterfacePreview.mode) }
+                if ["episodes", "settings", "subtitles", "quality"].contains(InterfacePreview.mode) { openPanel(InterfacePreview.mode) }
             }
             #endif
         }
@@ -187,8 +193,8 @@ struct PlayerView: View {
                             playback.send(playback.playing ? "pause" : "play")
                             scheduleHide()
                         } label: {
-                            Image(systemName: playback.playing ? "pause.fill" : "play.fill")
-                                .font(.system(size: 32, weight: .semibold)).frame(width: 72, height: 72)
+                            MorphIcon(name: playback.playing ? "pause" : "play", size: 32)
+                                .frame(width: 32, height: 32).frame(width: 72, height: 72)
                                 .cinemaGlass(cornerRadius: 36, interactive: true)
                         }.accessibilityLabel(playback.playing ? "Tạm dừng" : "Phát")
                         skipButton(forward: true)
@@ -216,6 +222,12 @@ struct PlayerView: View {
                             else { controlButton("forward.end.fill", "Tập tiếp") { select(next) } }
                         }
                         Spacer(minLength: 0)
+                        if current.source.isMovie {
+                            Button { openPanel("subtitles") } label: { MorphIcon(name: "captions").frame(width: 23, height: 23).frame(width: 44, height: 44) }
+                                .accessibilityLabel("Phụ đề và caption")
+                            Button { openPanel("quality") } label: { MorphIcon(name: "quality").frame(width: 23, height: 23).frame(width: 44, height: 44) }
+                                .accessibilityLabel("Chất lượng video")
+                        }
                         controlButton("lock.open", "Khóa điều khiển") { locked = true; controlsVisible = false }
                         controlButton(playback.fill ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", "Đổi tỉ lệ hình") {
                             playback.fill.toggle(); playback.send("fit", playback.fill ? 1 : 0); scheduleHide()
@@ -227,7 +239,12 @@ struct PlayerView: View {
     }
 
     private func controlButton(_ icon: String, _ label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: icon).font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44) }
+        let names = ["chevron.left": "back", "gearshape": "settings", "xmark": "close", "lock.fill": "lock", "lock.open": "unlock",
+                     "arrow.down.right.and.arrow.up.left": "shrink", "arrow.up.left.and.arrow.down.right": "expand", "forward.end.fill": "next"]
+        return Button(action: action) {
+            if let name = names[icon] { MorphIcon(name: name).frame(width: 22, height: 22).frame(width: 44, height: 44) }
+            else { Image(systemName: icon).font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44) }
+        }
             .cinemaGlass(cornerRadius: 22, interactive: true)
             .accessibilityLabel(label)
     }
@@ -254,14 +271,16 @@ struct PlayerView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(kind == "episodes" ? "Danh sách tập" : "Cài đặt phát").font(.title3.bold())
+                    Text(panelTitle(kind)).font(.title3.bold())
                     Text(kind == "episodes" ? "\(episodes.count) tập · \(current.title)" : "Theo cách bạn thích")
                         .font(.caption).foregroundColor(.white.opacity(0.5))
                 }
                 Spacer()
                 controlButton("xmark", "Đóng bảng") { closePanel() }
             }
-            if kind == "episodes" { episodePanel } else { settingsPanel }
+            if kind == "episodes" { episodePanel }
+            else if ["audio", "subtitles", "quality", "seasons"].contains(kind) { optionPanel(kind) }
+            else { settingsPanel }
         }.padding(20)
     }
 
@@ -270,7 +289,9 @@ struct PlayerView: View {
         let season = panelSeason.isEmpty ? current.season : panelSeason
         return VStack(spacing: 14) {
             if seasons.count > 1 {
-                Picker("Phần", selection: $panelSeason) { ForEach(seasons, id: \.self) { Text($0).tag($0) } }.pickerStyle(.menu)
+                Button { panel = "seasons" } label: {
+                    HStack { Text(season); Spacer(); MorphIcon(name: "down").frame(width: 18, height: 18) }.frame(minHeight: 44)
+                }
             }
             ScrollViewReader { proxy in
                 ScrollView {
@@ -295,16 +316,9 @@ struct PlayerView: View {
     private var settingsPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                if !playback.audioTracks.isEmpty {
-                    Picker("Âm thanh", selection: $playback.audioTrack) {
-                        ForEach(playback.audioTracks.indices, id: \.self) { index in Text(playback.audioTracks[index]).tag(index) }
-                    }.onChange(of: playback.audioTrack) { playback.send("audio", Double($0)) }
-                }
-                if !playback.subtitleTracks.isEmpty {
-                    Picker("Phụ đề", selection: $playback.subtitleTrack) {
-                        ForEach(playback.subtitleTracks.indices, id: \.self) { index in Text(playback.subtitleTracks[index]).tag(index) }
-                    }.onChange(of: playback.subtitleTrack) { playback.send("subtitle", Double($0)) }
-                }
+                settingsRow("audio", value: playback.audioTracks.first { $0.id == playback.audioTrack }?.title ?? "Theo video")
+                settingsRow("subtitles", value: playback.subtitleTracks.first { $0.id == playback.subtitleTrack }?.title ?? "Tắt / không có")
+                settingsRow("quality", value: playback.qualities.first { $0.id == playback.quality }?.title ?? "Tự động")
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Tốc độ phát").font(.subheadline.weight(.semibold))
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
@@ -332,6 +346,93 @@ struct PlayerView: View {
                 }
                 Button { closePanel(); retry() } label: { Label("Tải lại luồng phát", systemImage: "arrow.clockwise") }
             }.font(.subheadline).padding(.bottom, 8)
+        }
+    }
+
+    private func panelTitle(_ kind: String) -> String {
+        ["episodes": "Danh sách tập", "seasons": "Chọn phần / máy chủ", "audio": "Âm thanh", "subtitles": "Phụ đề · Caption", "quality": "Chất lượng video"][kind] ?? "Cài đặt phát"
+    }
+
+    private func settingsRow(_ kind: String, value: String) -> some View {
+        Button { panel = kind } label: {
+            HStack(spacing: 12) {
+                MorphIcon(name: kind == "subtitles" ? "captions" : kind).frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(panelTitle(kind)).font(.subheadline.weight(.semibold))
+                    Text(value).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption)
+            }.frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
+        }.buttonStyle(.plain)
+    }
+
+    private func choices(_ kind: String) -> [PlaybackChoice] {
+        switch kind {
+        case "audio": return playback.audioTracks
+        case "subtitles": return playback.subtitleTracks
+        case "quality": return playback.qualities.map { .init(id: $0.id, title: $0.title) }
+        default: return episodes.reduce(into: [PlaybackChoice]()) { result, episode in
+            if !result.contains(where: { $0.id == episode.season }) { result.append(.init(id: episode.season, title: episode.season)) }
+        }
+        }
+    }
+
+    private func selectedChoice(_ kind: String) -> String {
+        switch kind {
+        case "audio": return playback.audioTrack
+        case "subtitles": return playback.subtitleTrack
+        case "quality": return playback.quality
+        default: return panelSeason
+        }
+    }
+
+    private func optionPanel(_ kind: String) -> some View {
+        let options = choices(kind)
+        return VStack(alignment: .leading, spacing: 12) {
+            Button { panel = kind == "seasons" ? "episodes" : "settings" } label: {
+                Label("Quay lại", systemImage: "chevron.left").frame(minHeight: 36)
+            }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(options) { option in
+                            Button {
+                                // Stable option identity, never a transient menu index.
+                                if kind == "seasons" { panelSeason = option.id; panel = "episodes" }
+                                else { playback.chooseOption?(kind, option.id) }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Text(option.title).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 8)
+                                    if selectedChoice(kind) == option.id { MorphIcon(name: "check").frame(width: 20, height: 20) }
+                                }
+                                .padding(.horizontal, 14).padding(.vertical, 12).frame(minHeight: 48)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(selectedChoice(kind) == option.id ? Color.anpinimeAccent.opacity(0.28) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+                                .contentShape(Rectangle())
+                            }.buttonStyle(.plain).id(option.id)
+                        }
+                        if options.isEmpty {
+                            Text("Luồng hiện tại không cung cấp lựa chọn này cho trình phát native.")
+                                .font(.footnote).foregroundStyle(.secondary).padding(.vertical)
+                        }
+                        if kind == "quality" {
+                            Text("Chỉ hiện mức chất lượng nguồn thực sự cung cấp. Mức chọn là giới hạn tối đa; video có thể giảm chất lượng khi mạng yếu.")
+                                .font(.caption).foregroundStyle(.secondary).padding(.vertical, 8)
+                        }
+                        if kind == "subtitles", !options.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Cỡ chữ \(Int(playback.subtitleSize))%").font(.subheadline)
+                                Slider(value: $playback.subtitleSize, in: 70...180, step: 10)
+                                    .onChange(of: playback.subtitleSize) { playback.send("subtitleSize", $0) }
+                                Toggle("Nền tối cho phụ đề", isOn: $playback.subtitleBackground)
+                                    .onChange(of: playback.subtitleBackground) { playback.send("subtitleBackground", $0 ? 1 : 0) }
+                            }.padding(.vertical, 12)
+                        }
+                    }
+                }.onAppear { proxy.scrollTo(selectedChoice(kind), anchor: .center) }
+            }
         }
     }
 

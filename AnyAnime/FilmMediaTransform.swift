@@ -3,6 +3,24 @@ import Foundation
 /// Film4k's public player removes a complete PNG envelope before decoding media.
 /// This is container normalization, not DRM/key handling.
 enum FilmMediaTransform {
+    static func qualities(_ text: String) -> [PlaybackQuality] {
+        var values: [String: PlaybackQuality] = [:]
+        for line in text.components(separatedBy: .newlines) where line.hasPrefix("#EXT-X-STREAM-INF:") {
+            func attribute(_ name: String) -> String? {
+                guard let range = line.range(of: "(?:[:,])\(name)=([^,]+)", options: .regularExpression) else { return nil }
+                return String(line[range]).components(separatedBy: "=").last
+            }
+            guard let raw = attribute("RESOLUTION") else { continue }
+            let dimensions = raw.split(separator: "x").compactMap { Double($0) }
+            guard dimensions.count == 2, dimensions.allSatisfy({ $0 > 0 && $0.isFinite }) else { continue }
+            let bandwidth = Double(attribute("BANDWIDTH") ?? "") ?? 0
+            let height = dimensions[1], key = "height-\(Int(height))"
+            let quality = PlaybackQuality(id: key, title: "\(Int(height))p", bandwidth: bandwidth, width: dimensions[0], height: height)
+            if (values[key]?.bandwidth ?? -1) < bandwidth { values[key] = quality }
+        }
+        return [.automatic] + values.values.sorted { $0.height > $1.height }
+    }
+
     static func unwrap(_ data: Data) -> Data {
         let signature: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         guard data.starts(with: signature) else { return data }

@@ -56,6 +56,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
     private var resumeAfterRefresh = 0.0
     private var mediaTracksLoaded = false
     private var filmRelay: FilmMediaRelay?
+    private var trackTask: Task<Void, Never>?
+    private var audioOptions: [String: AVMediaSelectionOption] = [:]
+    private var subtitleOptions: [String: AVMediaSelectionOption] = [:]
 
     init(episode: Episode, service: AnimeService, playback: PlaybackState) {
         self.episode = episode
@@ -84,6 +87,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             loadingLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
         playback.command = { [weak self] name, value in self?.perform(name, value: value) }
+        playback.chooseOption = { [weak self] kind, id in self?.chooseOption(kind, id: id) }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--ui-preview") {
             Task { @MainActor in
@@ -92,6 +96,11 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                     self.playback.duration = 1440
                     self.playback.currentTime = 325
                     self.playback.playing = true
+                    self.playback.audioTracks = [.init(id: "vi", title: "Tiếng Việt"), .init(id: "en", title: "English · Stereo")]
+                    self.playback.audioTrack = "vi"
+                    self.playback.subtitleTracks = [.init(id: "off", title: "Tắt phụ đề")] + (1...35).map { .init(id: "subtitle-\($0)", title: "Phụ đề ngôn ngữ \($0)") }
+                    self.playback.subtitleTrack = "subtitle-12"
+                    self.playback.qualities = [.automatic, .init(id: "1080", title: "1080p", bandwidth: 4000000, width: 1920, height: 1080)]
                 }
             }
             return
@@ -106,6 +115,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         active = false
         requestTask?.cancel()
         filmRelay?.stop(); filmRelay = nil
+        trackTask?.cancel()
         fallbackTimer?.invalidate()
         revealTimer?.invalidate()
         nativeTimer?.invalidate()
@@ -135,8 +145,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             case "rate": if player.rate != 0 { player.rate = Float(value) }
             case "volume": player.volume = Float(value)
             case "fit": playerController?.videoGravity = value == 1 ? .resizeAspectFill : .resizeAspect
-            case "audio": selectTrack(.audible, index: Int(value))
-            case "subtitle": selectTrack(.legible, index: Int(value) - 1)
+            case "subtitleSize", "subtitleBackground": applySubtitleStyle()
             default: break
             }
         } else {
@@ -161,6 +170,10 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 else if self.episode.source == .film4k && resolved.url.pathExtension == "m3u8" {
                     self.filmRelay?.stop()
                     let relay = FilmMediaRelay(origin: self.baseURL, headers: resolved.headers)
+                    relay.onQualities = { [weak self] options in
+                        guard let self, self.active else { return }
+                        if self.playback.qualities != options { self.playback.qualities = options }
+                    }
                     self.filmRelay = relay
                     let localURL = try await relay.start(resolved.url)
                     try Task.checkCancellation()
@@ -336,7 +349,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
         let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers,
                                                   AVURLAssetHTTPCookiesKey: cookies])
-        let player = AVPlayer(playerItem: AVPlayerItem(asset: asset))
+        let player = AVPlayer(playerItem: AVPlayerItem(asset: asset, automaticallyLoadedAssetKeys: ["playable", "availableMediaCharacteristicsWithMediaSelectionOptions"]))
         player.setMediaSelectionCriteria(AVPlayerMediaSelectionCriteria(preferredLanguages: ["vi", "en"], preferredMediaCharacteristics: nil), forMediaCharacteristic: .audible)
         mediaTracksLoaded = false
         let controller = AVPlayerViewController()
@@ -350,6 +363,18 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         view.insertSubview(controller.view, at: 0)
         controller.didMove(toParent: self)
         playerController = controller
+        applySubtitleStyle()
+        if filmRelay == nil, url.pathExtension.lowercased() == "m3u8" {
+            trackTask?.cancel()
+            trackTask = Task { [weak self] in
+                var request = URLRequest(url: url)
+                headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+                guard let (data, _) = try? await Self.episodeSession.data(for: request),
+                      let text = String(data: data, encoding: .utf8), text.hasPrefix("#EXTM3U"),
+                      let self, self.active, !Task.isCancelled, self.playerController?.player === player else { return }
+                self.playback.qualities = FilmMediaTransform.qualities(text)
+            }
+        }
         loadingLabel.isHidden = true
         revealTimer?.invalidate()
         directWebView?.removeFromSuperview()
@@ -420,23 +445,53 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
     }
 
     private func loadMediaTracks(_ item: AVPlayerItem) {
+        let generation = UUID().uuidString
+        audioOptions = [:]; subtitleOptions = [:]
         if let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .audible) {
-            playback.audioTracks = group.options.map(\.displayName)
             let selected = item.currentMediaSelection.selectedMediaOption(in: group)
-            playback.audioTrack = group.options.firstIndex(where: { $0 == selected }) ?? 0
+            playback.audioTracks = group.options.enumerated().map { index, option in
+                let id = "\(generation)-audio-\(index)"
+                audioOptions[id] = option
+                if option == selected { playback.audioTrack = id }
+                return PlaybackChoice(id: id, title: option.displayName)
+            }
         }
         if let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
-            playback.subtitleTracks = ["Tắt"] + group.options.map(\.displayName)
             let selected = item.currentMediaSelection.selectedMediaOption(in: group)
-            playback.subtitleTrack = (group.options.firstIndex(where: { $0 == selected }) ?? -1) + 1
+            playback.subtitleTrack = "off"
+            playback.subtitleTracks = [.init(id: "off", title: "Tắt phụ đề")] + group.options.enumerated().map { index, option in
+                let id = "\(generation)-subtitle-\(index)"
+                subtitleOptions[id] = option
+                if option == selected { playback.subtitleTrack = id }
+                return PlaybackChoice(id: id, title: option.displayName)
+            }
         }
     }
 
-    private func selectTrack(_ characteristic: AVMediaCharacteristic, index: Int) {
-        guard let item = playerController?.player?.currentItem,
-              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: characteristic) else { return }
-        if index == -1 && characteristic == .legible { item.select(nil, in: group) }
-        else if group.options.indices.contains(index) { item.select(group.options[index], in: group) }
+    private func chooseOption(_ kind: String, id: String) {
+        guard active, let item = playerController?.player?.currentItem else { return }
+        if kind == "quality", let option = playback.qualities.first(where: { $0.id == id }) {
+            item.preferredPeakBitRate = option.bandwidth
+            item.preferredMaximumResolution = CGSize(width: option.width, height: option.height)
+            playback.quality = id
+            return
+        }
+        let characteristic: AVMediaCharacteristic = kind == "audio" ? .audible : .legible
+        guard let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: characteristic) else { return }
+        if kind == "subtitles", id == "off" { item.select(nil, in: group); playback.subtitleTrack = "off" }
+        else if kind == "subtitles", let option = subtitleOptions[id], group.options.contains(option) {
+            item.select(option, in: group); playback.subtitleTrack = id
+        } else if kind == "audio", let option = audioOptions[id], group.options.contains(option) {
+            item.select(option, in: group); playback.audioTrack = id
+        }
+    }
+
+    private func applySubtitleStyle() {
+        let attributes: [String: Any] = [
+            kCMTextMarkupAttribute_RelativeFontSize as String: playback.subtitleSize,
+            kCMTextMarkupAttribute_BackgroundColorARGB as String: [playback.subtitleBackground ? 0.7 : 0.0, 0.0, 0.0, 0.0]
+        ]
+        if let rule = AVTextStyleRule(textMarkupAttributes: attributes) { playerController?.player?.currentItem?.textStyleRules = [rule] }
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {

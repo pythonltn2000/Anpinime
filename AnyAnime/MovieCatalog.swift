@@ -33,6 +33,11 @@ enum MovieCatalog {
         return components.url!
     }
 
+    static func rating(_ value: Any?) -> String {
+        guard let number = Double(text(value)), number.isFinite, number > 0 else { return "" }
+        return String(format: "%.1f", number)
+    }
+
     static func filmItems(_ rows: [Object], base: URL) -> [Anime] {
         var seen = Set<String>()
         return rows.compactMap { row in
@@ -42,7 +47,7 @@ enum MovieCatalog {
             return Anime(title: title, url: route("movie/" + slug, base: base),
                          imageURL: url(row["poster"], base: base),
                          episodeText: row["mediaType"] as? String == "tv" ? (count.isEmpty ? "Phim bộ" : "\(count) tập") : "Phim lẻ",
-                         quality: text(row["maxRes"]), score: text(row["score"]), source: .film4k)
+                         quality: text(row["maxRes"]), score: rating(row["score"]), source: .film4k)
         }
     }
 
@@ -108,7 +113,7 @@ enum MovieCatalog {
             return Anime(title: title, url: route(format.detailPath + slug, base: base),
                          imageURL: url(row["poster_url"] ?? row["thumb_url"], base: imageBase),
                          episodeText: text(row["episode_current"] ?? row["current_episode"]),
-                         quality: text(row["quality"]), score: text((row["tmdb"] as? Object)?["vote_average"]), source: .phim4k)
+                         quality: text(row["quality"]), score: rating((row["tmdb"] as? Object)?["vote_average"]), source: .phim4k)
         }
     }
 
@@ -146,7 +151,7 @@ enum MovieCatalog {
 enum Phim4KFormat: String, CaseIterable, Identifiable {
     case free1, free2
     var id: String { rawValue }
-    var title: String { self == .free1 ? "Phim4K Free1" : "Phim4K Free2" }
+    var title: String { self == .free1 ? "Kiểu API A" : "Kiểu API B" }
     var defaultURL: URL { URL(string: self == .free1 ? "https://free1.phim4k.lol" : "https://free2.phim4k.lol")! }
     var listPath: String { self == .free1 ? "danh-sach/phim-moi-cap-nhat-v3" : "api/films/phim-moi-cap-nhat" }
     var detailPath: String { self == .free1 ? "phim/" : "api/film/" }

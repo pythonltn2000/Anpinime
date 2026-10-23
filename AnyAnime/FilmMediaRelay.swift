@@ -1,10 +1,21 @@
 import Foundation
 import Network
 
+private final class FilmRedirectPolicy: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        var request = request
+        if response.url?.host != request.url?.host { request.setValue(nil, forHTTPHeaderField: "X-F4K-PT") }
+        completionHandler(request)
+    }
+}
+
 /// An in-process, loopback-only HLS adapter. URLs are opaque per-playback IDs;
 /// callers cannot pass arbitrary upstream URLs. No movie files are written to disk.
 @MainActor
 final class FilmMediaRelay {
+    var onQualities: (([PlaybackQuality]) -> Void)?
     private let origin: URL
     private let headers: [String: String]
     private let secret = UUID().uuidString
@@ -26,7 +37,7 @@ final class FilmMediaRelay {
         config.timeoutIntervalForRequest = 25
         config.timeoutIntervalForResource = 40
         config.httpMaximumConnectionsPerHost = 4
-        session = URLSession(configuration: config)
+        session = URLSession(configuration: config, delegate: FilmRedirectPolicy(), delegateQueue: nil)
         mediaCache.totalCostLimit = 32 * 1024 * 1024
         mediaCache.countLimit = 8
     }
@@ -139,6 +150,7 @@ final class FilmMediaRelay {
             guard data.count <= 64 * 1024 * 1024 else { send(id, status: 502, body: Data()); return }
             let body: Data, type: String
             if data.starts(with: Data("#EXTM3U".utf8)), let text = String(data: data, encoding: .utf8) {
+                if text.contains("#EXT-X-STREAM-INF:") { onQualities?(FilmMediaTransform.qualities(text)) }
                 body = Data(FilmMediaTransform.playlist(text, base: http.url ?? url, map: localURL).utf8)
                 type = "application/vnd.apple.mpegurl"
             } else {

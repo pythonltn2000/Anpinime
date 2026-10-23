@@ -87,11 +87,12 @@ jobs:
               if [ -f "$ANPINIME_APP_DATA/Documents/playback-$backend.json" ]; then break; fi
               sleep 1
             done
+            xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot "previews/playback-$backend.png"
+            cp "$RUNNER_TEMP/anpinime-media-server.log" previews/fixture-server.log
             test -f "$ANPINIME_APP_DATA/Documents/playback-$backend.json"
             cp "$ANPINIME_APP_DATA/Documents/playback-$backend.json" "previews/playback-$backend.json"
-            xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot "previews/playback-$backend.png"
           done
-          for scene in choice movies loading player episodes settings list app-settings; do
+          for scene in choice movies loading player episodes settings subtitles quality list movie-loading app-settings; do
             xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime --ui-preview "$scene"
             sleep 7
             xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot "previews/$scene.png"

@@ -49,6 +49,7 @@ check(MovieCatalog.url("javascript:alert(1)", base: filmBase) == nil, "Provider 
 var otherSource = film
 otherSource.source = .phim4k
 check(film.id != otherSource.id, "The same path in different sources has a different catalog identity")
+check(MovieCatalog.rating(8.300000000000001) == "8.3", "Movie ratings do not expose floating-point precision artifacts")
 
 let pngEnvelope = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==")!
 let media = Data([0, 0, 0, 24]) + Data("ftypisom".utf8)
@@ -64,3 +65,8 @@ check(rewritten.contains("URI=\"http://127.0.0.1:1234/init.png\"") && rewritten.
 check(FilmMediaTransform.byteRange("bytes=0-1", count: 100) == 0..<2, "AVPlayer's initial two-byte probe is supported")
 check(FilmMediaTransform.byteRange("bytes=-10", count: 100) == 90..<100, "Suffix byte ranges use normalized media size")
 check(FilmMediaTransform.byteRange("bytes=100-", count: 100) == nil, "Unsatisfiable byte ranges are rejected")
+let qualityManifest = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=4000000,RESOLUTION=1920x1080,CODECS=\"avc1,mp4a\"\na.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=4200000,RESOLUTION=1920x1080\nb.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=2000000,RESOLUTION=1280x720\nc.m3u8"
+let qualities = FilmMediaTransform.qualities(qualityManifest)
+check(qualities.map(\.title) == ["Tự động", "1080p", "720p"], "Quality choices come from actual HLS variants and deduplicate audio/codec variants")
+check(qualities[1].bandwidth == 4200000, "A resolution limit preserves the available codec/audio alternatives")
+check(FilmMediaTransform.qualities("#EXTM3U\n#EXTINF:8,\nsegment.ts").count == 1, "Media playlists do not fabricate unsupported resolutions")

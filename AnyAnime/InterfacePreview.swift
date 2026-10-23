@@ -10,15 +10,28 @@ struct InterfacePreview: View {
     var body: some View {
         if Self.mode == "choice" {
             LibraryChoiceView { _ in }
+        } else if Self.mode == "intro" {
+            LibraryTransition(from: "AppLogo", to: "MovieLogo", intro: true)
+        } else if Self.mode == "switch" {
+            LibraryTransition(from: "AppLogo", to: "MovieLogo", intro: false)
         } else if Self.mode == "movies" {
             MovieHomePreview()
         } else if Self.mode == "list" {
             LoadingView(text: "Đang tải danh sách anime…")
+        } else if Self.mode == "movie-loading" {
+            MovieLoaderPreview()
         } else if Self.mode == "app-settings" {
             NavigationView { AppSettingsView() }.tint(.anpinimeAccent)
         } else {
             PlayerView(episode: episodes[3], title: "Hành trình dưới bầu trời sao", artworkURL: nil, episodes: episodes)
         }
+    }
+}
+
+private struct MovieLoaderPreview: View {
+    @EnvironmentObject private var service: AnimeService
+    var body: some View {
+        LoadingView(text: "Đang tải danh sách phim…").onAppear { service.selectSource(.film4k) }
     }
 }
 

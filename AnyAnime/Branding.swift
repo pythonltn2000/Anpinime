@@ -8,8 +8,12 @@ extension Color {
 /// GIF is composited with screen blending by LoadingView so black disappears
 /// into the dark app background without changing the supplied animation.
 struct AnimatedListLoader: UIViewRepresentable {
-    private static let animation: UIImage? = {
-        guard let url = Bundle.main.url(forResource: "Code_Generated_Image", withExtension: "gif"),
+    var movie = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private static let animeAnimation = animation(named: "Code_Generated_Image")
+    private static let movieAnimation = animation(named: "MovieLoading")
+    private static func animation(named name: String) -> UIImage? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "gif"),
               let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         var frames: [UIImage] = []
         var duration = 0.0
@@ -26,10 +30,10 @@ struct AnimatedListLoader: UIViewRepresentable {
             frames.append(UIImage(cgImage: frame))
         }
         return UIImage.animatedImage(with: frames, duration: duration)
-    }()
+    }
 
     func makeUIView(context: Context) -> UIImageView {
-        let view = UIImageView(image: Self.animation)
+        let view = UIImageView()
         view.contentMode = .scaleAspectFit
         view.setContentHuggingPriority(.defaultLow, for: .horizontal)
         view.setContentHuggingPriority(.defaultLow, for: .vertical)
@@ -38,6 +42,10 @@ struct AnimatedListLoader: UIViewRepresentable {
         view.accessibilityLabel = "Đang tải"
         return view
     }
-    func updateUIView(_ uiView: UIImageView, context: Context) { }
+    func updateUIView(_ uiView: UIImageView, context: Context) {
+        let animation = movie ? Self.movieAnimation : Self.animeAnimation
+        let image = reduceMotion ? (animation?.images?.first ?? animation) : animation
+        if uiView.image !== image { uiView.image = image }
+    }
     static func dismantleUIView(_ uiView: UIImageView, coordinator: ()) { uiView.stopAnimating() }
 }

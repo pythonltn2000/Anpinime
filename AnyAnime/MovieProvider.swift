@@ -60,14 +60,14 @@ final class MovieProvider {
                 try Task.checkCancellation()
                 baseURL = url; format = candidateFormat
                 categories = [.init(title: "Phim mới cập nhật", path: "latest")]
-                return [.init(title: "Phim4K • Mới cập nhật", items: items)]
+                return [.init(title: "Mới cập nhật", items: items)]
             } catch {
                 if Task.isCancelled { throw CancellationError() }
             }
         }
         throw MovieSourceError.unavailable(custom.isEmpty
-            ? "Nguồn phim 2 (Phim4K) hiện không kết nối được các máy chủ Free1/Free2 ghi trong IPA. Bạn có thể chọn Nguồn phim 1 hoặc cập nhật địa chỉ Phim4K trong Cài đặt."
-            : "Không đọc được dữ liệu Phim4K tại địa chỉ đã lưu. Kiểm tra địa chỉ và định dạng Free1/Free2 trong Cài đặt.")
+            ? "Nguồn phim 2 hiện chưa kết nối được máy chủ. Bạn có thể chọn Nguồn phim 1 hoặc cập nhật kết nối trong Cài đặt."
+            : "Không đọc được dữ liệu Nguồn phim 2 tại địa chỉ đã lưu. Kiểm tra địa chỉ và kiểu API trong Cài đặt.")
     }
 
     func list(path: String, page: Int = 1) async throws -> [Anime] {
