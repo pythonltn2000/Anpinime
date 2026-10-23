@@ -1,6 +1,8 @@
 # AnPinime (iOS 15+)
 
-Ứng dụng xem anime với danh sách phim, tìm kiếm, thể loại và trình phát toàn màn hình. Màn hình chờ phim dùng ảnh nền và tên phim nhấp nháy; trình phát có danh sách tập, tua, tốc độ, tỉ lệ hình, khóa chạm, độ sáng và tự phát tập tiếp theo.
+Ứng dụng xem anime và phim với danh sách, tìm kiếm, thể loại và trình phát toàn màn hình. Mỗi lần khởi động, chọn **Anime** hoặc **Phim**; chạm logo ở trang chủ để chọn lại. Trong mục Phim, menu cạnh logo đổi giữa **Nguồn phim 1 · Film4k.net** và **Nguồn phim 2 · Phim4K**. Danh sách, tìm kiếm và tập phim của các nguồn không bị trộn chung.
+
+Màn hình chờ phim dùng ảnh nền và tên phim nhấp nháy; trình phát có danh sách tập, tua, tốc độ, tỉ lệ hình, khóa chạm, độ sáng và tự phát tập tiếp theo. Luồng native có nhiều track cho phép chọn âm thanh và phụ đề trong cài đặt trình phát.
 
 Tác giả: **KingLTN** — Telegram [@kingltnn](https://t.me/kingltnn).
 
@@ -18,12 +20,28 @@ Khi request dữ liệu gặp HTTP 403 hoặc trang xác minh, app thử lại b
 
 ## Dữ liệu và trình phát
 
+### Anime
+
 - Danh sách được đọc từ HTML công khai bằng nhiều selector dự phòng (`TPost`, `ml-item`, `film-item`, `movie-item`).
 - Tìm kiếm dùng `/tim-kiem/{từ-khóa}/`.
 - Thể loại và trạng thái dùng các đường dẫn của website nguồn.
 - Trình phát ưu tiên cơ chế native: đọc `filmID` và `data-hash`, POST `/ajax/player`, giải AES-CBC bằng khóa SHA-256 rồi giải nén dữ liệu. Nếu cơ chế đó thay đổi hoặc lỗi, app tự chuyển sang trình phát WKWebView và dò URL video để mở bằng AVPlayer.
 
 URL video phát hiện từ iframe (kể cả manifest của player dùng blob) được chuyển sang AVPlayer cùng cookie và Referer của iframe. Nếu native không phát được, app tiếp tục phiên video WebKit. Nút phát vẫn khả dụng khi đã nhận metadata nhưng chưa có khung hình.
+
+### Nguồn phim 1 · Film4k.net
+
+Đọc JSON công khai từ `/api/home`, `/api/search/suggest`, `/api/title/{slug}` và `/api/watch/{slug}`. Hỗ trợ danh sách phân trang, phim lẻ, phim bộ, từng phần và từng tập. Khi bấm xem, lấy URL mới từ watch và phiên `/api/play-ticket`; chấp nhận cả phản hồi có token và phản hồi `{ok:true}` không cần token. Không lưu URL video hết hạn vào danh sách.
+
+Luồng HLS/MP4 dùng AVPlayer cùng cookie/Referer và ticket nếu có. Khi phát lỗi, lấy lại URL một lần rồi mới chuyển sang trình phát website đúng tập. Ticket chỉ được gắn vào URL thuộc máy chủ nguồn. Nguồn ngoài có thể thay đổi codec, API hoặc yêu cầu đăng nhập; app không đảm bảo mọi phim của website đều phát được trên mọi thiết bị.
+
+### Nguồn phim 2 · Phim4K
+
+Đây là nguồn riêng, **không phải Film4k.net**. Tích hợp hai họ endpoint tìm thấy khi phân tích IPA 2.8.4: Free1 (`/danh-sach/phim-moi-cap-nhat-v3`, `/v1/api/tim-kiem`, `/phim/{slug}`) và Free2 (`/api/films/phim-moi-cap-nhat`, `/api/films/search`, `/api/film/{slug}`). Hỗ trợ danh sách, tìm kiếm, máy chủ/tập, HLS và embed theo hai cấu trúc JSON tương ứng.
+
+Tại lần kiểm tra 23/10/2026, `free1.phim4k.lol` và `free2.phim4k.lol` không phân giải DNS; `api.phim4k.dpdns.org` báo vùng bị nhà cung cấp đình chỉ. Do đó **chưa xác nhận xem phim thực tế từ Nguồn 2**. Schema được kiểm thử bằng dữ liệu mẫu, không đồng nghĩa máy chủ cũ còn hoạt động. Backend riêng có API key/cấu hình runtime của IPA chưa được tích hợp. App hiển thị lỗi rõ ràng, không thay bằng phim của nguồn khác.
+
+Khi có địa chỉ thay thế tương thích, vào **Cài đặt → Nguồn phim 2 · Phim4K**, nhập URL HTTPS và chọn định dạng Free1/Free2. Để trống để dùng lại các địa chỉ mặc định. Địa chỉ mới phải thực sự cung cấp API tương ứng, không chỉ là trang giới thiệu ứng dụng.
 
 ## Build IPA
 
@@ -40,7 +58,9 @@ Logo sử dụng `logo.png`. Animation `Code_Generated_Image.gif` chỉ dùng kh
 
 ## Kiểm thử
 
-Workflow kiểm tra parser, nguồn ảnh lazy-load, trạng thái phát và thao tác tạm dừng. Khi chạy thủ công với `preview=true`, simulator phát video mẫu qua iframe của máy chủ cục bộ yêu cầu cookie/Referer; chỉ đạt khi thời gian phát vượt một giây và màn hình nằm ngang, cho cả AVPlayer và WebKit. Sau đó chụp các màn hình giao diện. Fixture và chế độ kiểm thử không nằm trong bản Release.
+Workflow kiểm tra parser anime và JSON của hai nguồn phim, URL ảnh, định danh nguồn, thứ tự phần/tập, trạng thái phát và thao tác tạm dừng. Khi chạy thủ công với `preview=true`, simulator kiểm tra AVPlayer, WebKit và hai provider bằng máy chủ cục bộ. Fixture Film4k yêu cầu cookie/Referer/ticket, cố ý trả video hết hạn ở lần đầu để kiểm tra tự làm mới URL. Chỉ đạt khi thời gian phát vượt một giây và màn hình nằm ngang.
+
+Một bước riêng kiểm tra Film4k trực tiếp trên mạng và lưu kết quả nếu phát thành công; bước này không chặn build vì phụ thuộc website bên ngoài. Kết quả fixture không được tính là xác nhận phát thực tế. Sau đó có artifact ảnh giao diện. Fixture và chế độ kiểm thử không nằm trong bản Release.
 
 ## Giới hạn
 

@@ -45,7 +45,8 @@ final class ArtworkLoader: ObservableObject {
     }
 
     private static func currentURL(_ url: URL, baseURL: URL) -> URL {
-        guard let host = url.host?.lowercased(),
+        guard let baseHost = baseURL.host?.lowercased(), baseHost.hasPrefix("animevietsub.") || baseHost.hasPrefix("www.animevietsub."),
+              let host = url.host?.lowercased(),
               host.hasPrefix("animevietsub.") || host.hasPrefix("www.animevietsub."),
               var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else { return url }
         components.host = baseURL.host

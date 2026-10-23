@@ -3,12 +3,12 @@ import WebKit
 import AVKit
 
 struct PlayerControllerView: UIViewControllerRepresentable {
-    let episodeURL: URL
-    let baseURL: URL
+    let episode: Episode
+    let service: AnimeService
     let playback: PlaybackState
 
     func makeUIViewController(context: Context) -> AnimePlayerViewController {
-        AnimePlayerViewController(episodeURL: episodeURL, baseURL: baseURL, playback: playback)
+        AnimePlayerViewController(episode: episode, service: service, playback: playback)
     }
 
     func updateUIViewController(_ uiViewController: AnimePlayerViewController, context: Context) { }
@@ -30,6 +30,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
 
     private let episodeURL: URL
     private let baseURL: URL
+    private let episode: Episode
+    private let service: AnimeService
     private let playback: PlaybackState
     private var active = true
     private var requestTask: Task<Void, Never>?
@@ -48,10 +50,17 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
     private var revealTimer: Timer?
     private var fallbackLoadedURL: URL?
     private let loadingLabel = UILabel()
+    private var providerHeaders: [String: String] = [:]
+    private var providerWebURL: URL?
+    private var providerRefreshAttempted = false
+    private var resumeAfterRefresh = 0.0
+    private var mediaTracksLoaded = false
 
-    init(episodeURL: URL, baseURL: URL, playback: PlaybackState) {
-        self.episodeURL = episodeURL
-        self.baseURL = baseURL
+    init(episode: Episode, service: AnimeService, playback: PlaybackState) {
+        self.episode = episode
+        self.service = service
+        self.episodeURL = episode.url
+        self.baseURL = service.baseURL
         self.playback = playback
         super.init(nibName: nil, bundle: nil)
     }
@@ -87,7 +96,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             return
         }
         #endif
-        attemptDirectPlayer()
+        if episode.source.isMovie { attemptProviderPlayer() }
+        else { attemptDirectPlayer() }
     }
 
     func shutdown() {
@@ -123,6 +133,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             case "rate": if player.rate != 0 { player.rate = Float(value) }
             case "volume": player.volume = Float(value)
             case "fit": playerController?.videoGravity = value == 1 ? .resizeAspectFill : .resizeAspect
+            case "audio": selectTrack(.audible, index: Int(value))
+            case "subtitle": selectTrack(.legible, index: Int(value) - 1)
             default: break
             }
         } else {
@@ -130,6 +142,26 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             guard let data = try? JSONSerialization.data(withJSONObject: payload),
                   let json = String(data: data, encoding: .utf8) else { return }
             fallbackWebView?.evaluateJavaScript("window.postMessage(\(json),'*')")
+        }
+    }
+
+    private func attemptProviderPlayer(refresh: Bool = false) {
+        requestTask?.cancel()
+        requestTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let resolved = try await self.service.resolvePlayback(self.episode, refresh: refresh)
+                try Task.checkCancellation()
+                guard self.active else { return }
+                self.providerHeaders = resolved.headers
+                self.providerWebURL = resolved.webURL
+                if resolved.isWeb { self.startFallback(url: resolved.url) }
+                else { self.showNativePlayer(url: resolved.url) }
+            } catch {
+                guard self.active, !Task.isCancelled else { return }
+                if refresh, let url = self.providerWebURL { self.startFallback(url: url) }
+                else { self.playback.error = error.localizedDescription }
+            }
         }
     }
 
@@ -193,13 +225,13 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         directWebView?.removeFromSuperview()
         directWebView = nil
 
-        let targetURL = requestedURL ?? episodeURL
+        let targetURL = requestedURL ?? providerWebURL ?? episodeURL
         if let webView = fallbackWebView {
             guard fallbackLoadedURL?.absoluteString != targetURL.absoluteString else { return }
             fallbackLoadedURL = targetURL
             loadingLabel.text = "Đang mở trình phát toàn màn hình…"
             webView.isHidden = true
-            webView.load(playerRequest(for: targetURL))
+            loadWebPlayer(webView, url: targetURL)
             scheduleFallbackReveal(for: webView)
             return
         }
@@ -228,8 +260,19 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             Task { @MainActor in self?.inspectVerification() }
         }
         fallbackLoadedURL = targetURL
-        webView.load(playerRequest(for: targetURL))
+        loadWebPlayer(webView, url: targetURL)
         scheduleFallbackReveal(for: webView)
+    }
+
+    private func loadWebPlayer(_ webView: WKWebView, url: URL) {
+        Task { @MainActor [weak self, weak webView] in
+            guard let self, let webView else { return }
+            for cookie in HTTPCookieStorage.shared.cookies ?? [] {
+                await webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
+            }
+            guard self.active, self.fallbackLoadedURL == url else { return }
+            webView.load(self.playerRequest(for: url))
+        }
     }
 
     private func playerRequest(for url: URL) -> URLRequest {
@@ -275,11 +318,18 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         nativeStartedAt = Date()
         playback.loading = true
         playback.error = nil
-        let headers = ["User-Agent": AnimeService.userAgent, "Referer": (referer ?? episodeURL).absoluteString]
+        var headers = ["User-Agent": AnimeService.userAgent, "Referer": (referer ?? episodeURL).absoluteString]
+        if episode.source.isMovie {
+            headers.merge(providerHeaders) { _, provider in provider }
+            // A provider's session ticket must never be forwarded to a third-party iframe/CDN.
+            if url.host != baseURL.host { headers.removeValue(forKey: "X-F4K-PT") }
+        }
         let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
         let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers,
                                                   AVURLAssetHTTPCookiesKey: cookies])
         let player = AVPlayer(playerItem: AVPlayerItem(asset: asset))
+        player.setMediaSelectionCriteria(AVPlayerMediaSelectionCriteria(preferredLanguages: ["vi", "en"], preferredMediaCharacteristics: nil), forMediaCharacteristic: .audible)
+        mediaTracksLoaded = false
         let controller = AVPlayerViewController()
         controller.player = player
         controller.showsPlaybackControls = false
@@ -323,12 +373,28 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             playerController = nil
             playback.loading = true
             playback.buffering = false
+            playback.audioTracks = []; playback.subtitleTracks = []
+            if episode.source.isMovie && !providerRefreshAttempted {
+                providerRefreshAttempted = true
+                resumeAfterRefresh = playback.currentTime
+                attemptProviderPlayer(refresh: true)
+                return
+            }
             if let webView = fallbackWebView {
                 webView.isHidden = false
                 perform("play", value: 0)
                 scheduleFallbackReveal(for: webView)
-            } else { startFallback() }
+            } else if !episode.source.isMovie || providerWebURL != nil { startFallback() }
+            else { playback.error = "Không phát được định dạng video này từ nguồn đã chọn." }
             return
+        }
+        if item.status == .readyToPlay && !mediaTracksLoaded {
+            mediaTracksLoaded = true
+            loadMediaTracks(item)
+            if resumeAfterRefresh > 0 {
+                player.seek(to: CMTime(seconds: resumeAfterRefresh, preferredTimescale: 600))
+                resumeAfterRefresh = 0
+            }
         }
         let duration = item.duration.seconds
         let time = player.currentTime().seconds
@@ -342,6 +408,26 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         #if DEBUG
         PlaybackSmokeTest.record(time: time, backend: "native", size: view.bounds.size)
         #endif
+    }
+
+    private func loadMediaTracks(_ item: AVPlayerItem) {
+        if let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .audible) {
+            playback.audioTracks = group.options.map(\.displayName)
+            let selected = item.currentMediaSelection.selectedMediaOption(in: group)
+            playback.audioTrack = group.options.firstIndex(where: { $0 == selected }) ?? 0
+        }
+        if let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
+            playback.subtitleTracks = ["Tắt"] + group.options.map(\.displayName)
+            let selected = item.currentMediaSelection.selectedMediaOption(in: group)
+            playback.subtitleTrack = (group.options.firstIndex(where: { $0 == selected }) ?? -1) + 1
+        }
+    }
+
+    private func selectTrack(_ characteristic: AVMediaCharacteristic, index: Int) {
+        guard let item = playerController?.player?.currentItem,
+              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: characteristic) else { return }
+        if index == -1 && characteristic == .legible { item.select(nil, in: group) }
+        else if group.options.indices.contains(index) { item.select(group.options[index], in: group) }
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -626,6 +712,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             return rect.width>=240&&rect.height>=120;
           }
           function focus(){
+            if(!window.document||!document.documentElement)return false;
             if(challenge())return false;
             hideChrome();
             var videos=document.querySelectorAll('video');

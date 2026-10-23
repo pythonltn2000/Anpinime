@@ -10,9 +10,17 @@ final class AnimeService: ObservableObject {
     @Published private(set) var status = "Đang xác định máy chủ AnimeVietsub…"
     @Published private(set) var verificationGeneration = 0
     @Published private(set) var imageGeneration = 0
+    @Published private(set) var source: ContentSource = .anime
     let website = WebsiteSession()
 
-    let categories: [AnimeCategory] = [
+    @Published private(set) var movieCategories: [AnimeCategory] = []
+    var categories: [AnimeCategory] { source.isMovie ? movieCategories : animeCategories }
+    var contentName: String { source.isMovie ? "phim" : "anime" }
+    private let film4k = MovieProvider(source: .film4k)
+    private let phim4k = MovieProvider(source: .phim4k)
+    private var homeRequestID = UUID()
+
+    private let animeCategories: [AnimeCategory] = [
         .init(title: "TV/Series", path: "/anime-bo/"),
         .init(title: "Movie/OVA", path: "/anime-le/"),
         .init(title: "Hoạt hình Trung Quốc", path: "/hoat-hinh-trung-quoc/"),
@@ -42,6 +50,25 @@ final class AnimeService: ObservableObject {
     private let resolver = DomainResolver.shared
     private let session: URLSession
 
+    func selectSource(_ value: ContentSource) {
+        guard source != value else { return }
+        homeRequestID = UUID()
+        source = value
+        homeSections = []
+        movieCategories = []
+        homeLoading = false
+        status = "Đang kết nối \(value.subtitle)…"
+        if value.isMovie { baseURL = provider(value).baseURL }
+        else { baseURL = URL(string: "https://animevietsub.vip")! }
+        imageGeneration += 1
+    }
+
+    private func provider(_ source: ContentSource) -> MovieProvider { source == .film4k ? film4k : phim4k }
+
+    func resolvePlayback(_ episode: Episode, refresh: Bool = false) async throws -> ResolvedPlayback {
+        try await provider(episode.source).resolve(episode, refresh: refresh)
+    }
+
     init() {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
@@ -59,13 +86,38 @@ final class AnimeService: ObservableObject {
 
     func loadHome(forceDomainRefresh: Bool = false) async {
         guard !homeLoading else { return }
+        let generation = UUID()
+        homeRequestID = generation
+        let selectedSource = source
         homeLoading = true
         status = forceDomainRefresh ? "Đang cập nhật tên miền…" : "Đang tải anime…"
-        defer { homeLoading = false }
+        defer { if homeRequestID == generation { homeLoading = false } }
 
-        baseURL = await resolver.resolve(force: forceDomainRefresh)
+        if selectedSource.isMovie {
+            status = "Đang tải \(selectedSource.title)…"
+            do {
+                let provider = provider(selectedSource)
+                let sections = try await provider.home()
+                try Task.checkCancellation()
+                guard homeRequestID == generation else { return }
+                homeSections = sections
+                movieCategories = provider.categories
+                baseURL = provider.baseURL
+                imageGeneration += 1
+                status = "Đã kết nối \(selectedSource.subtitle)"
+            } catch {
+                guard homeRequestID == generation else { return }
+                register(error)
+            }
+            return
+        }
+
+        let resolved = await resolver.resolve(force: forceDomainRefresh)
+        guard homeRequestID == generation else { return }
+        baseURL = resolved
         do {
             let html = try await fetchHTML(url: baseURL)
+            guard homeRequestID == generation else { return }
             var parsed = HTMLParser.sections(from: html, baseURL: baseURL)
 
             if parsed.count < 2 {
@@ -78,6 +130,7 @@ final class AnimeService: ObservableObject {
                     if let items = try? await list(path: path), !items.isEmpty {
                         parsed.append(AnimeSection(title: title, items: items))
                     }
+                    guard homeRequestID == generation else { return }
                 }
             }
 
@@ -86,11 +139,13 @@ final class AnimeService: ObservableObject {
             imageGeneration += 1
             status = "Đã kết nối \(baseURL.host ?? "AnimeVietsub")"
         } catch {
+            guard homeRequestID == generation else { return }
             register(error)
         }
     }
 
-    func list(path: String) async throws -> [Anime] {
+    func list(path: String, page: Int = 1) async throws -> [Anime] {
+        if source.isMovie { return try await provider(source).list(path: path, page: page) }
         let url = try makeURL(path)
         let html = try await fetchHTML(url: url)
         let items = HTMLParser.animes(from: html, baseURL: baseURL)
@@ -101,6 +156,7 @@ final class AnimeService: ObservableObject {
     func search(_ query: String) async throws -> [Anime] {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return [] }
+        if source.isMovie { return try await provider(source).search(clean) }
         guard let encoded = clean.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
             throw AnimeServiceError.invalidURL
         }
@@ -108,6 +164,7 @@ final class AnimeService: ObservableObject {
     }
 
     func detail(for anime: Anime) async throws -> AnimeDetail {
+        if anime.source.isMovie { return try await provider(anime.source).detail(anime) }
         let html = try await fetchHTML(url: anime.url)
         return HTMLParser.detail(from: html, anime: anime, baseURL: baseURL)
     }
@@ -133,14 +190,14 @@ final class AnimeService: ObservableObject {
 
         if http.statusCode == 403 || HTMLParser.containsVerification(html) {
             let (browserHTML, browserURL) = try await website.load(responseURL)
-            if let accepted = await resolver.acceptResolvedURL(browserURL) { baseURL = accepted }
-            imageGeneration += 1
+            if let accepted = await resolver.acceptResolvedURL(browserURL), source == .anime { baseURL = accepted }
+            if source == .anime { imageGeneration += 1 }
             return browserHTML
         }
         guard (200..<400).contains(http.statusCode) else { throw AnimeServiceError.http(http.statusCode) }
         guard !html.isEmpty else { throw AnimeServiceError.emptyData }
 
-        if let accepted = await resolver.acceptResolvedURL(responseURL), accepted.host != baseURL.host {
+        if let accepted = await resolver.acceptResolvedURL(responseURL), source == .anime, accepted.host != baseURL.host {
             baseURL = accepted
         }
         return html

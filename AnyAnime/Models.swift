@@ -1,5 +1,38 @@
 import Foundation
 
+enum ContentSource: String, CaseIterable, Identifiable {
+    case anime, film4k, phim4k
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .anime: return "AnimeVietsub"
+        case .film4k: return "Nguồn phim 1"
+        case .phim4k: return "Nguồn phim 2"
+        }
+    }
+    var subtitle: String {
+        switch self {
+        case .anime: return "Anime"
+        case .film4k: return "Film4k.net"
+        case .phim4k: return "Phim4K"
+        }
+    }
+    var isMovie: Bool { self != .anime }
+}
+
+enum EpisodePlayback: Hashable {
+    case animePage
+    case film4k(slug: String, season: Int?, episode: Int?, server: Int)
+    case phim4k(detailURL: URL, server: Int, index: Int)
+}
+
+struct ResolvedPlayback {
+    let url: URL
+    let headers: [String: String]
+    let webURL: URL?
+    let isWeb: Bool
+}
+
 struct Anime: Identifiable, Hashable {
     let title: String
     let url: URL
@@ -7,8 +40,9 @@ struct Anime: Identifiable, Hashable {
     let episodeText: String
     let quality: String
     let score: String
+    var source: ContentSource = .anime
 
-    var id: String { url.absoluteString }
+    var id: String { source.rawValue + ":" + url.absoluteString }
 }
 
 struct AnimeSection: Identifiable, Hashable {
@@ -23,8 +57,10 @@ struct Episode: Identifiable, Hashable {
     let url: URL
     let number: Int?
     let season: String
+    var source: ContentSource = .anime
+    var playback: EpisodePlayback = .animePage
 
-    var id: String { url.absoluteString + title }
+    var id: String { source.rawValue + ":" + url.absoluteString + season + title }
 }
 
 struct AnimeDetail: Hashable {

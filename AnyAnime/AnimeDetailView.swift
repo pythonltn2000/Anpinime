@@ -11,7 +11,7 @@ struct AnimeDetailView: View {
 
     var body: some View {
         Group {
-            if loading { LoadingView(text: "Đang tải thông tin anime…") }
+            if loading { LoadingView(text: "Đang tải thông tin phim…") }
             else if let detail { detailContent(detail) }
             else {
                 EmptyStateView(icon: "exclamationmark.triangle", title: "Không tải được chi tiết", message: message, actionTitle: "Thử lại") {
@@ -58,6 +58,8 @@ struct AnimeDetailView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent).tint(.red).padding(.horizontal)
+                } else {
+                    Text("Nguồn này chưa có tập phát được.").font(.subheadline).foregroundStyle(.secondary).padding(.horizontal)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {

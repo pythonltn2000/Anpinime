@@ -15,12 +15,17 @@ final class PlaybackState: ObservableObject {
     @Published var rate = 1.0
     @Published var fill = false
     @Published var volume = 1.0
+    @Published var audioTracks: [String] = []
+    @Published var subtitleTracks: [String] = []
+    @Published var audioTrack = 0
+    @Published var subtitleTrack = 0
     var command: ((String, Double) -> Void)?
 
     func send(_ name: String, _ value: Double = 0) { command?(name, value) }
     func reset() {
         loading = true; buffering = false; playing = false
         currentTime = 0; duration = 0; error = nil; verification = false
+        audioTracks = []; subtitleTracks = []; audioTrack = 0; subtitleTrack = 0
     }
 }
 
@@ -59,7 +64,7 @@ struct PlayerView: View {
         GeometryReader { geometry in
             ZStack {
                 Color.black.ignoresSafeArea()
-                PlayerControllerView(episodeURL: current.url, baseURL: service.baseURL, playback: playback)
+                PlayerControllerView(episode: current, service: service, playback: playback)
                     .id(current.id + "-\(attempt)")
                     .ignoresSafeArea()
 
@@ -169,7 +174,7 @@ struct PlayerView: View {
                     controlButton("chevron.left", "Đóng trình phát") { dismiss() }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title).font(.headline).lineLimit(1)
-                        Text(current.title).font(.caption).foregroundColor(.white.opacity(0.6))
+                        Text(current.source.isMovie ? "\(current.source.title) · \(current.title)" : current.title).font(.caption).foregroundColor(.white.opacity(0.6))
                     }
                     Spacer(minLength: 0)
                     controlButton("gearshape", "Cài đặt phát") { openPanel("settings") }
@@ -290,6 +295,16 @@ struct PlayerView: View {
     private var settingsPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
+                if !playback.audioTracks.isEmpty {
+                    Picker("Âm thanh", selection: $playback.audioTrack) {
+                        ForEach(playback.audioTracks.indices, id: \.self) { index in Text(playback.audioTracks[index]).tag(index) }
+                    }.onChange(of: playback.audioTrack) { playback.send("audio", Double($0)) }
+                }
+                if !playback.subtitleTracks.isEmpty {
+                    Picker("Phụ đề", selection: $playback.subtitleTrack) {
+                        ForEach(playback.subtitleTracks.indices, id: \.self) { index in Text(playback.subtitleTracks[index]).tag(index) }
+                    }.onChange(of: playback.subtitleTrack) { playback.send("subtitle", Double($0)) }
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Tốc độ phát").font(.subheadline.weight(.semibold))
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {

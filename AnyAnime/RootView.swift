@@ -2,10 +2,26 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var service: AnimeService
+    @State private var enteredLibrary = false
 
     var body: some View {
+        Group {
+            if enteredLibrary {
+                library
+            } else {
+                LibraryChoiceView { source in
+                    service.selectSource(source)
+                    enteredLibrary = true
+                }
+            }
+        }
+        .tint(.anpinimeAccent)
+        .background(VerificationGate(browser: service.website))
+    }
+
+    private var library: some View {
         TabView {
-            NavigationView { HomeView() }
+            NavigationView { HomeView(onChooseLibrary: { enteredLibrary = false }) }
                 .tabItem { Label("Trang chủ", systemImage: "house.fill") }
 
             NavigationView { AnimeSearchView() }
@@ -17,18 +33,65 @@ struct RootView: View {
             NavigationView { AppSettingsView() }
                 .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
         }
+        .id(service.source)
         .tint(.anpinimeAccent)
-        .background(VerificationGate(browser: service.website))
+    }
+}
+
+struct LibraryChoiceView: View {
+    let select: (ContentSource) -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                LinearGradient(colors: [Color(red: 0.10, green: 0.04, blue: 0.21), .black, Color(red: 0.03, green: 0.09, blue: 0.16)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 26) {
+                        Image("AppLogo").resizable().scaledToFit().frame(width: 104, height: 104).cornerRadius(28)
+                        VStack(spacing: 9) {
+                            Text("AnPinime").font(.system(size: 36, weight: .heavy, design: .rounded))
+                            Text("Hôm nay bạn muốn xem gì?").font(.title3).foregroundStyle(.secondary)
+                        }
+                        VStack(spacing: 16) {
+                            choice("Anime", subtitle: "Khám phá thế giới hoạt hình", icon: "sparkles.tv", color: .anpinimeAccent, source: .anime)
+                            choice("Phim", subtitle: "Phim lẻ, phim bộ • Chọn nguồn riêng", icon: "film.stack", color: .cyan, source: .film4k)
+                        }.frame(maxWidth: 480)
+                        Text("Một nơi dành cho những bộ phim bạn yêu thích.")
+                            .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    }
+                    .padding(28)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: geometry.size.height)
+                }
+            }
+        }
+    }
+
+    private func choice(_ title: String, subtitle: String, icon: String, color: Color, source: ContentSource) -> some View {
+        Button { select(source) } label: {
+            HStack(spacing: 18) {
+                Image(systemName: icon).font(.system(size: 30, weight: .medium)).foregroundStyle(color)
+                    .frame(width: 56, height: 60)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(title).font(.title2.bold()).foregroundStyle(.white)
+                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").foregroundStyle(.secondary)
+            }.padding(20).cinemaGlass(cornerRadius: 28, interactive: true)
+        }.buttonStyle(.plain)
     }
 }
 
 struct HomeView: View {
     @EnvironmentObject private var service: AnimeService
+    var onChooseLibrary: (() -> Void)? = nil
 
     var body: some View {
         Group {
             if service.homeSections.isEmpty && service.homeLoading {
-                LoadingView(text: "Đang tải danh sách anime…")
+                LoadingView(text: "Đang tải danh sách \(service.contentName)…")
             } else if service.homeSections.isEmpty {
                 EmptyStateView(
                     icon: "wifi.exclamationmark",
@@ -40,6 +103,12 @@ struct HomeView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 24) {
                         DomainStatusView()
+                        if service.source.isMovie {
+                            NavigationLink(destination: AnimeGridView(title: "Tất cả phim", path: "")) {
+                                HStack { Label("Khám phá tất cả phim", systemImage: "square.grid.2x2"); Spacer(); Image(systemName: "chevron.right") }
+                                    .padding().cinemaGlass(cornerRadius: 18)
+                            }.buttonStyle(.plain).padding(.horizontal)
+                        }
                         ForEach(service.homeSections) { section in
                             AnimeRow(section: section)
                         }
@@ -49,8 +118,28 @@ struct HomeView: View {
                 .refreshable { await service.loadHome(forceDomainRefresh: true) }
             }
         }
-        .navigationTitle("AnPinime")
+        .navigationTitle(service.source.isMovie ? "Phim" : "Anime")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                HStack(spacing: 10) {
+                    Button { onChooseLibrary?() } label: {
+                        Image("AppLogo").resizable().scaledToFit().frame(width: 32, height: 32).cornerRadius(9)
+                    }.accessibilityLabel("Chọn Anime hoặc Phim")
+                    if service.source.isMovie {
+                        Menu {
+                            ForEach([ContentSource.film4k, .phim4k]) { source in
+                                Button { service.selectSource(source) } label: {
+                                    Label("\(source.title) · \(source.subtitle)", systemImage: source == service.source ? "checkmark.circle.fill" : "circle")
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 5) { Text(service.source.title).font(.caption.weight(.semibold)); Image(systemName: "chevron.down").font(.caption2) }
+                                .padding(.horizontal, 10).padding(.vertical, 8).cinemaGlass(cornerRadius: 16, interactive: true)
+                        }
+                    }
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { Task { await service.loadHome(forceDomainRefresh: true) } } label: {
                     Image(systemName: "arrow.clockwise")
@@ -58,7 +147,7 @@ struct HomeView: View {
                 .disabled(service.homeLoading)
             }
         }
-        .task {
+        .task(id: service.source) {
             if service.homeSections.isEmpty { await service.loadHome() }
         }
     }
@@ -148,6 +237,9 @@ struct AnimeGridView: View {
     @State private var items: [Anime] = []
     @State private var loading = true
     @State private var errorMessage = ""
+    @State private var page = 1
+    @State private var loadingMore = false
+    @State private var hasMore = true
 
     private let columns = [GridItem(.adaptive(minimum: 132), spacing: 14)]
 
@@ -169,6 +261,12 @@ struct AnimeGridView: View {
                         }
                     }
                     .padding()
+                    if service.source.isMovie && hasMore {
+                        Button { Task { await loadMore() } } label: {
+                            if loadingMore { ProgressView() } else { Text("Tải thêm phim") }
+                        }.buttonStyle(.bordered).disabled(loadingMore).padding()
+                    }
+                    if !errorMessage.isEmpty { Text(errorMessage).font(.footnote).foregroundStyle(.secondary).padding() }
                 }
                 .refreshable { await load() }
             }
@@ -183,11 +281,25 @@ struct AnimeGridView: View {
         defer { loading = false }
         do {
             items = try await service.list(path: path)
+            page = 1; hasMore = !items.isEmpty
             errorMessage = ""
         } catch {
             errorMessage = error.localizedDescription
             service.register(error)
         }
+    }
+
+    private func loadMore() async {
+        guard !loadingMore else { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        do {
+            let next = try await service.list(path: path, page: page + 1)
+            let known = Set(items.map(\.id))
+            let unique = next.filter { !known.contains($0.id) }
+            hasMore = !unique.isEmpty
+            items += unique; page += 1; errorMessage = ""
+        } catch { errorMessage = error.localizedDescription }
     }
 }
 
@@ -196,13 +308,13 @@ struct AnimeSearchView: View {
     @State private var query = ""
     @State private var results: [Anime] = []
     @State private var loading = false
-    @State private var message = "Nhập từ khóa để tìm anime"
+    @State private var message = "Nhập tên phim để tìm trong nguồn đang chọn"
 
     var body: some View {
         Group {
             if loading { LoadingView(text: "Đang tìm kiếm…") }
             else if results.isEmpty {
-                EmptyStateView(icon: "magnifyingglass", title: "Tìm anime", message: message, actionTitle: nil, action: nil)
+                EmptyStateView(icon: "magnifyingglass", title: "Tìm \(service.contentName)", message: message, actionTitle: nil, action: nil)
             } else {
                 List(results) { anime in
                     NavigationLink(destination: AnimeDetailView(anime: anime)) {
@@ -213,7 +325,7 @@ struct AnimeSearchView: View {
             }
         }
         .navigationTitle("Tìm kiếm")
-        .searchable(text: $query, prompt: "Tên anime")
+        .searchable(text: $query, prompt: "Tên \(service.contentName)")
         .onSubmit(of: .search) { Task { await search() } }
         .onChange(of: service.verificationGeneration) { _ in
             if !query.isEmpty { Task { await search() } }
@@ -241,6 +353,9 @@ struct AppSettingsView: View {
     @AppStorage("AnPinime.autoNext") private var autoNext = true
     @AppStorage("AnPinime.rememberSpeed") private var rememberSpeed = true
     @AppStorage("AnPinime.skipSeconds") private var skipSeconds = 10
+    @State private var phim4kURL = UserDefaults.standard.string(forKey: "AnPinime.phim4kURL") ?? ""
+    @State private var phim4kFormat = Phim4KFormat(rawValue: UserDefaults.standard.string(forKey: "AnPinime.phim4kFormat") ?? "") ?? .free1
+    @State private var sourceMessage = ""
 
     var body: some View {
         Form {
@@ -248,7 +363,7 @@ struct AppSettingsView: View {
                 VStack(spacing: 10) {
                     Image("AppLogo").resizable().scaledToFit().frame(width: 112, height: 112).cornerRadius(26)
                     Text("AnPinime").font(.largeTitle.bold())
-                    Text("Một thế giới anime. Một nơi dành cho bạn.")
+                    Text("Anime và điện ảnh. Một nơi dành cho bạn.")
                         .font(.subheadline).foregroundColor(.secondary).multilineTextAlignment(.center)
                 }.frame(maxWidth: .infinity).padding(.vertical, 16)
             }
@@ -260,15 +375,41 @@ struct AppSettingsView: View {
                 }
             }
             Section("Kết nối") {
+                LabeledContentCompat(title: "Nguồn đang chọn", value: service.source.subtitle)
                 LabeledContentCompat(title: "Máy chủ", value: service.baseURL.host ?? "Đang kết nối")
                 Button("Làm mới danh sách và kết nối") { Task { await service.loadHome(forceDomainRefresh: true) } }
                     .disabled(service.homeLoading)
+            }
+            if service.source.isMovie {
+                Section {
+                    TextField("https://…", text: $phim4kURL)
+                        .keyboardType(.URL).textInputAutocapitalization(.never).disableAutocorrection(true)
+                    Picker("Định dạng", selection: $phim4kFormat) {
+                        ForEach(Phim4KFormat.allCases) { Text($0.title).tag($0) }
+                    }
+                    Button("Lưu địa chỉ nguồn 2") {
+                        let value = phim4kURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !value.isEmpty {
+                            guard let url = URL(string: value), url.scheme == "https", url.host != nil,
+                                  url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else {
+                                sourceMessage = "Hãy nhập URL HTTPS hợp lệ, không chứa mật khẩu hoặc tham số."
+                                return
+                            }
+                        }
+                        UserDefaults.standard.set(value, forKey: "AnPinime.phim4kURL")
+                        UserDefaults.standard.set(phim4kFormat.rawValue, forKey: "AnPinime.phim4kFormat")
+                        sourceMessage = value.isEmpty ? "Đã dùng lại máy chủ mặc định." : "Đã lưu địa chỉ."
+                        if service.source == .phim4k { Task { await service.loadHome(forceDomainRefresh: true) } }
+                    }.disabled(service.homeLoading)
+                    if !sourceMessage.isEmpty { Text(sourceMessage).font(.footnote).foregroundStyle(.secondary) }
+                } header: { Text("Nguồn phim 2 · Phim4K") }
+                  footer: { Text("Để trống để dùng máy chủ Free1/Free2 của Phim4K. Khi nhà cung cấp đổi địa chỉ, bạn có thể nhập địa chỉ API mới ở đây.") }
             }
             Section("Giới thiệu") {
                 LabeledContentCompat(title: "Ứng dụng", value: "AnPinime")
                 LabeledContentCompat(title: "Phiên bản", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.1.0")
                 LabeledContentCompat(title: "Tác giả", value: "KingLTN")
-                Text("Khám phá anime, chọn tập yêu thích và tận hưởng từng khung hình.")
+                Text("Khám phá anime và phim, chọn nguồn yêu thích và tận hưởng từng khung hình.")
                     .font(.footnote).foregroundColor(.secondary)
                 Link(destination: URL(string: "https://t.me/kingltnn")!) {
                     HStack(spacing: 12) {
