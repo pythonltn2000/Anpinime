@@ -1,6 +1,6 @@
 # AnPinime (iOS 15+)
 
-Ứng dụng xem anime và phim với danh sách, tìm kiếm, thể loại và trình phát toàn màn hình. Mỗi lần khởi động, chọn **Anime** hoặc **Phim**; chạm logo ở trang chủ để chọn lại. Trong mục Phim, menu cạnh logo đổi giữa **Nguồn phim 1 · Film4k.net** và **Nguồn phim 2 · Phim4K**. Danh sách, tìm kiếm và tập phim của các nguồn không bị trộn chung.
+Ứng dụng xem anime và phim với danh sách, tìm kiếm, thể loại và trình phát toàn màn hình. Mỗi lần khởi động, chọn **Anime** hoặc **Phim**; chạm logo ở trang chủ để chọn lại. Trong mục Phim, menu cạnh logo đổi giữa **Nguồn phim 1** và **Nguồn phim 2**. Danh sách, tìm kiếm và tập phim của các nguồn không bị trộn chung.
 
 Màn hình chờ phim dùng ảnh nền và tên phim nhấp nháy; trình phát có danh sách tập, tua, tốc độ, tỉ lệ hình, khóa chạm, độ sáng và tự phát tập tiếp theo. Luồng native có nhiều track cho phép chọn âm thanh và phụ đề trong cài đặt trình phát.
 
@@ -41,9 +41,11 @@ Film4k có các luồng fMP4 bọc trong PNG. `FilmMediaRelay` chỉ lắng nghe
 
 Đây là nguồn riêng, **không phải Film4k.net**. Tích hợp hai họ endpoint tìm thấy khi phân tích IPA 2.8.4: Free1 (`/danh-sach/phim-moi-cap-nhat-v3`, `/v1/api/tim-kiem`, `/phim/{slug}`) và Free2 (`/api/films/phim-moi-cap-nhat`, `/api/films/search`, `/api/film/{slug}`). Hỗ trợ danh sách, tìm kiếm, máy chủ/tập, HLS và embed theo hai cấu trúc JSON tương ứng.
 
-Tại lần kiểm tra 23/10/2026, `free1.phim4k.lol` và `free2.phim4k.lol` không phân giải DNS; `api.phim4k.dpdns.org` báo vùng bị nhà cung cấp đình chỉ. Do đó **chưa xác nhận xem phim thực tế từ Nguồn 2**. Schema được kiểm thử bằng dữ liệu mẫu, không đồng nghĩa máy chủ cũ còn hoạt động. Backend riêng có API key/cấu hình runtime của IPA chưa được tích hợp. App hiển thị lỗi rõ ràng, không thay bằng phim của nguồn khác.
+`MovieSourceDirectory` đọc cấu hình AES-GCM công khai của IPA từ `rip.cryboiz.workers.dev/api/add`, chỉ lấy địa chỉ `free1/free2` và lưu địa chỉ hợp lệ gần nhất. Không nhập tài khoản, quảng cáo, token hoặc plugin của app tham chiếu. Phân tích ngày 23/10/2026 xác định máy chủ mới `free.cryboiz.workers.dev` đang trả danh sách/chi tiết thật, với video trong trường `link` trỏ đến HLS không có đuôi `.m3u8`. Relay hỗ trợ cả định dạng này. Những địa chỉ `.lol` ghi cứng trong IPA đã lỗi DNS; backend REST riêng và Free2 chưa được xác nhận hoạt động.
 
-Khi có địa chỉ thay thế tương thích, vào **Cài đặt → Nguồn phim 2 · Phim4K**, nhập URL HTTPS và chọn định dạng Free1/Free2. Để trống để dùng lại các địa chỉ mặc định. Địa chỉ mới phải thực sự cung cấp API tương ứng, không chỉ là trang giới thiệu ứng dụng.
+Một số phim trả HTTP 500 từ máy chủ video, trong khi tập 1 của `thuong-nguyen-do` trả playlist HLS hợp lệ. Không tự thay phim lỗi bằng phim khác. Máy chủ Vietsub/lồng tiếng được giữ riêng trong Danh sách tập. Chọn phụ đề/âm thanh rời khi luồng thực sự có track; phụ đề đã ghép vào hình không thể tắt. Chưa hỗ trợ đầy đủ các tệp MKV/ASS mà trình phát mpv của app tham chiếu có thể xử lý.
+
+Khi có địa chỉ thay thế tương thích, vào **Cài đặt → Nguồn phim 2**, nhập URL HTTPS và chọn Kiểu API A/B. Để trống để cập nhật tự động. Địa chỉ mới phải thực sự cung cấp API tương ứng, không chỉ là trang giới thiệu ứng dụng.
 
 ## Build IPA
 
@@ -58,11 +60,13 @@ Bundle ID: `com.xemphim.aipinime`. Tên hiển thị: `AnPinime`. Gói ứng d�
 
 Logo sử dụng `logo.png`. Animation `Code_Generated_Image.gif` chỉ dùng khi tải danh sách, tìm kiếm và chi tiết; phần nền đen được hòa bằng screen blending trên nền tối. Màn hình chờ phát phim dùng ảnh phim riêng.
 
+Mục Phim có GIF `AnyAnime/Resources/MovieLoading.gif` tạo từ `logo2.png`. Khởi động kết hợp hai logo; chuyển Anime/Phim dùng hiệu ứng tách mảnh và hiện logo mới bằng Canvas. Reduce Motion dùng chuyển mờ nhẹ. Các icon trình phát dùng đường nét tạo bằng Morphicons 2.0.0 và vẽ native với CAShapeLayer; không nhúng WebView cho icon. Bảng chọn track dùng ID ổn định thay vì chỉ số hàng. Xem [ghi chú tài nguyên](Tools/animation-assets.md).
+
 ## Kiểm thử
 
 Workflow kiểm tra parser anime và JSON của hai nguồn phim, URL ảnh, định danh nguồn, thứ tự phần/tập, chuẩn hóa PNG/HLS/Range, trạng thái phát và thao tác tạm dừng. Khi chạy thủ công với `preview=true`, simulator kiểm tra AVPlayer, WebKit và hai provider bằng máy chủ cục bộ. Fixture Film4k yêu cầu cookie/Referer/ticket, cố ý trả video hết hạn ở lần đầu rồi HLS có segment bọc PNG để kiểm tra tự làm mới URL và relay. Chỉ đạt khi thời gian phát vượt một giây và màn hình nằm ngang.
 
-Một bước riêng kiểm tra Film4k trực tiếp trên mạng và lưu kết quả nếu phát thành công; bước này không chặn build vì phụ thuộc website bên ngoài. Kết quả fixture không được tính là xác nhận phát thực tế. Sau đó có artifact ảnh giao diện. Fixture và chế độ kiểm thử không nằm trong bản Release.
+Các bước riêng kiểm tra cả hai nguồn trực tiếp trên mạng và lưu JSON nếu phát thành công; chúng không chặn build vì phụ thuộc website bên ngoài. Phải có `playback-film4k-live.json`/`playback-phim4k-live.json` trong artifact mới tính là xác nhận phát trực tiếp, không chỉ nhìn trạng thái workflow. Fixture cũng kiểm tra chọn/tắt phụ đề, bỏ qua ID cũ và chọn chất lượng. Fixture và chế độ kiểm thử không nằm trong bản Release.
 
 ## Giới hạn
 

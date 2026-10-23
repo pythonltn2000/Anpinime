@@ -417,11 +417,15 @@ struct PlayerView: View {
                             Text("Luồng hiện tại không cung cấp lựa chọn này cho trình phát native.")
                                 .font(.footnote).foregroundStyle(.secondary).padding(.vertical)
                         }
+                        if kind == "subtitles" {
+                            Text("Chỉ tắt được phụ đề rời. Chữ đã ghép vào hình không thể tắt; với nguồn có nhiều bản Vietsub/lồng tiếng, hãy đổi máy chủ trong Danh sách tập.")
+                                .font(.caption).foregroundStyle(.secondary).padding(.vertical, 8)
+                        }
                         if kind == "quality" {
                             Text("Chỉ hiện mức chất lượng nguồn thực sự cung cấp. Mức chọn là giới hạn tối đa; video có thể giảm chất lượng khi mạng yếu.")
                                 .font(.caption).foregroundStyle(.secondary).padding(.vertical, 8)
                         }
-                        if kind == "subtitles", !options.isEmpty {
+                        if kind == "subtitles", options.count > 1 {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Cỡ chữ \(Int(playback.subtitleSize))%").font(.subheadline)
                                 Slider(value: $playback.subtitleSize, in: 70...180, step: 10)

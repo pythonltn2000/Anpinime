@@ -123,6 +123,20 @@ jobs:
           xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot previews/phim4k-live.png
           test -f "$ANPINIME_APP_DATA/Documents/playback-phim4k-live.json"
           cp "$ANPINIME_APP_DATA/Documents/playback-phim4k-live.json" previews/
+      - name: Record logo transitions
+        if: always()
+        run: |
+          ANPINIME_SIMULATOR_ID=$(xcrun simctl list devices booted -j | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(Object.values(JSON.parse(s).devices).flat()[0].udid))')
+          mkdir -p previews
+          for scene in intro switch; do
+            xcrun simctl io "$ANPINIME_SIMULATOR_ID" recordVideo --codec=h264 "previews/$scene.mp4" &
+            ANPINIME_RECORD_PID=$!
+            sleep 1
+            xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime --ui-preview "$scene"
+            sleep 4
+            kill -INT "$ANPINIME_RECORD_PID"
+            wait "$ANPINIME_RECORD_PID" || true
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
