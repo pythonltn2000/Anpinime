@@ -18,7 +18,7 @@ jobs:
 
       - name: Verify parsing and playback regressions
         run: |
-          swiftc AnyAnime/Models.swift AnyAnime/HTMLParser.swift AnyAnime/MovieCatalog.swift Tests/main.swift -o "$RUNNER_TEMP/anpinime-parser-tests"
+          swiftc AnyAnime/Models.swift AnyAnime/HTMLParser.swift AnyAnime/MovieCatalog.swift AnyAnime/FilmMediaTransform.swift Tests/main.swift -o "$RUNNER_TEMP/anpinime-parser-tests"
           "$RUNNER_TEMP/anpinime-parser-tests"
           npm install --prefix "$RUNNER_TEMP/anpinime-js-tests" jsdom@26.1.0 --no-audit --no-fund
           NODE_PATH="$RUNNER_TEMP/anpinime-js-tests/node_modules" node Tests/player.test.cjs

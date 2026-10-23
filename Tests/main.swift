@@ -49,3 +49,18 @@ check(MovieCatalog.url("javascript:alert(1)", base: filmBase) == nil, "Provider 
 var otherSource = film
 otherSource.source = .phim4k
 check(film.id != otherSource.id, "The same path in different sources has a different catalog identity")
+
+let pngEnvelope = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==")!
+let media = Data([0, 0, 0, 24]) + Data("ftypisom".utf8)
+check(FilmMediaTransform.unwrap(pngEnvelope + media) == media, "Complete PNG envelope is removed without altering video bytes")
+check(FilmMediaTransform.unwrap(media) == media, "Unwrapped media passes through unchanged")
+check(FilmMediaTransform.unwrap(pngEnvelope) == pngEnvelope, "An ordinary PNG without appended media is not treated as video")
+check(FilmMediaTransform.unwrap(Data(pngEnvelope.prefix(25))) == Data(pngEnvelope.prefix(25)), "Truncated PNG chunks never cause an out-of-bounds read")
+let playlist = "#EXTM3U\n#EXT-X-MAP:URI=\"init.png\"\n#EXT-X-MEDIA:TYPE=AUDIO,URI=\"/a.m3u8\"\nsegment.png\n"
+let rewritten = FilmMediaTransform.playlist(playlist, base: URL(string: "https://films.example/hls/master.m3u8")!) { url in
+    URL(string: "http://127.0.0.1:1234/" + url.lastPathComponent)!
+}
+check(rewritten.contains("URI=\"http://127.0.0.1:1234/init.png\"") && rewritten.contains("\nhttp://127.0.0.1:1234/segment.png"), "HLS init, track and segment URLs are routed through the local adapter")
+check(FilmMediaTransform.byteRange("bytes=0-1", count: 100) == 0..<2, "AVPlayer's initial two-byte probe is supported")
+check(FilmMediaTransform.byteRange("bytes=-10", count: 100) == 90..<100, "Suffix byte ranges use normalized media size")
+check(FilmMediaTransform.byteRange("bytes=100-", count: 100) == nil, "Unsatisfiable byte ranges are rejected")

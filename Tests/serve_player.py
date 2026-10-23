@@ -4,8 +4,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import json
 import time
+import base64
 
 VIDEO = Path(__file__).with_name("sample.mp4").read_bytes()
+PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==")
 
 class Handler(BaseHTTPRequestHandler):
     watch_requests = 0
@@ -37,7 +39,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/watch/fixture-movie":
             Handler.watch_requests += 1
-            stream = "/expired.mp4" if Handler.watch_requests == 1 else "/provider.mp4"
+            stream = "/expired.mp4" if Handler.watch_requests == 1 else "/wrapped/master.m3u8"
             self.send_json({"movie": movie, "episodes": [], "sources": [{"url": stream}]})
             return
         if path == "/danh-sach/phim-moi-cap-nhat-v3":
@@ -48,6 +50,29 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/expired.mp4":
             self.send_error(410, "Fixture URL expired; resolver must refresh once")
+            return
+        if path.startswith("/wrapped/"):
+            if self.headers.get("X-F4K-PT") != "fixture-ticket" or "movie_session=1" not in self.headers.get("Cookie", "") or "/watch/fixture-movie" not in self.headers.get("Referer", ""):
+                self.send_error(403, "HLS requires ticket, cookie and watch Referer")
+                return
+            name = path.removeprefix("/wrapped/")
+            if name == "master.m3u8":
+                data = b'#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=500000,CODECS="avc1.42c00c,mp4a.40.2"\nmedia.m3u8\n'
+                content_type = "application/vnd.apple.mpegurl"
+            elif name == "media.m3u8":
+                data = Path(__file__).with_name("wrapped-hls").joinpath(name).read_bytes()
+                content_type = "application/vnd.apple.mpegurl"
+            elif name in ("init.mp4", "media0.m4s", "media1.m4s"):
+                data = PNG + Path(__file__).with_name("wrapped-hls").joinpath(name).read_bytes()
+                content_type = "image/png"
+            else:
+                self.send_error(404)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
             return
         if path in ("/sample.mp4", "/provider.mp4", "/legacy.mp4"):
             if path == "/sample.mp4" and ("smoke_session=1" not in self.headers.get("Cookie", "") or "/embed.html" not in self.headers.get("Referer", "")):

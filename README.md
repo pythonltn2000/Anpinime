@@ -35,6 +35,8 @@ URL video phát hiện từ iframe (kể cả manifest của player dùng blob) 
 
 Luồng HLS/MP4 dùng AVPlayer cùng cookie/Referer và ticket nếu có. Khi phát lỗi, lấy lại URL một lần rồi mới chuyển sang trình phát website đúng tập. Ticket chỉ được gắn vào URL thuộc máy chủ nguồn. Nguồn ngoài có thể thay đổi codec, API hoặc yêu cầu đăng nhập; app không đảm bảo mọi phim của website đều phát được trên mọi thiết bị.
 
+Film4k có các luồng fMP4 bọc trong PNG. `FilmMediaRelay` chỉ lắng nghe tại loopback của thiết bị, viết lại URL playlist và bỏ lớp PNG hoàn chỉnh trước khi đưa byte video cho AVPlayer. Hỗ trợ init segment, audio, subtitle và Range sau khi chuẩn hóa; không tải phim xuống ổ đĩa. Listener bị đóng khi rời trình phát. Cơ chế này dựa trên định dạng thực tế và cách xử lý trong player công khai của website, không xử lý DRM.
+
 ### Nguồn phim 2 · Phim4K
 
 Đây là nguồn riêng, **không phải Film4k.net**. Tích hợp hai họ endpoint tìm thấy khi phân tích IPA 2.8.4: Free1 (`/danh-sach/phim-moi-cap-nhat-v3`, `/v1/api/tim-kiem`, `/phim/{slug}`) và Free2 (`/api/films/phim-moi-cap-nhat`, `/api/films/search`, `/api/film/{slug}`). Hỗ trợ danh sách, tìm kiếm, máy chủ/tập, HLS và embed theo hai cấu trúc JSON tương ứng.
@@ -58,7 +60,7 @@ Logo sử dụng `logo.png`. Animation `Code_Generated_Image.gif` chỉ dùng kh
 
 ## Kiểm thử
 
-Workflow kiểm tra parser anime và JSON của hai nguồn phim, URL ảnh, định danh nguồn, thứ tự phần/tập, trạng thái phát và thao tác tạm dừng. Khi chạy thủ công với `preview=true`, simulator kiểm tra AVPlayer, WebKit và hai provider bằng máy chủ cục bộ. Fixture Film4k yêu cầu cookie/Referer/ticket, cố ý trả video hết hạn ở lần đầu để kiểm tra tự làm mới URL. Chỉ đạt khi thời gian phát vượt một giây và màn hình nằm ngang.
+Workflow kiểm tra parser anime và JSON của hai nguồn phim, URL ảnh, định danh nguồn, thứ tự phần/tập, chuẩn hóa PNG/HLS/Range, trạng thái phát và thao tác tạm dừng. Khi chạy thủ công với `preview=true`, simulator kiểm tra AVPlayer, WebKit và hai provider bằng máy chủ cục bộ. Fixture Film4k yêu cầu cookie/Referer/ticket, cố ý trả video hết hạn ở lần đầu rồi HLS có segment bọc PNG để kiểm tra tự làm mới URL và relay. Chỉ đạt khi thời gian phát vượt một giây và màn hình nằm ngang.
 
 Một bước riêng kiểm tra Film4k trực tiếp trên mạng và lưu kết quả nếu phát thành công; bước này không chặn build vì phụ thuộc website bên ngoài. Kết quả fixture không được tính là xác nhận phát thực tế. Sau đó có artifact ảnh giao diện. Fixture và chế độ kiểm thử không nằm trong bản Release.
 

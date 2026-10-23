@@ -55,6 +55,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
     private var providerRefreshAttempted = false
     private var resumeAfterRefresh = 0.0
     private var mediaTracksLoaded = false
+    private var filmRelay: FilmMediaRelay?
 
     init(episode: Episode, service: AnimeService, playback: PlaybackState) {
         self.episode = episode
@@ -104,6 +105,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         guard active else { return }
         active = false
         requestTask?.cancel()
+        filmRelay?.stop(); filmRelay = nil
         fallbackTimer?.invalidate()
         revealTimer?.invalidate()
         nativeTimer?.invalidate()
@@ -156,7 +158,14 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 self.providerHeaders = resolved.headers
                 self.providerWebURL = resolved.webURL
                 if resolved.isWeb { self.startFallback(url: resolved.url) }
-                else { self.showNativePlayer(url: resolved.url) }
+                else if self.episode.source == .film4k && resolved.url.pathExtension == "m3u8" {
+                    self.filmRelay?.stop()
+                    let relay = FilmMediaRelay(origin: self.baseURL, headers: resolved.headers)
+                    self.filmRelay = relay
+                    let localURL = try await relay.start(resolved.url)
+                    try Task.checkCancellation()
+                    self.showNativePlayer(url: localURL)
+                } else { self.showNativePlayer(url: resolved.url) }
             } catch {
                 guard self.active, !Task.isCancelled else { return }
                 if refresh, let url = self.providerWebURL { self.startFallback(url: url) }
