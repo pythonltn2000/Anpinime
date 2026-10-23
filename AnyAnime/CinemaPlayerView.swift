@@ -151,14 +151,10 @@ struct PlayerView: View {
             .frame(width: size.width, height: size.height).clipped()
             .overlay(Color.black.opacity(0.44))
             LinearGradient(colors: [.black.opacity(0.2), .black.opacity(0.1), .black.opacity(0.95)], startPoint: .top, endPoint: .bottom)
-            VStack(spacing: 18) {
+            VStack(spacing: 16) {
                 Text("ANPINIME").font(.system(size: 11, weight: .bold, design: .rounded)).tracking(6).foregroundColor(.white.opacity(0.65))
                 PulsingMovieTitle(title: title, size: size.width > 600 ? 40 : 30)
                 Text(current.title).font(.subheadline.weight(.medium)).foregroundColor(.white.opacity(0.7))
-                HStack(spacing: 9) {
-                    ProgressView().tint(.white.opacity(0.8))
-                    Text("Đang chuẩn bị phim của bạn").font(.caption).foregroundColor(.white.opacity(0.65))
-                }
             }.padding(.horizontal, 36).opacity(playback.duration > 0 ? 0 : 1)
         }.ignoresSafeArea().allowsHitTesting(false)
     }
@@ -356,16 +352,39 @@ struct PlayerView: View {
 
 private struct PulsingMovieTitle: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var glowing = false
+    @State private var illuminated = false
     let title: String
     let size: CGFloat
+
     var body: some View {
-        Text(title).font(.system(size: size, weight: .heavy, design: .rounded))
-            .multilineTextAlignment(.center).lineLimit(3)
-            .shadow(color: .black.opacity(0.6), radius: 20)
-            .opacity(reduceMotion ? 1 : (glowing ? 1 : 0.4))
-            .animation(reduceMotion ? nil : .easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: glowing)
-            .onAppear { glowing = true }
+        ZStack {
+            titleText
+                .foregroundColor(.anpinimeAccent)
+                .blur(radius: illuminated ? 14 : 5)
+                .opacity(reduceMotion ? 0.35 : (illuminated ? 0.52 : 0.16))
+                .scaleEffect(illuminated ? 1.025 : 0.985)
+            titleText
+                .foregroundStyle(LinearGradient(
+                    colors: [.white, .white.opacity(0.92), .anpinimeAccent.opacity(0.86)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+                .shadow(color: .black.opacity(0.72), radius: 18, y: 8)
+                .shadow(color: .anpinimeAccent.opacity(illuminated ? 0.42 : 0.08), radius: illuminated ? 16 : 4)
+                .opacity(reduceMotion ? 1 : (illuminated ? 1 : 0.68))
+                .scaleEffect(reduceMotion ? 1 : (illuminated ? 1.012 : 0.992))
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 1.45).repeatForever(autoreverses: true), value: illuminated)
+        .onAppear { illuminated = true }
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(.custom("AvenirNext-Heavy", size: size, relativeTo: .title))
+            .tracking(-0.7)
+            .multilineTextAlignment(.center)
+            .lineLimit(3)
+            .minimumScaleFactor(0.72)
     }
 }
 

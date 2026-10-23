@@ -267,8 +267,33 @@ struct AppSettingsView: View {
             Section("Giới thiệu") {
                 LabeledContentCompat(title: "Ứng dụng", value: "AnPinime")
                 LabeledContentCompat(title: "Phiên bản", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.1.0")
+                LabeledContentCompat(title: "Tác giả", value: "KingLTN")
                 Text("Khám phá anime, chọn tập yêu thích và tận hưởng từng khung hình.")
                     .font(.footnote).foregroundColor(.secondary)
+                Link(destination: URL(string: "https://t.me/kingltnn")!) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 38, height: 38)
+                            .background(Color(red: 0.13, green: 0.67, blue: 0.91), in: Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Telegram").font(.headline)
+                            Text("@kingltnn").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                    .cinemaGlass(cornerRadius: 20, interactive: true)
+                }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
             }
         }
         .navigationTitle("Cài đặt")

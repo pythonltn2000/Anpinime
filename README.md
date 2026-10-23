@@ -2,6 +2,8 @@
 
 Ứng dụng xem anime với danh sách phim, tìm kiếm, thể loại và trình phát toàn màn hình. Màn hình chờ phim dùng ảnh nền và tên phim nhấp nháy; trình phát có danh sách tập, tua, tốc độ, tỉ lệ hình, khóa chạm, độ sáng và tự phát tập tiếp theo.
 
+Tác giả: **KingLTN** — Telegram [@kingltnn](https://t.me/kingltnn).
+
 Khi mở phim, app chuyển sang hướng ngang và trở lại hướng dọc khi thoát. Bảng tập và cài đặt dùng Liquid Glass trên iOS 26; iOS 15–18 dùng nền material. Ảnh phim được tải cùng User-Agent, Referer và cookie của phiên kết nối, có cache và làm mới sau khi đổi tên miền.
 
 ## Cơ chế tên miền động

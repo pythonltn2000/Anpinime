@@ -19,6 +19,15 @@ struct PlayerControllerView: UIViewControllerRepresentable {
 
 @MainActor
 final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+    private static let episodeSession: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.httpCookieStorage = .shared
+        configuration.httpShouldSetCookies = true
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 20
+        return URLSession(configuration: configuration)
+    }()
+
     private let episodeURL: URL
     private let baseURL: URL
     private let playback: PlaybackState
@@ -125,17 +134,14 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
     }
 
     private func attemptDirectPlayer() {
-        var request = URLRequest(url: episodeURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        var request = URLRequest(url: episodeURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
         request.setValue(AnimeService.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue(baseURL.absoluteString, forHTTPHeaderField: "Referer")
 
         requestTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let configuration = URLSessionConfiguration.default
-                configuration.httpCookieStorage = .shared
-                configuration.httpShouldSetCookies = true
-                let (data, response) = try await URLSession(configuration: configuration).data(for: request)
+                let (data, response) = try await Self.episodeSession.data(for: request)
                 guard self.active, !Task.isCancelled else { return }
                 guard let http = response as? HTTPURLResponse, (200..<400).contains(http.statusCode),
                       let html = String(data: data, encoding: .utf8),
@@ -170,7 +176,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         webView.loadHTMLString(html, baseURL: baseURL)
 
         fallbackTimer?.invalidate()
-        fallbackTimer = Timer.scheduledTimer(withTimeInterval: 14, repeats: false) { [weak self] _ in
+        // The direct endpoint normally answers in a few seconds. Move on quickly when
+        // its player contract has changed instead of keeping the viewer on the loader.
+        fallbackTimer = Timer.scheduledTimer(withTimeInterval: 9, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.startFallback() }
         }
     }
@@ -443,6 +451,11 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        let normalized = message.folding(options: .diacriticInsensitive, locale: Locale(identifier: "vi_VN")).lowercased()
+        if normalized.contains("neu ban khong the truy cap animevietsub") {
+            completionHandler()
+            return
+        }
         let alert = UIAlertController(title: "Trình phát", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
         present(alert, animated: true)
@@ -495,7 +508,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             window.webkit.messageHandlers.playerError.postMessage(detail);
           }
         }
-        var checks=0, timer=setInterval(()=>{if(typeof pako!=='undefined'||checks++>30){clearInterval(timer);start();}},100);
+        // The local script tag is blocking: pako is ready here, or start() immediately
+        // loads the CDN fallback. Polling for three seconds only slowed failure recovery.
+        start();
         </script></body></html>
         """
     }
@@ -527,6 +542,14 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             var p=v.play();if(p&&p.catch)p.catch(function(){state();});
           }
           function important(el,key,value){if(el&&(el.style.getPropertyValue(key)!==value||el.style.getPropertyPriority(key)!=='important'))el.style.setProperty(key,value,'important');}
+          function hideAccessNotices(){
+            var candidates=document.querySelectorAll('p,span,small,a,.alert,.notice,.message,.warning,[class*="notice"],[class*="warning"],[class*="notify"]');
+            candidates.forEach(function(el){
+              var text=String(el.innerText||el.textContent||'').toLowerCase();
+              var notice=text.indexOf('nếu bạn không thể truy cập animevietsub')>=0||text.indexOf('neu ban khong the truy cap animevietsub')>=0;
+              if(notice&&text.length<500)important(el,'display','none');
+            });
+          }
           function challenge(){return /just a moment|xác minh an toàn|xác minh bảo mật|verify you are human|checking your browser/i.test(document.title)||!!document.querySelector('#challenge-form');}
           function state(){
             var v=activeVideo;if(!v)return;
@@ -553,6 +576,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           });
           function hideChrome(){
             hidden.forEach(function(s){try{document.querySelectorAll(s).forEach(function(e){important(e,'display','none');});}catch(e){}});
+            hideAccessNotices();
             important(document.documentElement,'margin','0'); important(document.documentElement,'padding','0');
             important(document.documentElement,'background','#000'); important(document.documentElement,'overflow','hidden');
             important(document.body,'margin','0'); important(document.body,'padding','0');

@@ -52,9 +52,13 @@ assert.equal(f.video.paused, false);
 assert(f.messages.some(m => m.name === 'mediaState' && m.value.ready && m.value.duration === 180));
 f.dom.window.close();
 
+const n = fixture('<title>Xem phim</title><body><p class="notice">Nếu bạn không thể truy cập AnimeVietsub, hãy thử tên miền khác.</p><video src="https://cdn.example/movie.mp4"></video></body>');
+assert.equal(n.w.document.querySelector('.notice').style.display, 'none', 'Hide the AnimeVietsub access notice from the player');
+n.dom.window.close();
+
 const c = fixture('<title>Just a moment...</title><body><header>Verify</header><form id="challenge-form"><input type="checkbox"></form></body>');
 assert.equal(c.w.__anyanimeFocusPlayer(), false);
 assert.notEqual(c.w.document.querySelector('header').style.display, 'none', 'Keep real challenge usable');
 assert(!c.messages.some(m => m.name === 'playerReady'));
 c.dom.window.close();
-console.log('PASS: fullscreen isolation, playback commands, pause preservation, seek limits, fill persistence and challenge visibility');
+console.log('PASS: fullscreen isolation, playback commands, access notice filtering, pause preservation, seek limits, fill persistence and challenge visibility');
