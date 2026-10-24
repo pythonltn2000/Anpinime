@@ -61,6 +61,9 @@ struct PlayerView: View {
 
     private var current: Episode { selectedEpisode ?? episode }
     private var currentIndex: Int? { episodes.firstIndex(where: { $0.id == current.id }) }
+    private var availableSeasons: [String] {
+        episodes.reduce(into: [String]()) { if !$0.contains($1.season) { $0.append($1.season) } }
+    }
     private var nextEpisode: Episode? {
         guard let i = currentIndex, i + 1 < episodes.count, episodes[i + 1].season == current.season else { return nil }
         return episodes[i + 1]
@@ -105,7 +108,12 @@ struct PlayerView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "wifi.exclamationmark").font(.largeTitle)
                             Text(error).multilineTextAlignment(.center)
-                            Button("Thử phát lại") { retry() }.buttonStyle(.borderedProminent).tint(.anpinimeAccent)
+                            HStack(spacing: 12) {
+                                Button("Thử phát lại") { retry() }.buttonStyle(.borderedProminent).tint(.anpinimeAccent)
+                                if availableSeasons.count > 1 {
+                                    Button("Đổi Server") { openPanel("seasons") }.buttonStyle(.bordered).tint(.white)
+                                }
+                            }
                         }.padding(24).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
                             .padding(30)
                     }
@@ -180,7 +188,7 @@ struct PlayerView: View {
                     controlButton("chevron.left", "Đóng trình phát") { dismiss() }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title).font(.headline).lineLimit(1)
-                        Text(current.source.isMovie ? "\(current.source.title) · \(current.title)" : current.title).font(.caption).foregroundColor(.white.opacity(0.6))
+                        Text(current.source.isMovie ? "\(current.season) · \(current.title)" : current.title).font(.caption).foregroundColor(.white.opacity(0.65)).lineLimit(1)
                     }
                     Spacer(minLength: 0)
                     controlButton("gearshape", "Cài đặt phát") { openPanel("settings") }
@@ -217,6 +225,9 @@ struct PlayerView: View {
                     }
                     HStack(spacing: 12) {
                         smallButton("Danh sách tập", "rectangle.stack") { openPanel("episodes") }
+                        if availableSeasons.count > 1 {
+                            smallButton("Đổi Server", "server.rack") { openPanel("seasons") }
+                        }
                         if let next = nextEpisode {
                             if size.width > 500 { smallButton("Tập tiếp", "forward.end.fill") { select(next) } }
                             else { controlButton("forward.end.fill", "Tập tiếp") { select(next) } }
@@ -399,8 +410,19 @@ struct PlayerView: View {
                         ForEach(options) { option in
                             Button {
                                 // Stable option identity, never a transient menu index.
-                                if kind == "seasons" { panelSeason = option.id; panel = "episodes" }
-                                else { playback.chooseOption?(kind, option.id) }
+                                if kind == "seasons" {
+                                    panelSeason = option.id
+                                    let seasonEpisodes = episodes.filter { $0.season == option.id }
+                                    if seasonEpisodes.count == 1, let single = seasonEpisodes.first {
+                                        select(single)
+                                    } else if let matched = seasonEpisodes.first(where: { $0.number == current.number }) {
+                                        select(matched)
+                                    } else {
+                                        panel = "episodes"
+                                    }
+                                } else {
+                                    playback.chooseOption?(kind, option.id)
+                                }
                             } label: {
                                 HStack(spacing: 12) {
                                     Text(option.title).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)

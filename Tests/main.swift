@@ -36,9 +36,12 @@ let movieJSON = try MovieCatalog.object(Data(#"{"movie":{"slug":"movie","title":
 let movieDetail = try MovieCatalog.filmDetail(movieJSON, anime: film, base: filmBase)
 check(movieDetail.episodes.count == 1, "Feature films expose a playable entry even when detail omits expiring streams")
 let legacyBase = URL(string: "https://legacy.example")!
-let legacyJSON = try MovieCatalog.object(Data(#"{"data":{"APP_DOMAIN_CDN_IMAGE":"https://img.example/","items":[{"slug":"sample","name":"Legacy film","poster_url":"poster.jpg"}]}}"#.utf8))
+let legacyJSON = try MovieCatalog.object(Data(#"{"data":{"APP_DOMAIN_CDN_IMAGE":"https://img.example","items":[{"slug":"sample","name":"Legacy film","poster_url":"uploads/poster.jpg","thumb_url":"uploads/thumb.jpg","year":2026,"quality":"4K","lang":"Vietsub"}]}}"#.utf8))
 let legacy = MovieCatalog.legacyItems(legacyJSON, base: legacyBase, format: .free1)[0]
-check(legacy.source == .phim4k && legacy.imageURL?.host == "img.example", "Phim4K retains separate provider and image CDN")
+check(legacy.source == .phim4k && legacy.imageURL?.absoluteString == "https://img.example/uploads/poster.jpg", "Phim4K retains separate provider and image CDN even without trailing slash")
+check(legacy.bannerURL?.absoluteString == "https://img.example/uploads/thumb.jpg", "Phim4K populates horizontal bannerURL for Featured Hero Carousel")
+check(Phim4KFormat.free1.homeSectionsConfig.map(\.title) == ["Mới cập nhật", "Drama xứ Kim Chi", "Thiên đường Drama Tàu", "Phim Việt", "Phim hoạt hình", "Phim lẻ", "Phim bộ mới nhất"], "Nguồn phim 2 provides all 6 requested category rows plus Mới cập nhật")
+check(Phim4KFormat.free1.defaultCategories.count > 20, "Nguồn phim 2 provides full genre and country browsing list")
 let legacyDetail = try MovieCatalog.object(Data(#"{"movie":{"name":"Legacy film"},"episodes":[{"server_name":"Vietsub","server_data":[{"name":"01","link_m3u8":"https://media.example/a.m3u8","link_embed":"https://embed.example/a"}]}]}"#.utf8))
 let free1Detail = try MovieCatalog.legacyDetail(legacyDetail, anime: legacy)
 check(free1Detail.episodes.first?.source == .phim4k, "Free1 detail maps episodes to the Phim4K resolver")

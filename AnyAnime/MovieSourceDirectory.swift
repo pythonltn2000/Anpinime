@@ -4,6 +4,19 @@ import CryptoKit
 /// The IPA publishes changing provider addresses in an AES-GCM config envelope.
 /// Only the public catalog routes are consumed; account tokens, ads and plugins are ignored.
 enum MovieSourceDirectory {
+    struct CoreAPI {
+        let baseURL: URL
+        let apiKey: String
+    }
+
+    static func coreAPI() -> CoreAPI {
+        let saved = UserDefaults.standard.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
+        let host = saved["api"].flatMap(address) ?? URL(string: "https://api.phim4k.online")!
+        let token = saved["tokens"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = (token?.isEmpty == false) ? token! : "bbbb411dea44849"
+        return CoreAPI(baseURL: host, apiKey: key)
+    }
+
     static func candidates(session: URLSession) async -> [(URL, Phim4KFormat)] {
         var addresses = UserDefaults.standard.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
         do {
@@ -23,8 +36,11 @@ enum MovieSourceDirectory {
             let decoded = try MovieCatalog.object(AES.GCM.open(box, using: key))
             guard let config = decoded["data"] as? MovieCatalog.Object else { throw MovieSourceError.invalidData }
             var updated: [String: String] = [:]
-            for name in ["free1", "free2"] {
+            for name in ["free1", "free2", "api"] {
                 if let value = config[name] as? String, let url = address(value) { updated[name] = url.absoluteString }
+            }
+            if let token = config["tokens"] as? String, !token.isEmpty {
+                updated["tokens"] = token
             }
             if !updated.isEmpty {
                 addresses = updated
@@ -32,11 +48,22 @@ enum MovieSourceDirectory {
             }
         } catch { /* A last-known directory remains useful during a temporary bootstrap outage. */ }
         var result: [(URL, Phim4KFormat)] = []
-        for format in Phim4KFormat.allCases {
-            if let raw = addresses[format.rawValue], let url = address(raw) { result.append((url, format)) }
+        if let raw = addresses["free1"], let url = address(raw) {
+            result.append((url, .free1))
         }
-        for format in Phim4KFormat.allCases where !result.contains(where: { $0.0 == format.defaultURL }) {
-            result.append((format.defaultURL, format))
+        let defaultFree1 = Phim4KFormat.free1.defaultURL
+        if !result.contains(where: { $0.0 == defaultFree1 }) {
+            result.append((defaultFree1, .free1))
+        }
+        if let phimAPI = URL(string: "https://phimapi.com"), !result.contains(where: { $0.0 == phimAPI }) {
+            result.append((phimAPI, .free1))
+        }
+        let defaultFree2 = Phim4KFormat.free2.defaultURL
+        if !result.contains(where: { $0.0 == defaultFree2 }) {
+            result.append((defaultFree2, .free2))
+        }
+        if let raw = addresses["free2"], let url = address(raw), !result.contains(where: { $0.0 == url }) {
+            result.append((url, .free2))
         }
         return result
     }

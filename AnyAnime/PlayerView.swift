@@ -167,7 +167,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 self.providerHeaders = resolved.headers
                 self.providerWebURL = resolved.webURL
                 if resolved.isWeb { self.startFallback(url: resolved.url) }
-                else if self.episode.source.isMovie && (resolved.url.pathExtension.lowercased() == "m3u8" || resolved.url.path.hasSuffix("/stream/hls")) {
+                else if self.shouldUseMediaRelay(for: resolved.url) {
                     self.filmRelay?.stop()
                     let relay = FilmMediaRelay(origin: self.baseURL, headers: resolved.headers)
                     relay.onQualities = { [weak self] options in
@@ -333,6 +333,17 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         return configuration
     }
 
+    private func shouldUseMediaRelay(for url: URL) -> Bool {
+        guard episode.source.isMovie else { return false }
+        let ext = url.pathExtension.lowercased()
+        if episode.source == .film4k {
+            return ext == "m3u8" || url.path.hasSuffix("/stream/hls")
+        }
+        // For Nguồn phim 2 (.phim4k), standard .m3u8/.mp4 streams play directly from CDN via HTTP/2 for maximum speed.
+        // Extensionless HLS endpoints (like /api/content/stream/hls) use FilmMediaRelay so AVPlayer receives a .m3u8 URL.
+        return url.path.contains("/stream/hls") || (ext.isEmpty && url.path.lowercased().contains("hls"))
+    }
+
     private func showNativePlayer(url: URL, referer: URL? = nil) {
         guard active, playerController == nil else { return }
         fallbackTimer?.invalidate()
@@ -349,7 +360,13 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
         let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers,
                                                   AVURLAssetHTTPCookiesKey: cookies])
-        let player = AVPlayer(playerItem: AVPlayerItem(asset: asset, automaticallyLoadedAssetKeys: ["playable", "availableMediaCharacteristicsWithMediaSelectionOptions"]))
+        let playerItem = AVPlayerItem(asset: asset, automaticallyLoadedAssetKeys: ["playable", "availableMediaCharacteristicsWithMediaSelectionOptions"])
+        // Fast start for heavy high-bitrate/4K streams: start decoding with a small initial forward buffer,
+        // then expand buffer once playback is active.
+        playerItem.preferredForwardBufferDuration = 4.0
+        playerItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+        let player = AVPlayer(playerItem: playerItem)
+        player.automaticallyWaitsToMinimizeStalling = false
         player.setMediaSelectionCriteria(AVPlayerMediaSelectionCriteria(preferredLanguages: ["vi", "en"], preferredMediaCharacteristics: nil), forMediaCharacteristic: .audible)
         mediaTracksLoaded = false
         let controller = AVPlayerViewController()
@@ -438,6 +455,10 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         playback.buffering = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
         if player.timeControlStatus == .playing || time > 0 {
             playback.loading = false; playback.error = nil
+            if time > 2.5, item.preferredForwardBufferDuration < 12.0 {
+                item.preferredForwardBufferDuration = 16.0
+                player.automaticallyWaitsToMinimizeStalling = true
+            }
         }
         #if DEBUG
         PlaybackSmokeTest.record(time: time, backend: "native", size: view.bounds.size, playback: playback)

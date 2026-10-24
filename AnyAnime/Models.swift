@@ -24,6 +24,7 @@ enum EpisodePlayback: Hashable {
     case animePage
     case film4k(slug: String, season: Int?, episode: Int?, server: Int)
     case phim4k(detailURL: URL, server: Int, index: Int)
+    case directStream(url: URL, webURL: URL?, isWeb: Bool, referer: URL?)
 }
 
 struct ResolvedPlayback {
@@ -51,9 +52,12 @@ struct Anime: Identifiable, Hashable {
     let title: String
     let url: URL
     let imageURL: URL?
+    var bannerURL: URL? = nil
     let episodeText: String
     let quality: String
     let score: String
+    var summary: String = ""
+    var info: String = ""
     var source: ContentSource = .anime
 
     var id: String { source.rawValue + ":" + url.absoluteString }
@@ -62,6 +66,7 @@ struct Anime: Identifiable, Hashable {
 struct AnimeSection: Identifiable, Hashable {
     let title: String
     let items: [Anime]
+    var categoryPath: String? = nil
 
     var id: String { title }
 }
@@ -71,10 +76,11 @@ struct Episode: Identifiable, Hashable {
     let url: URL
     let number: Int?
     let season: String
+    var qualityBadge: String = ""
     var source: ContentSource = .anime
     var playback: EpisodePlayback = .animePage
 
-    var id: String { source.rawValue + ":" + url.absoluteString + season + title }
+    var id: String { source.rawValue + ":" + url.absoluteString + "|" + season + "|" + title + "|" + qualityBadge }
 }
 
 struct AnimeDetail: Hashable {

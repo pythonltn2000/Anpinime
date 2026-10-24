@@ -78,7 +78,7 @@ struct LibraryChoiceView: View {
                                startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 26) {
-                        Image("AppLogo").resizable().scaledToFit().frame(width: 104, height: 104).cornerRadius(28)
+                        Image("AppLogo").resizable().scaledToFit().frame(width: 120, height: 120)
                         VStack(spacing: 9) {
                             Text("AnPinime").font(.system(size: 36, weight: .heavy, design: .rounded))
                             Text("Hôm nay bạn muốn xem gì?").font(.title3).foregroundStyle(.secondary)
@@ -118,6 +118,11 @@ struct HomeView: View {
     @EnvironmentObject private var service: AnimeService
     var onChooseLibrary: (() -> Void)? = nil
 
+    private var featuredItems: [Anime] {
+        guard let first = service.homeSections.first else { return [] }
+        return Array(first.items.prefix(8))
+    }
+
     var body: some View {
         Group {
             if service.homeSections.isEmpty && service.homeLoading {
@@ -132,12 +137,22 @@ struct HomeView: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 24) {
+                        if !featuredItems.isEmpty {
+                            FeaturedCarouselView(items: featuredItems)
+                        }
                         DomainStatusView()
                         if service.source.isMovie {
                             NavigationLink(destination: AnimeGridView(title: "Tất cả phim", path: "")) {
-                                HStack { Label("Khám phá tất cả phim", systemImage: "square.grid.2x2"); Spacer(); Image(systemName: "chevron.right") }
-                                    .padding().cinemaGlass(cornerRadius: 18)
-                            }.buttonStyle(.plain).padding(.horizontal)
+                                HStack {
+                                    Label("Khám phá kho phim & thể loại", systemImage: "square.grid.2x2")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                }
+                                .padding()
+                                .cinemaGlass(cornerRadius: 18)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal)
                         }
                         ForEach(service.homeSections) { section in
                             AnimeRow(section: section)
@@ -154,7 +169,7 @@ struct HomeView: View {
             ToolbarItem(placement: .navigationBarLeading) {
                 HStack(spacing: 10) {
                     Button { onChooseLibrary?() } label: {
-                        Image(service.source.isMovie ? "MovieLogo" : "AppLogo").resizable().scaledToFit().frame(width: 32, height: 32).cornerRadius(9)
+                        Image(service.source.isMovie ? "MovieLogo" : "AppLogo").resizable().scaledToFit().frame(width: 34, height: 34)
                     }.accessibilityLabel("Chọn Anime hoặc Phim")
                     if service.source.isMovie {
                         Menu {
@@ -183,14 +198,188 @@ struct HomeView: View {
     }
 }
 
+struct FeaturedCarouselView: View {
+    let items: [Anime]
+    @State private var selection = 0
+
+    var body: some View {
+        VStack(spacing: 10) {
+            TabView(selection: $selection) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, anime in
+                    NavigationLink(destination: AnimeDetailView(anime: anime)) {
+                        FeaturedHeroCard(anime: anime)
+                    }
+                    .buttonStyle(.plain)
+                    .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 295)
+
+            if items.count > 1 {
+                HStack(spacing: 6) {
+                    ForEach(0..<items.count, id: \.self) { index in
+                        Capsule()
+                            .fill(index == selection ? Color.anpinimeAccent : Color.white.opacity(0.28))
+                            .frame(width: index == selection ? 20 : 6, height: 6)
+                            .animation(.easeInOut(duration: 0.2), value: selection)
+                    }
+                }
+            }
+        }
+        .task(id: items.map(\.id).joined()) {
+            guard items.count > 1 else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 5_500_000_000)
+                guard !Task.isCancelled else { break }
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    selection = (selection + 1) % items.count
+                }
+            }
+        }
+    }
+}
+
+struct FeaturedHeroCard: View {
+    let anime: Anime
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            RemoteImage(url: anime.bannerURL ?? anime.imageURL)
+                .frame(maxWidth: .infinity)
+                .frame(height: 285)
+                .clipped()
+
+            LinearGradient(
+                stops: [
+                    .init(color: .black.opacity(0.35), location: 0),
+                    .init(color: .black.opacity(0.15), location: 0.35),
+                    .init(color: .black.opacity(0.82), location: 0.72),
+                    .init(color: .black.opacity(0.96), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 6) {
+                    Text("ĐỀ CỬ MỚI")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .tracking(0.8)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.anpinimeAccent, in: Capsule())
+                        .foregroundColor(.white)
+
+                    if !anime.quality.isEmpty {
+                        Badge(text: anime.quality, color: .cyan)
+                    }
+                    if !anime.episodeText.isEmpty {
+                        Badge(text: anime.episodeText, color: .red)
+                    }
+                    if !anime.score.isEmpty {
+                        HStack(spacing: 3) {
+                            Image(systemName: "star.fill")
+                            Text(anime.score)
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.black.opacity(0.55), in: Capsule())
+                        .foregroundColor(.yellow)
+                    }
+                    Spacer()
+                }
+
+                Spacer(minLength: 0)
+
+                HStack(alignment: .bottom, spacing: 14) {
+                    RemoteImage(url: anime.imageURL)
+                        .frame(width: 82, height: 118)
+                        .clipped()
+                        .cornerRadius(10)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.22), lineWidth: 1))
+                        .shadow(color: .black.opacity(0.6), radius: 8, y: 4)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(anime.title)
+                            .font(.title3.weight(.heavy))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+
+                        if !anime.info.isEmpty {
+                            Text(anime.info)
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(.white.opacity(0.82))
+                                .lineLimit(1)
+                        }
+
+                        if !anime.summary.isEmpty {
+                            Text(anime.summary)
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.68))
+                                .lineLimit(2)
+                        }
+
+                        HStack(spacing: 10) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "play.fill")
+                                Text("Xem ngay")
+                            }
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.anpinimeAccent, in: Capsule())
+                            .foregroundColor(.white)
+
+                            HStack(spacing: 5) {
+                                Image(systemName: "info.circle")
+                                Text("Chi tiết")
+                            }
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.16), in: Capsule())
+                            .foregroundColor(.white)
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+            }
+            .padding(16)
+        }
+        .frame(height: 285)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        )
+        .padding(.horizontal)
+    }
+}
+
 struct AnimeRow: View {
     let section: AnimeSection
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(section.title)
-                .font(.title3.bold())
-                .padding(.horizontal)
+            HStack {
+                Text(section.title)
+                    .font(.title3.bold())
+                Spacer()
+                if let path = section.categoryPath, !path.isEmpty {
+                    NavigationLink(destination: AnimeGridView(title: section.title, path: path)) {
+                        HStack(spacing: 4) {
+                            Text("Xem thêm")
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.anpinimeAccent)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
                     ForEach(section.items) { anime in
@@ -243,20 +432,36 @@ struct BrowseView: View {
     @EnvironmentObject private var service: AnimeService
 
     var body: some View {
-        List(service.categories) { category in
-            NavigationLink(destination: AnimeGridView(title: category.title, path: category.path)) {
-                Label(category.title, systemImage: icon(for: category.path))
+        Group {
+            if service.categories.isEmpty && service.homeLoading {
+                LoadingView(text: "Đang tải thể loại…")
+            } else {
+                List(service.categories) { category in
+                    NavigationLink(destination: AnimeGridView(title: category.title, path: category.path)) {
+                        Label(category.title, systemImage: icon(for: category.path))
+                    }
+                }
             }
         }
         .navigationTitle("Thể loại")
+        .task(id: service.source) {
+            if service.categories.isEmpty { await service.loadHome() }
+        }
     }
 
     private func icon(for path: String) -> String {
-        if path.contains("dang-chieu") { return "play.circle" }
-        if path.contains("tron-bo") { return "checkmark.circle" }
-        if path.contains("trung-quoc") { return "sparkles.tv" }
-        if path.contains("anime-le") { return "film" }
-        return "rectangle.stack"
+        if path.contains("dang-chieu") || path.contains("moi-cap-nhat") { return "play.circle.fill" }
+        if path.contains("tron-bo") { return "checkmark.circle.fill" }
+        if path.contains("han-quoc") || path.contains("trung-quoc") || path.contains("viet-nam") || path.contains("au-my") || path.contains("nhat-ban") || path.contains("thai-lan") {
+            return "globe.asia.australia.fill"
+        }
+        if path.contains("hoat-hinh") { return "sparkles.tv.fill" }
+        if path.contains("anime-le") || path.contains("phim-le") || path.contains("type=movie") { return "film.fill" }
+        if path.contains("phim-bo") || path.contains("type=tv") { return "tv.fill" }
+        if path.contains("hanh-dong") || path.contains("vo-thuat") { return "flame.fill" }
+        if path.contains("tinh-cam") { return "heart.fill" }
+        if path.contains("kinh-di") || path.contains("bi-an") { return "moon.stars.fill" }
+        return "rectangle.stack.fill"
     }
 }
 
@@ -391,7 +596,7 @@ struct AppSettingsView: View {
         Form {
             Section {
                 VStack(spacing: 10) {
-                    Image("AppLogo").resizable().scaledToFit().frame(width: 112, height: 112).cornerRadius(26)
+                    Image("AppLogo").resizable().scaledToFit().frame(width: 120, height: 120)
                     Text("AnPinime").font(.largeTitle.bold())
                     Text("Anime và điện ảnh. Một nơi dành cho bạn.")
                         .font(.subheadline).foregroundColor(.secondary).multilineTextAlignment(.center)

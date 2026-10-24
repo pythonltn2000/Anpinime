@@ -58,13 +58,47 @@ final class MovieProvider {
         #endif
         for (url, candidateFormat) in candidates {
             do {
-                let json = try await request(MovieCatalog.route(candidateFormat.listPath, base: url, query: [.init(name: "page", value: "1")]))
-                let items = MovieCatalog.legacyItems(json, base: url, format: candidateFormat)
-                guard !items.isEmpty else { throw MovieSourceError.invalidData }
+                let firstSectionPath = candidateFormat.homeSectionsConfig.first?.path ?? candidateFormat.listPath
+                let json = try await request(MovieCatalog.route(firstSectionPath, base: url, query: [.init(name: "page", value: "1")]))
+                let latestItems = MovieCatalog.legacyItems(json, base: url, format: candidateFormat)
+                guard !latestItems.isEmpty else { throw MovieSourceError.invalidData }
                 try Task.checkCancellation()
-                baseURL = url; format = candidateFormat
-                categories = [.init(title: "Phim mới cập nhật", path: "latest")]
-                return [.init(title: "Mới cập nhật", items: items)]
+                baseURL = url
+                format = candidateFormat
+                categories = candidateFormat.defaultCategories
+
+                let sectionConfigs = url.host == "127.0.0.1" ? [] : Array(candidateFormat.homeSectionsConfig.dropFirst())
+                var fetchedSections: [Int: AnimeSection] = [
+                    0: AnimeSection(title: "Mới cập nhật", items: latestItems, categoryPath: firstSectionPath)
+                ]
+
+                await withTaskGroup(of: (Int, AnimeSection?).self) { group in
+                    for ( idx, config ) in sectionConfigs.enumerated() {
+                        let order = idx + 1
+                        group.addTask { [weak self] in
+                            guard let self else { return (order, nil) }
+                            do {
+                                let routeURL = MovieCatalog.route(config.path, base: url, query: [.init(name: "page", value: "1")])
+                                let secJSON = try await self.request(routeURL)
+                                let secItems = await MainActor.run {
+                                    MovieCatalog.legacyItems(secJSON, base: url, format: candidateFormat)
+                                }
+                                guard !secItems.isEmpty else { return (order, nil) }
+                                return (order, AnimeSection(title: config.title, items: secItems, categoryPath: config.path))
+                            } catch {
+                                return (order, nil)
+                            }
+                        }
+                    }
+                    for await (order, section) in group {
+                        if let section {
+                            fetchedSections[order] = section
+                        }
+                    }
+                }
+
+                let ordered = fetchedSections.keys.sorted().compactMap { fetchedSections[$0] }
+                return ordered.isEmpty ? [AnimeSection(title: "Mới cập nhật", items: latestItems, categoryPath: firstSectionPath)] : ordered
             } catch {
                 if Task.isCancelled { throw CancellationError() }
             }
@@ -81,7 +115,8 @@ final class MovieProvider {
                                                          query: filters + [.init(name: "page", value: String(page))]))
             return MovieCatalog.filmItems(json["list"] as? [MovieCatalog.Object] ?? [], base: baseURL)
         }
-        let json = try await request(MovieCatalog.route(format.listPath, base: baseURL, query: [.init(name: "page", value: String(page))]))
+        let cleanPath = (path.isEmpty || path == "latest") ? format.listPath : path
+        let json = try await request(MovieCatalog.route(cleanPath, base: baseURL, query: [.init(name: "page", value: String(page))]))
         return MovieCatalog.legacyItems(json, base: baseURL, format: format)
     }
 
@@ -89,9 +124,16 @@ final class MovieProvider {
         let path = source == .film4k ? "api/search/suggest" : format.searchPath
         let key = source == .film4k ? "q" : "keyword"
         let json = try await request(MovieCatalog.route(path, base: baseURL, query: [.init(name: key, value: query)]))
-        return source == .film4k
-            ? MovieCatalog.filmItems(json["list"] as? [MovieCatalog.Object] ?? [], base: baseURL)
-            : MovieCatalog.legacyItems(json, base: baseURL, format: format)
+        if source == .film4k {
+            return MovieCatalog.filmItems(json["list"] as? [MovieCatalog.Object] ?? [], base: baseURL)
+        }
+        var results = MovieCatalog.legacyItems(json, base: baseURL, format: format)
+        if results.isEmpty, baseURL.host != "phim.nguonc.com", let backupURL = URL(string: "https://phim.nguonc.com") {
+            if let backupJSON = try? await request(MovieCatalog.route(Phim4KFormat.free2.searchPath, base: backupURL, query: [.init(name: "keyword", value: query)])) {
+                results = MovieCatalog.legacyItems(backupJSON, base: backupURL, format: .free2)
+            }
+        }
+        return results
     }
 
     func detail(_ anime: Anime) async throws -> AnimeDetail {
@@ -99,8 +141,94 @@ final class MovieProvider {
             let json = try await request(MovieCatalog.route("api/title/" + anime.url.lastPathComponent, base: baseURL))
             return try MovieCatalog.filmDetail(json, anime: anime, base: baseURL)
         }
-        let json = try await request(anime.url)
-        return try MovieCatalog.legacyDetail(json, anime: anime)
+        let slug = anime.url.lastPathComponent
+        let primaryHost = anime.url.host?.lowercased() ?? ""
+        let prefix = primaryHost.contains("cryboiz") ? "Phim4K" : (primaryHost.contains("phimapi") ? "VIP Nhanh" : (primaryHost.contains("nguonc") ? "NguonC" : "Server 1"))
+        let primaryJSON = try await request(anime.url)
+        let baseDetail = try MovieCatalog.legacyDetail(primaryJSON, anime: anime, serverPrefix: prefix)
+        if primaryHost == "127.0.0.1" || primaryHost == "localhost" {
+            return baseDetail
+        }
+
+        var allEpisodes = baseDetail.episodes
+        var summary = baseDetail.summary
+        var banner = baseDetail.bannerURL
+        var info = baseDetail.info
+
+        // Concurrently aggregate additional servers from VIP CDN (phimapi.com), NguonC (phim.nguonc.com), and Phim4K Core (api.phim4k.online)
+        await withTaskGroup(of: (Int, [Episode], String?, URL?, String?).self) { group in
+            if !primaryHost.contains("phimapi.com"), let vipURL = URL(string: "https://phimapi.com/phim/\(slug)") {
+                group.addTask { [weak self] in
+                    guard let self, let json = try? await self.request(vipURL) else { return (1, [], nil, nil, nil) }
+                    let eps = await MainActor.run { MovieCatalog.directEpisodes(from: json, detailURL: vipURL, serverPrefix: "VIP Nhanh") }
+                    return (1, eps, nil, nil, nil)
+                }
+            }
+            if !primaryHost.contains("nguonc.com"), let nguonURL = URL(string: "https://phim.nguonc.com/api/film/\(slug)") {
+                group.addTask { [weak self] in
+                    guard let self, let json = try? await self.request(nguonURL) else { return (2, [], nil, nil, nil) }
+                    let eps = await MainActor.run { MovieCatalog.directEpisodes(from: json, detailURL: nguonURL, serverPrefix: "NguonC") }
+                    return (2, eps, nil, nil, nil)
+                }
+            }
+            let baseFallback = allEpisodes
+            let searchTitle = baseDetail.title
+            group.addTask { [weak self] in
+                guard let self else { return (3, [], nil, nil, nil) }
+                let core = await MainActor.run { MovieSourceDirectory.coreAPI() }
+                let searchRoute = MovieCatalog.route("rest-api/v130/search", base: core.baseURL,
+                                                     query: [.init(name: "q", value: searchTitle), .init(name: "page", value: "1"), .init(name: "type", value: "movietvserieslive")])
+                guard let searchJSON = try? await self.requestCore(searchRoute, apiKey: core.apiKey) else { return (3, [], nil, nil, nil) }
+                let movies = searchJSON["movie"] as? [MovieCatalog.Object] ?? []
+                let series = searchJSON["tvseries"] as? [MovieCatalog.Object] ?? []
+                let candidates = movies.map { ($0, "movie") } + series.map { ($0, "tvseries") }
+                guard let matched = candidates.first(where: { row, _ in
+                    let rowSlug = MovieCatalog.text(row["slug"]).lowercased()
+                    let rowTitle = MovieCatalog.text(row["title"]).lowercased()
+                    return rowSlug == slug.lowercased() || rowTitle.contains(searchTitle.lowercased())
+                }) ?? candidates.first else { return (3, [], nil, nil, nil) }
+                let vid = MovieCatalog.text(matched.0["videos_id"])
+                guard !vid.isEmpty else { return (3, [], nil, nil, nil) }
+                let detailRoute = MovieCatalog.route("rest-api/v130/single_details", base: core.baseURL,
+                                                     query: [.init(name: "type", value: matched.1), .init(name: "id", value: vid)])
+                guard let coreDetail = try? await self.requestCore(detailRoute, apiKey: core.apiKey) else { return (3, [], nil, nil, nil) }
+                return await MainActor.run {
+                    let eps = MovieCatalog.corePhim4KEpisodes(from: coreDetail, detailURL: anime.url, fallbackEpisodes: baseFallback)
+                    let desc = MovieCatalog.text(coreDetail["description"])
+                        .replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    let thumb = MovieCatalog.url(coreDetail["thumbnail_url"] ?? coreDetail["poster_url"], base: core.baseURL)
+                    let runtime = MovieCatalog.text(coreDetail["runtime"])
+                    return (3, eps, desc.isEmpty ? nil : desc, thumb, runtime.isEmpty ? nil : runtime)
+                }
+            }
+
+            var extraByOrder: [Int: [Episode]] = [:]
+            for await (order, eps, extraDesc, extraBanner, extraRuntime) in group {
+                if !eps.isEmpty { extraByOrder[order] = eps }
+                if (summary.isEmpty || summary == "Chưa có nội dung giới thiệu."), let extraDesc, !extraDesc.isEmpty {
+                    summary = extraDesc
+                }
+                if banner == nil, let extraBanner {
+                    banner = extraBanner
+                }
+                if let extraRuntime, !info.contains(extraRuntime) {
+                    info = [info, extraRuntime].filter { !$0.isEmpty }.joined(separator: " • ")
+                }
+            }
+            for order in extraByOrder.keys.sorted() {
+                if let eps = extraByOrder[order] {
+                    allEpisodes.append(contentsOf: eps)
+                }
+            }
+        }
+
+        return AnimeDetail(title: baseDetail.title,
+                           posterURL: baseDetail.posterURL,
+                           bannerURL: banner ?? baseDetail.posterURL,
+                           summary: summary,
+                           info: info,
+                           episodes: allEpisodes)
     }
 
     func resolve(_ episode: Episode, refresh: Bool = false) async throws -> ResolvedPlayback {
@@ -128,11 +256,30 @@ final class MovieProvider {
             let rows = groups[server]["server_data"] as? [MovieCatalog.Object] ?? groups[server]["items"] as? [MovieCatalog.Object] ?? []
             guard rows.indices.contains(index), let stream = MovieCatalog.legacyStream(rows[index], base: detailURL) else { throw MovieSourceError.noVideo }
             let web = MovieCatalog.url(rows[index]["link_embed"] ?? rows[index]["embed"], base: detailURL)
-            return ResolvedPlayback(url: stream.url, headers: ["Referer": baseURL.absoluteString, "User-Agent": AnimeService.userAgent],
+            let originHost = detailURL.scheme.flatMap { s in detailURL.host.map { "\(s)://\($0)" } } ?? baseURL.absoluteString
+            return ResolvedPlayback(url: stream.url, headers: ["Referer": originHost + "/", "Origin": originHost, "User-Agent": AnimeService.userAgent],
                                     webURL: web, isWeb: stream.web)
+        case .directStream(let url, let webURL, let isWeb, let referer):
+            let refURL = referer ?? baseURL
+            let originHost = refURL.scheme.flatMap { s in refURL.host.map { "\(s)://\($0)" } } ?? baseURL.absoluteString
+            return ResolvedPlayback(url: url, headers: ["Referer": originHost + "/", "Origin": originHost, "User-Agent": AnimeService.userAgent],
+                                    webURL: webURL, isWeb: isWeb)
         case .animePage:
             throw MovieSourceError.noVideo
         }
+    }
+
+    private func requestCore(_ url: URL, apiKey: String) async throws -> MovieCatalog.Object {
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(apiKey, forHTTPHeaderField: "API-KEY")
+        request.setValue(AnimeService.userAgent, forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await session.data(for: request)
+        try Task.checkCancellation()
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw MovieSourceError.invalidData
+        }
+        return try MovieCatalog.object(data)
     }
 
     private static func isNative(_ source: MovieCatalog.Object) -> Bool {

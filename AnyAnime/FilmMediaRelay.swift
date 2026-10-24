@@ -35,11 +35,12 @@ final class FilmMediaRelay {
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = .shared
         config.timeoutIntervalForRequest = 25
-        config.timeoutIntervalForResource = 40
-        config.httpMaximumConnectionsPerHost = 4
+        config.timeoutIntervalForResource = 60
+        config.httpMaximumConnectionsPerHost = 12
+        config.waitsForConnectivity = false
         session = URLSession(configuration: config, delegate: FilmRedirectPolicy(), delegateQueue: nil)
-        mediaCache.totalCostLimit = 32 * 1024 * 1024
-        mediaCache.countLimit = 8
+        mediaCache.totalCostLimit = 96 * 1024 * 1024
+        mediaCache.countLimit = 24
     }
 
     func start(_ url: URL) async throws -> URL {
@@ -93,7 +94,7 @@ final class FilmMediaRelay {
     }
 
     private func accept(_ connection: NWConnection) {
-        guard listener != nil, connections.count < 12 else { connection.cancel(); return }
+        guard listener != nil, connections.count < 32 else { connection.cancel(); return }
         let id = UUID()
         connections[id] = connection
         connection.start(queue: queue)
@@ -139,7 +140,7 @@ final class FilmMediaRelay {
             } else {
                 (data, response) = try await session.data(for: request)
                 if let http = response as? HTTPURLResponse, http.statusCode == 200,
-                   data.starts(with: [137, 80, 78, 71]), data.count < 16 * 1024 * 1024 {
+                   !data.starts(with: Data("#EXTM3U".utf8)), data.count < 32 * 1024 * 1024 {
                     mediaCache.setObject(data as NSData, forKey: url as NSURL, cost: data.count)
                 }
             }
@@ -147,7 +148,7 @@ final class FilmMediaRelay {
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 send(id, status: (response as? HTTPURLResponse)?.statusCode ?? 502, body: Data()); return
             }
-            guard data.count <= 64 * 1024 * 1024 else { send(id, status: 502, body: Data()); return }
+            guard data.count <= 128 * 1024 * 1024 else { send(id, status: 502, body: Data()); return }
             let body: Data, type: String
             if data.starts(with: Data("#EXTM3U".utf8)), let text = String(data: data, encoding: .utf8) {
                 if text.contains("#EXT-X-STREAM-INF:") { onQualities?(FilmMediaTransform.qualities(text)) }

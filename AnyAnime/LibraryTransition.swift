@@ -19,18 +19,18 @@ struct LibraryTransition: View {
                     Color(red: 0.018, green: 0.012, blue: 0.04).ignoresSafeArea()
                     Circle().fill(Color.anpinimeAccent.opacity(0.18)).frame(width: side * 1.45, height: side * 1.45).blur(radius: 55)
                     if reduceMotion {
-                        Image(to).resizable().scaledToFit().frame(width: side).opacity(progress).blendMode(.screen)
+                        Image(to).resizable().scaledToFit().frame(width: side).opacity(progress)
                     } else if intro {
                         let merge = min(1, progress / 0.65)
                         let eased = merge * merge * (3 - 2 * merge)
                         Image("AppLogo").resizable().scaledToFit().frame(width: side)
                             .offset(x: -side * 0.64 * (1 - eased), y: -18 * sin(merge * .pi))
                             .rotationEffect(.degrees(-12 * (1 - eased)))
-                            .opacity(1 - max(0, progress - 0.72) / 0.28).blendMode(.screen)
+                            .opacity(1 - max(0, progress - 0.72) / 0.28)
                         Image("MovieLogo").resizable().scaledToFit().frame(width: side)
                             .offset(x: side * 0.64 * (1 - eased), y: 18 * sin(merge * .pi))
                             .rotationEffect(.degrees(12 * (1 - eased)))
-                            .opacity(progress < 0.7 ? 1 : 0.65).blendMode(.screen)
+                            .opacity(progress < 0.7 ? 1 : 0.65)
                     } else {
                         let burst = min(1, max(0, (progress - 0.08) / 0.64))
                         Canvas { context, size in
@@ -49,10 +49,10 @@ struct LibraryTransition: View {
                                     piece.draw(image, in: CGRect(x: -side / 2, y: -side / 2, width: side, height: side))
                                 }
                             }
-                        }.blendMode(.screen)
+                        }
                         let reveal = min(1, max(0, (progress - 0.3) / 0.7))
                         Image(to).resizable().scaledToFit().frame(width: side)
-                            .scaleEffect(0.82 + reveal * 0.18).opacity(reveal).blur(radius: (1 - reveal) * 5).blendMode(.screen)
+                            .scaleEffect(0.82 + reveal * 0.18).opacity(reveal).blur(radius: (1 - reveal) * 5)
                     }
                     VStack { Spacer(); Text(intro ? "ANPINIME" : (to == "MovieLogo" ? "ĐIỆN ẢNH" : "ANIME"))
                         .font(.system(size: 13, weight: .semibold, design: .rounded)).tracking(5)
