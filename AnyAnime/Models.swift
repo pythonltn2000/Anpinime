@@ -50,6 +50,7 @@ struct PlaybackQuality: Identifiable, Hashable {
 
 struct Anime: Identifiable, Hashable {
     let title: String
+    var subtitle: String = ""
     let url: URL
     let imageURL: URL?
     var bannerURL: URL? = nil

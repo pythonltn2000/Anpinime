@@ -18,7 +18,7 @@ struct AnimeDetailView: View {
     }
 
     var body: some View {
-        Group {
+        ZStack {
             if loading { LoadingView(text: "Đang tải thông tin phim…") }
             else if let detail { detailContent(detail) }
             else {
@@ -60,20 +60,40 @@ struct AnimeDetailView: View {
         let activeSeason = selectedSeason.isEmpty ? (seasons.first ?? "") : selectedSeason
         let activeEpisodes = detail.episodes.filter { $0.season == activeSeason }
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 16) {
                 ZStack(alignment: .bottomLeading) {
                     RemoteImage(url: detail.bannerURL ?? detail.posterURL)
-                        .frame(maxWidth: .infinity).frame(height: 245).clipped()
-                    LinearGradient(colors: [.clear, .black.opacity(0.95)], startPoint: .top, endPoint: .bottom)
-                    HStack(alignment: .bottom, spacing: 14) {
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 235)
+                        .clipped()
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black.opacity(0.25), location: 0),
+                            .init(color: .black.opacity(0.45), location: 0.45),
+                            .init(color: .black.opacity(0.96), location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    HStack(alignment: .bottom, spacing: 12) {
                         RemoteImage(url: detail.posterURL)
-                            .frame(width: 105, height: 150).clipped().cornerRadius(10)
+                            .frame(width: 96, height: 138)
+                            .clipped()
+                            .cornerRadius(10)
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.18), lineWidth: 1))
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text(detail.title).font(.title2.bold()).foregroundColor(.white)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(detail.title)
+                                .font(.title3.bold())
+                                .foregroundColor(.white)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                             if !detail.info.isEmpty {
-                                Text(detail.info).font(.caption).foregroundColor(.white.opacity(0.82)).lineLimit(3)
+                                Text(detail.info)
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.82))
+                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             if seasons.count > 1 {
                                 HStack(spacing: 5) {
@@ -87,9 +107,13 @@ struct AnimeDetailView: View {
                                 .foregroundColor(.white)
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding()
+                    .padding(16)
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 235)
+                .clipped()
 
                 if let first = activeEpisodes.first ?? detail.episodes.first {
                     HStack(spacing: 10) {
@@ -105,6 +129,7 @@ struct AnimeDetailView: View {
                                 Image(systemName: "play.fill")
                                 Text(seasons.count > 1 ? "Xem phim · Chọn Server" : "Xem phim")
                                     .fontWeight(.bold)
+                                    .lineLimit(1)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 4)
@@ -125,21 +150,26 @@ struct AnimeDetailView: View {
                             .tint(.anpinimeAccent)
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 16)
                 } else {
-                    Text("Nguồn này chưa có tập phát được.").font(.subheadline).foregroundStyle(.secondary).padding(.horizontal)
+                    Text("Nguồn này chưa có tập phát được.").font(.subheadline).foregroundStyle(.secondary).padding(.horizontal, 16)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Nội dung").font(.headline)
-                    Text(detail.summary).font(.subheadline).foregroundColor(.secondary)
+                    Text(detail.summary)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.horizontal)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
 
                 if !detail.episodes.isEmpty {
                     episodeSection(detail.episodes, seasons: seasons, active: activeSeason, visible: activeEpisodes)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 24)
         }
     }

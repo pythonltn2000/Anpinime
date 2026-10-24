@@ -46,7 +46,9 @@ enum MovieCatalog {
             let count = text(row["epCount"])
             let epText = row["mediaType"] as? String == "tv" ? (count.isEmpty ? "Phim bộ" : "\(count) tập") : "Phim lẻ"
             let infoParts = [text(row["year"]), text(row["country"]), epText].filter { !$0.isEmpty }
-            return Anime(title: title, url: route("movie/" + slug, base: base),
+            let enTitle = (row["title"] as? Object).map { text($0["en"]) } ?? ""
+            let sub = (enTitle != title && !enTitle.isEmpty) ? enTitle : infoParts.joined(separator: " • ")
+            return Anime(title: title, subtitle: sub, url: route("movie/" + slug, base: base),
                          imageURL: url(row["poster"], base: base),
                          bannerURL: url(row["backdrop"], base: base) ?? url(row["poster"], base: base),
                          episodeText: epText,
@@ -143,7 +145,9 @@ enum MovieCatalog {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let summaryText = rawDesc.nonempty ?? (originName.isEmpty ? "" : "\(originName) • \((genres + countries).prefix(3).joined(separator: ", "))")
             let infoParts = ([yearText, langText] + countries.prefix(1) + genres.prefix(2)).filter { !$0.isEmpty }
+            let sub = (originName != title && !originName.isEmpty) ? originName : infoParts.joined(separator: " • ")
             return Anime(title: title,
+                         subtitle: sub,
                          url: route(format.detailPath + slug, base: base),
                          imageURL: poster,
                          bannerURL: banner,

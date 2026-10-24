@@ -522,8 +522,7 @@ private struct PulsingMovieTitle: View {
 
     private var titleText: some View {
         Text(title)
-            .font(.custom("AvenirNext-Heavy", size: size, relativeTo: .title))
-            .tracking(-0.7)
+            .font(.system(size: size, weight: .black, design: .rounded))
             .multilineTextAlignment(.center)
             .lineLimit(3)
             .minimumScaleFactor(0.72)

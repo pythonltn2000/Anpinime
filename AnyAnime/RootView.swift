@@ -63,7 +63,7 @@ struct RootView: View {
             NavigationView { AppSettingsView() }
                 .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
         }
-        .id(service.source)
+        .id(service.source.isMovie)
         .tint(.anpinimeAccent)
     }
 }
@@ -124,7 +124,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        Group {
+        ZStack {
             if service.homeSections.isEmpty && service.homeLoading {
                 LoadingView(text: "Đang tải danh sách \(service.contentName)…")
             } else if service.homeSections.isEmpty {
@@ -136,7 +136,7 @@ struct HomeView: View {
                 ) { Task { await service.loadHome(forceDomainRefresh: true) } }
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 24) {
+                    LazyVStack(alignment: .leading, spacing: 22) {
                         if !featuredItems.isEmpty {
                             FeaturedCarouselView(items: featuredItems)
                         }
@@ -158,7 +158,7 @@ struct HomeView: View {
                             AnimeRow(section: section)
                         }
                     }
-                    .padding(.vertical, 12)
+                    .padding(.bottom, 16)
                 }
                 .refreshable { await service.loadHome(forceDomainRefresh: true) }
             }
@@ -203,7 +203,7 @@ struct FeaturedCarouselView: View {
     @State private var selection = 0
 
     var body: some View {
-        VStack(spacing: 10) {
+        ZStack(alignment: .bottom) {
             TabView(selection: $selection) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, anime in
                     NavigationLink(destination: AnimeDetailView(anime: anime)) {
@@ -214,17 +214,18 @@ struct FeaturedCarouselView: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 295)
+            .frame(height: 465)
 
             if items.count > 1 {
                 HStack(spacing: 6) {
                     ForEach(0..<items.count, id: \.self) { index in
-                        Capsule()
-                            .fill(index == selection ? Color.anpinimeAccent : Color.white.opacity(0.28))
-                            .frame(width: index == selection ? 20 : 6, height: 6)
+                        Circle()
+                            .fill(index == selection ? Color.white : Color.white.opacity(0.32))
+                            .frame(width: index == selection ? 7 : 6, height: index == selection ? 7 : 6)
                             .animation(.easeInOut(duration: 0.2), value: selection)
                     }
                 }
+                .padding(.bottom, 10)
             }
         }
         .task(id: items.map(\.id).joined()) {
@@ -243,118 +244,124 @@ struct FeaturedCarouselView: View {
 struct FeaturedHeroCard: View {
     let anime: Anime
 
+    private var yearTag: String {
+        if let match = anime.info.range(of: #"\b(19|20)\d{2}\b"#, options: .regularExpression) {
+            return String(anime.info[match])
+        }
+        return anime.source.isMovie ? "2026" : "Mới"
+    }
+
+    private var subtitleText: String {
+        let candidate = anime.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !candidate.isEmpty && candidate.lowercased() != anime.title.lowercased() {
+            return candidate
+        }
+        return anime.info
+    }
+
+    private var qualityBadgeText: String {
+        let qual = anime.quality.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ep = anime.episodeText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedQual: String = {
+            let up = qual.uppercased()
+            if up == "FHD" || up == "1080P" || up == "FULLHD" { return "Full HD" }
+            return qual
+        }()
+        if !normalizedQual.isEmpty && !ep.isEmpty {
+            if ep == "Phim lẻ" {
+                return "\(normalizedQual) (PĐ)"
+            }
+            return "\(normalizedQual) • \(ep)"
+        }
+        if !normalizedQual.isEmpty {
+            return "\(normalizedQual) (PĐ)"
+        }
+        if !ep.isEmpty {
+            return ep
+        }
+        return "Full HD (PĐ)"
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            RemoteImage(url: anime.bannerURL ?? anime.imageURL)
+        ZStack(alignment: .bottom) {
+            RemoteImage(url: anime.imageURL ?? anime.bannerURL)
                 .frame(maxWidth: .infinity)
-                .frame(height: 285)
-                .clipped()
+                .frame(height: 465)
 
             LinearGradient(
                 stops: [
-                    .init(color: .black.opacity(0.35), location: 0),
-                    .init(color: .black.opacity(0.15), location: 0.35),
-                    .init(color: .black.opacity(0.82), location: 0.72),
-                    .init(color: .black.opacity(0.96), location: 1.0)
+                    .init(color: .black.opacity(0.45), location: 0.0),
+                    .init(color: .clear, location: 0.22),
+                    .init(color: .clear, location: 0.42),
+                    .init(color: .black.opacity(0.62), location: 0.68),
+                    .init(color: .black.opacity(0.92), location: 0.86),
+                    .init(color: .black, location: 1.0)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
-                    Text("ĐỀ CỬ MỚI")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
-                        .tracking(0.8)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.anpinimeAccent, in: Capsule())
+            VStack(spacing: 10) {
+                Text(anime.title)
+                    .font(.system(size: 26, weight: .heavy))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .shadow(color: .black.opacity(0.85), radius: 10, y: 3)
+                    .padding(.horizontal, 20)
+
+                if !subtitleText.isEmpty {
+                    Text(subtitleText)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.white.opacity(0.75))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .padding(.horizontal, 28)
+                }
+
+                HStack(spacing: 8) {
+                    Text(yearTag)
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.14), in: Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.22), lineWidth: 1))
 
-                    if !anime.quality.isEmpty {
-                        Badge(text: anime.quality, color: .cyan)
-                    }
-                    if !anime.episodeText.isEmpty {
-                        Badge(text: anime.episodeText, color: .red)
-                    }
                     if !anime.score.isEmpty {
-                        HStack(spacing: 3) {
-                            Image(systemName: "star.fill")
-                            Text(anime.score)
-                        }
-                        .font(.system(size: 10, weight: .bold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Color.black.opacity(0.55), in: Capsule())
-                        .foregroundColor(.yellow)
+                        Text("IMDb \(anime.score)")
+                            .font(.system(size: 12, weight: .heavy))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 5)
+                            .background(Color(red: 0.96, green: 0.77, blue: 0.09), in: Capsule())
                     }
-                    Spacer()
+
+                    Text(qualityBadgeText)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(Color(red: 0.08, green: 0.52, blue: 0.96), in: Capsule())
                 }
+                .padding(.top, 2)
 
-                Spacer(minLength: 0)
-
-                HStack(alignment: .bottom, spacing: 14) {
-                    RemoteImage(url: anime.imageURL)
-                        .frame(width: 82, height: 118)
-                        .clipped()
-                        .cornerRadius(10)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.22), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.6), radius: 8, y: 4)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(anime.title)
-                            .font(.title3.weight(.heavy))
-                            .foregroundColor(.white)
-                            .lineLimit(2)
-
-                        if !anime.info.isEmpty {
-                            Text(anime.info)
-                                .font(.caption.weight(.medium))
-                                .foregroundColor(.white.opacity(0.82))
-                                .lineLimit(1)
-                        }
-
-                        if !anime.summary.isEmpty {
-                            Text(anime.summary)
-                                .font(.caption2)
-                                .foregroundColor(.white.opacity(0.68))
-                                .lineLimit(2)
-                        }
-
-                        HStack(spacing: 10) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "play.fill")
-                                Text("Xem ngay")
-                            }
-                            .font(.caption.weight(.bold))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(Color.anpinimeAccent, in: Capsule())
-                            .foregroundColor(.white)
-
-                            HStack(spacing: 5) {
-                                Image(systemName: "info.circle")
-                                Text("Chi tiết")
-                            }
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.white.opacity(0.16), in: Capsule())
-                            .foregroundColor(.white)
-                        }
-                        .padding(.top, 2)
-                    }
-                }
+                Text("Xem chi tiết")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 30)
+                    .padding(.vertical, 12)
+                    .background(Color.white, in: Capsule())
+                    .shadow(color: .black.opacity(0.5), radius: 10, y: 4)
+                    .padding(.top, 4)
             }
-            .padding(16)
+            .padding(.bottom, 28)
+            .frame(maxWidth: .infinity)
         }
-        .frame(height: 285)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
-        )
-        .padding(.horizontal)
+        .frame(maxWidth: .infinity)
+        .frame(height: 465)
+        .clipped()
     }
 }
 
@@ -432,7 +439,7 @@ struct BrowseView: View {
     @EnvironmentObject private var service: AnimeService
 
     var body: some View {
-        Group {
+        ZStack {
             if service.categories.isEmpty && service.homeLoading {
                 LoadingView(text: "Đang tải thể loại…")
             } else {
@@ -479,7 +486,7 @@ struct AnimeGridView: View {
     private let columns = [GridItem(.adaptive(minimum: 132), spacing: 14)]
 
     var body: some View {
-        Group {
+        ZStack {
             if loading { LoadingView(text: "Đang tải \(title)…") }
             else if items.isEmpty {
                 EmptyStateView(icon: "film", title: "Không có dữ liệu", message: errorMessage, actionTitle: "Thử lại") {
@@ -546,7 +553,7 @@ struct AnimeSearchView: View {
     @State private var message = "Nhập tên phim để tìm trong nguồn đang chọn"
 
     var body: some View {
-        Group {
+        ZStack {
             if loading { LoadingView(text: "Đang tìm kiếm…") }
             else if results.isEmpty {
                 EmptyStateView(icon: "magnifyingglass", title: "Tìm \(service.contentName)", message: message, actionTitle: nil, action: nil)
@@ -733,13 +740,18 @@ struct RemoteImage: View {
     let url: URL?
 
     var body: some View {
-        Group {
-            if let image = loader.image { Image(uiImage: image).resizable().scaledToFill() }
-            else { ZStack { placeholder; if loader.loading { ProgressView() } } }
-        }
-        .task(id: "\(url?.absoluteString ?? "")|\(service.baseURL)|\(service.imageGeneration)") {
-            await loader.load(url, baseURL: service.baseURL, revision: service.imageGeneration)
-        }
+        Color.clear
+            .overlay {
+                if let image = loader.image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    ZStack { placeholder; if loader.loading { ProgressView() } }
+                }
+            }
+            .clipped()
+            .task(id: "\(url?.absoluteString ?? "")|\(service.baseURL)|\(service.imageGeneration)") {
+                await loader.load(url, baseURL: service.baseURL, revision: service.imageGeneration)
+            }
     }
 
     private var placeholder: some View {

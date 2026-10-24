@@ -19,6 +19,7 @@ final class AnimeService: ObservableObject {
     private let film4k = MovieProvider(source: .film4k)
     private let phim4k = MovieProvider(source: .phim4k)
     private var homeRequestID = UUID()
+    private var homeTask: Task<Void, Never>?
 
     private let animeCategories: [AnimeCategory] = [
         .init(title: "TV/Series", path: "/anime-bo/"),
@@ -52,15 +53,21 @@ final class AnimeService: ObservableObject {
 
     func selectSource(_ value: ContentSource) {
         guard source != value else { return }
-        homeRequestID = UUID()
+        homeTask?.cancel()
+        homeTask = nil
+        let generation = UUID()
+        homeRequestID = generation
         source = value
         homeSections = []
         movieCategories = []
-        homeLoading = false
+        homeLoading = true
         status = "Đang kết nối \(value.subtitle)…"
         if value.isMovie { baseURL = provider(value).baseURL }
         else { baseURL = URL(string: "https://animevietsub.vip")! }
         imageGeneration += 1
+        homeTask = Task { [weak self] in
+            await self?.performLoadHome(generation: generation, selectedSource: value, forceDomainRefresh: false)
+        }
     }
 
     private func provider(_ source: ContentSource) -> MovieProvider { source == .film4k ? film4k : phim4k }
@@ -85,13 +92,30 @@ final class AnimeService: ObservableObject {
     }
 
     func loadHome(forceDomainRefresh: Bool = false) async {
-        guard !homeLoading else { return }
+        if !forceDomainRefresh, homeLoading, let existing = homeTask {
+            await existing.value
+            return
+        }
+        homeTask?.cancel()
         let generation = UUID()
         homeRequestID = generation
         let selectedSource = source
         homeLoading = true
+        let task = Task { [weak self] in
+            await self?.performLoadHome(generation: generation, selectedSource: selectedSource, forceDomainRefresh: forceDomainRefresh)
+        }
+        homeTask = task
+        await task.value
+    }
+
+    private func performLoadHome(generation: UUID, selectedSource: ContentSource, forceDomainRefresh: Bool) async {
         status = forceDomainRefresh ? "Đang cập nhật tên miền…" : "Đang tải anime…"
-        defer { if homeRequestID == generation { homeLoading = false } }
+        defer {
+            if homeRequestID == generation {
+                homeLoading = false
+                homeTask = nil
+            }
+        }
 
         if selectedSource.isMovie {
             status = "Đang tải \(selectedSource.title)…"
@@ -174,7 +198,11 @@ final class AnimeService: ObservableObject {
     }
 
     func register(_ error: Error) {
-        status = error is CancellationError ? "Kết nối đã tạm dừng. Bạn có thể thử lại." : error.localizedDescription
+        if error is CancellationError || (error as? URLError)?.code == .cancelled {
+            status = "Kết nối đã tạm dừng. Bạn có thể thử lại."
+            return
+        }
+        status = error.localizedDescription
     }
 
     private func fetchHTML(url: URL) async throws -> String {
