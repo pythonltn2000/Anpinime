@@ -66,7 +66,8 @@ final class AnimeService: ObservableObject {
         else { baseURL = URL(string: "https://animevietsub.vip")! }
         imageGeneration += 1
         homeTask = Task { [weak self] in
-            await self?.performLoadHome(generation: generation, selectedSource: value, forceDomainRefresh: false)
+            guard let self else { return }
+            await self.performLoadHome(generation: generation, selectedSource: value, forceDomainRefresh: false)
         }
     }
 
@@ -102,7 +103,8 @@ final class AnimeService: ObservableObject {
         let selectedSource = source
         homeLoading = true
         let task = Task { [weak self] in
-            await self?.performLoadHome(generation: generation, selectedSource: selectedSource, forceDomainRefresh: forceDomainRefresh)
+            guard let self else { return }
+            await self.performLoadHome(generation: generation, selectedSource: selectedSource, forceDomainRefresh: forceDomainRefresh)
         }
         homeTask = task
         await task.value
