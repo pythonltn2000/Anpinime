@@ -7,7 +7,12 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     @Published var needsInteraction = false
     let webView: WKWebView
     private var pending: CheckedContinuation<(String, URL), Error>?
-    private var queue: [(URL, CheckedContinuation<(String, URL), Error>)] = []
+    private var queue: [(UUID, URL, Bool, CheckedContinuation<(String, URL), Error>)] = []
+    private var activeID: UUID?
+    private var waitForEpisodes = false
+    private var lastEpisodeCount = -1
+    private var stableEpisodePolls = 0
+    private var renderedSince: Date?
     private var timer: Timer?
     private var deadline = Date()
     private var inspecting = false
@@ -24,21 +29,39 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         webView.uiDelegate = self
     }
 
-    func load(_ url: URL) async throws -> (String, URL) {
-        try await withCheckedThrowingContinuation { continuation in
-            queue.append((url, continuation))
-            startNext()
+    func load(_ url: URL, waitForEpisodes: Bool = false) async throws -> (String, URL) {
+        let id = UUID()
+        return try await withTaskCancellationHandler(operation: {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                queue.append((id, url, waitForEpisodes, continuation))
+                startNext()
+            }
+        }, onCancel: {
+            Task { @MainActor [weak self] in self?.cancelRequest(id) }
+        })
+    }
+
+    private func cancelRequest(_ id: UUID) {
+        if activeID == id { finish(.failure(CancellationError())) }
+        else if let index = queue.firstIndex(where: { $0.0 == id }) {
+            queue.remove(at: index).3.resume(throwing: CancellationError())
         }
     }
 
     private func startNext() {
         guard pending == nil, !queue.isEmpty else { return }
         let request = queue.removeFirst()
-        pending = request.1
-        targetURL = request.0
+        activeID = request.0
+        pending = request.3
+        targetURL = request.1
+        waitForEpisodes = request.2
+        lastEpisodeCount = -1
+        stableEpisodePolls = 0
+        renderedSince = nil
         generation = UUID()
         deadline = Date().addingTimeInterval(45)
-        webView.load(URLRequest(url: request.0, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 40))
+        webView.load(URLRequest(url: request.1, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 40))
         timer = Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.inspectPage() }
         }
@@ -60,6 +83,14 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
                   let html = page["html"] as? String, let url = self.webView.url,
                   url.scheme == "https", !html.isEmpty else { return }
             if !HTMLParser.containsVerification(html) {
+                if self.waitForEpisodes {
+                    if self.renderedSince == nil { self.renderedSince = Date() }
+                    let count = (page["episodeCount"] as? Int) ?? 0
+                    self.stableEpisodePolls = count == self.lastEpisodeCount ? self.stableEpisodePolls + 1 : 0
+                    self.lastEpisodeCount = count
+                    let elapsed = Date().timeIntervalSince(self.renderedSince ?? Date())
+                    if elapsed < 8 && (count == 0 || self.stableEpisodePolls < 3) { return }
+                }
                 Task { @MainActor in
                     await self.copyCookies()
                     guard self.generation == requestGeneration, self.pending != nil else { return }
@@ -88,6 +119,9 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         needsInteraction = false
         let continuation = pending
         pending = nil
+        activeID = nil
+        generation = UUID()
+        inspecting = false
         continuation?.resume(with: result)
         startNext()
     }
@@ -112,7 +146,7 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     static let pageInspection = """
     (() => {
       const visible = e => { const r=e.getBoundingClientRect(); const s=getComputedStyle(e); return r.width>10 && r.height>10 && s.display!=='none' && s.visibility!=='hidden'; };
-      return {html:document.documentElement.outerHTML, interactive:Array.from(document.querySelectorAll('iframe[src*="challenges.cloudflare.com"],iframe[src*="recaptcha"],iframe[src*="hcaptcha"],.cf-turnstile,.g-recaptcha,.h-captcha,#challenge-stage input[type="checkbox"]')).some(visible)};
+      return {html:document.documentElement.outerHTML, episodeCount:document.querySelectorAll('a.btn-episode,a[data-hash]').length, interactive:Array.from(document.querySelectorAll('iframe[src*="challenges.cloudflare.com"],iframe[src*="recaptcha"],iframe[src*="hcaptcha"],.cf-turnstile,.g-recaptcha,.h-captcha,#challenge-stage input[type="checkbox"]')).some(visible)};
     })()
     """
 }

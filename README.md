@@ -1,6 +1,6 @@
 # AnPinime (iOS 15+)
 
-Ứng dụng xem anime và phim với danh sách, tìm kiếm, thể loại và trình phát toàn màn hình. Mỗi lần khởi động, chọn **Anime** hoặc **Phim**; chạm logo ở trang chủ để chọn lại. Trong mục Phim, menu cạnh logo đổi giữa **Nguồn phim 1** và **Nguồn phim 2**. Danh sách, tìm kiếm và tập phim của các nguồn không bị trộn chung.
+Ứng dụng xem anime và phim với danh sách, tìm kiếm, thể loại và trình phát toàn màn hình. Mỗi lần khởi động, chọn **Anime** hoặc **Phim**; chạm logo ở trang chủ để chọn lại. Trong mục Phim, menu cạnh logo đổi giữa **Nguồn phim 1 (NguonC)**, **Nguồn phim 2 (Phim4K)** và **Nguồn phim 3 (KKPhim)**. Danh sách, tìm kiếm và tập phim của các nguồn không bị trộn chung.
 
 Màn hình chờ phim dùng ảnh nền và tên phim nhấp nháy; trình phát có danh sách tập, tua, tốc độ, tỉ lệ hình, khóa chạm, độ sáng và tự phát tập tiếp theo. Luồng native có nhiều track cho phép chọn âm thanh và phụ đề trong cài đặt trình phát.
 
@@ -29,19 +29,30 @@ Khi request dữ liệu gặp HTTP 403 hoặc trang xác minh, app thử lại b
 
 URL video phát hiện từ iframe (kể cả manifest của player dùng blob) được chuyển sang AVPlayer cùng cookie và Referer của iframe. Nếu native không phát được, app tiếp tục phiên video WebKit. Nút phát vẫn khả dụng khi đã nhận metadata nhưng chưa có khung hình.
 
-### Nguồn phim 1 · Film4k.net
+### Nguồn phim 1 · NguonC
 
-Đọc JSON công khai từ `/api/home`, `/api/search/suggest`, `/api/title/{slug}` và `/api/watch/{slug}`. Hỗ trợ danh sách phân trang, phim lẻ, phim bộ, từng phần và từng tập. Khi bấm xem, lấy URL mới từ watch và phiên `/api/play-ticket`; chấp nhận cả phản hồi có token và phản hồi `{ok:true}` không cần token. Không lưu URL video hết hạn vào danh sách.
+Thay Film4k.net bằng `https://phim.nguonc.com`: danh sách `/api/films/phim-moi-cap-nhat`, tìm kiếm `/api/films/search?keyword=...`, chi tiết `/api/film/{slug}`. Thể loại dùng slug riêng của NguonC (ví dụ `phim-hai`, `khoa-hoc-vien-tuong`), không dùng slug KKPhim. Đọc đầy đủ máy chủ/tập trong `movie.episodes[].items`, ưu tiên HLS nếu có, dùng WebKit với nguồn chỉ có embed. ID nội bộ `film4k` được giữ để tương thích dữ liệu và fixture cũ.
 
-Luồng HLS/MP4 dùng AVPlayer cùng cookie/Referer và ticket nếu có. Khi phát lỗi, lấy lại URL một lần rồi mới chuyển sang trình phát website đúng tập. Ticket chỉ được gắn vào URL thuộc máy chủ nguồn. Nguồn ngoài có thể thay đổi codec, API hoặc yêu cầu đăng nhập; app không đảm bảo mọi phim của website đều phát được trên mọi thiết bị.
+### Nguồn phim 3 · KKPhim
 
-Film4k có các luồng fMP4 bọc trong PNG. `FilmMediaRelay` chỉ lắng nghe tại loopback của thiết bị, viết lại URL playlist và bỏ lớp PNG hoàn chỉnh trước khi đưa byte video cho AVPlayer. Hỗ trợ init segment, audio, subtitle và Range sau khi chuẩn hóa; không tải phim xuống ổ đĩa. Listener bị đóng khi rời trình phát. Cơ chế này dựa trên định dạng thực tế và cách xử lý trong player công khai của website, không xử lý DRM.
+Dùng API `https://phimapi.com` được công bố tại [tài liệu KKPhim](https://www.kkphim.com/api-document). Danh sách `/danh-sach/phim-moi-cap-nhat-v3`, tìm kiếm `/v1/api/tim-kiem`, thể loại `/v1/api/the-loai/{slug}` và chi tiết `/phim/{slug}`. Danh sách và tập mang định danh `.kkphim`, tách biệt nguồn 2 dù cấu trúc JSON tương thích.
+
+### Chuyển nguồn và độ ổn định
+
+- Cache trang chủ riêng theo nguồn trong 5 phút; cache danh sách/chi tiết trong 2 phút, có giới hạn số mục. Làm mới thủ công xóa cache liên quan.
+- Hiển thị trang đầu ngay khi có dữ liệu, sau đó tải các hàng movie còn lại đồng thời. Không chờ gom máy chủ từ nhà cung cấp khác khi mở chi tiết.
+- Đổi nguồn tạo lại các tab và ngăn kết quả tìm kiếm cũ ghi đè kết quả mới. Tìm kiếm chờ 350 ms sau khi nhập và hủy yêu cầu cũ.
+- Anime đọc cả trang xem phim để bổ sung danh sách tập; khi chưa có danh sách, chờ DOM WebKit ổn định. Không giới hạn số tập trong parser, sắp xếp nhãn tập dạng số và bỏ liên kết xem phim trùng.
+- Dùng tên miền anime đã lưu trước, resolve lại khi lỗi kết nối; thử lại một lần với lỗi mạng/HTTP 5xx. Yêu cầu WebKit bị hủy khi tác vụ không còn cần.
+- Web player đặt viewport theo thiết bị, bỏ inset tự động và transform của trang; mặc định giữ tỉ lệ video (`contain`). Các tab dùng điều hướng một cột trên điện thoại. Bỏ dòng trạng thái “Đã kết nối”.
 
 ### Nguồn phim 2 · Phim4K
 
 Đây là nguồn riêng, **không phải Film4k.net**. Tích hợp hai họ endpoint tìm thấy khi phân tích IPA 2.8.4: Free1 (`/danh-sach/phim-moi-cap-nhat-v3`, `/v1/api/tim-kiem`, `/phim/{slug}`) và Free2 (`/api/films/phim-moi-cap-nhat`, `/api/films/search`, `/api/film/{slug}`). Hỗ trợ danh sách, tìm kiếm, máy chủ/tập, HLS và embed theo hai cấu trúc JSON tương ứng.
 
-`MovieSourceDirectory` đọc cấu hình AES-GCM công khai của IPA từ `rip.cryboiz.workers.dev/api/add`, chỉ lấy địa chỉ `free1/free2` và lưu địa chỉ hợp lệ gần nhất. Không nhập tài khoản, quảng cáo, token hoặc plugin của app tham chiếu. Phân tích ngày 23/10/2026 xác định máy chủ mới `free.cryboiz.workers.dev` đang trả danh sách/chi tiết thật, với video trong trường `link` trỏ đến HLS không có đuôi `.m3u8`. Relay hỗ trợ cả định dạng này. Những địa chỉ `.lol` ghi cứng trong IPA đã lỗi DNS; backend REST riêng và Free2 chưa được xác nhận hoạt động.
+`MovieSourceDirectory` đọc cấu hình AES-GCM công khai của IPA từ `rip.cryboiz.workers.dev/api/add`, lấy địa chỉ API công khai và lưu địa chỉ hợp lệ gần nhất. Không dùng tài khoản hoặc plugin của app tham chiếu. Phân tích ngày 23/10/2026 xác định máy chủ mới `free.cryboiz.workers.dev` đang trả danh sách/chi tiết thật, với video trong trường `link` trỏ đến HLS không có đuôi `.m3u8`. Relay hỗ trợ cả định dạng này. Những địa chỉ `.lol` ghi cứng trong IPA đã lỗi DNS; backend REST riêng và Free2 chưa được xác nhận hoạt động.
+
+Nguồn 2 giữ API Phim4K và cấu hình URL tùy chỉnh. Không tự chuyển sang NguonC/KKPhim khi tìm kiếm, đọc danh sách, chi tiết hoặc phát lỗi.
 
 Một số phim trả HTTP 500 từ máy chủ video, trong khi tập 1 của `thuong-nguyen-do` trả playlist HLS hợp lệ. Không tự thay phim lỗi bằng phim khác. Máy chủ Vietsub/lồng tiếng được giữ riêng trong Danh sách tập. Chọn phụ đề/âm thanh rời khi luồng thực sự có track; phụ đề đã ghép vào hình không thể tắt. Chưa hỗ trợ đầy đủ các tệp MKV/ASS mà trình phát mpv của app tham chiếu có thể xử lý.
 
@@ -71,3 +82,7 @@ Các bước riêng kiểm tra cả hai nguồn trực tiếp trên mạng và l
 ## Giới hạn
 
 Website nguồn có thể thay HTML, player hoặc chính sách chống bot bất kỳ lúc nào. Resolver xử lý việc đổi domain, nhưng selector và cơ chế player vẫn cần cập nhật nếu website thay đổi cấu trúc lớn.
+
+### Kiểm tra thay đổi nguồn (26/10/2026)
+
+Đã kiểm tra trực tiếp NguonC: danh sách, tìm kiếm, thể loại, quốc gia và chi tiết có danh sách tập. KKPhim API và các domain anime trả 403 từ môi trường Linux này, nên chưa xác nhận phát trực tiếp trên iPhone. Build iOS và kiểm tra giao diện/xoay màn hình cần Xcode hoặc workflow macOS. Fixture Film4k cũ vẫn giữ để kiểm tra ticket/relay, không đại diện cho nguồn 1 mới.

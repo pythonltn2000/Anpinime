@@ -88,19 +88,24 @@ enum HTMLParser {
             guard let href = first(#"(?is)href\s*=\s*[\"']([^\"']+)[\"']"#, in: attributes),
                   let url = absoluteURL(href, relativeTo: baseURL) else { continue }
             let lower = (attributes + " " + href).lowercased()
-            guard lower.contains("btn-episode") || lower.contains("xem-phim") || lower.range(of: #"/(?:tap|ep)-?\d+"#, options: .regularExpression) != nil else { continue }
+            guard lower.contains("btn-episode") || lower.contains("data-hash") || lower.contains("xem-phim") || lower.range(of: #"/(?:tap|ep)-?\d+"#, options: .regularExpression) != nil else { continue }
 
             let rawTitle = cleanText(body)
-            let numberText = first(#"(?i)(?:tập|tap|ep)[^0-9]*([0-9]+)"#, in: rawTitle + " " + href)
+            let numberText = first(#"(?i)(?:tập|tap|ep)[^0-9]*([0-9]+)"#, in: rawTitle)
+                ?? first(#"^([0-9]+)(?:\s|$)"#, in: rawTitle)
+                ?? first(#"(?i)(?:tap|ep)-?([0-9]+)"#, in: href)
             let number = numberText.flatMap(Int.init)
             let episodeTitle = rawTitle.isEmpty ? number.map { "Tập \($0)" } ?? "Xem phim" : rawTitle
             let season = first(#"(?is)data-(?:season|season-id)\s*=\s*[\"']([^\"']+)[\"']"#, in: attributes).map(cleanText) ?? "Phần 1"
-            let key = url.absoluteString + episodeTitle
+            let key = url.absoluteString + "|" + season
             if seen.insert(key).inserted {
                 episodes.append(Episode(title: episodeTitle, url: url, number: number, season: season))
             }
         }
 
+        if episodes.contains(where: { $0.number != nil }) {
+            episodes.removeAll { $0.number == nil && ["xem phim", "xem ngay", "watch now"].contains($0.title.lowercased()) }
+        }
         episodes.sort {
             if let left = $0.number, let right = $1.number, left != right { return left < right }
             return $0.title.localizedStandardCompare($1.title) == .orderedAscending
@@ -113,6 +118,39 @@ enum HTMLParser {
             info: info,
             episodes: episodes
         )
+    }
+
+    static func watchURL(from html: String, baseURL: URL) -> URL? {
+        for match in matches(#"(?is)<a\b([^>]*)>(.*?)</a>"#, in: html) {
+            let attributes = substring(html, range: match.range(at: 1))
+            guard let href = first(#"(?is)href\s*=\s*["']([^"']+)["']"#, in: attributes),
+                  let url = absoluteURL(href, relativeTo: baseURL), url.host == baseURL.host else { continue }
+            if href.lowercased().contains("xem-phim") { return url }
+        }
+        return nil
+    }
+
+    static func mergedEpisodes(_ preview: [Episode], _ full: [Episode]) -> [Episode] {
+        var seen = Set<String>()
+        // Keep distinct special/server links even when their numeric labels match.
+        let combined = (full + preview).filter {
+            seen.insert($0.season + "|" + $0.url.absoluteString).inserted
+        }
+        let numbered = combined.contains { $0.number != nil }
+        return combined.filter { !numbered || $0.number != nil || !["xem phim", "xem ngay", "watch now"].contains($0.title.lowercased()) }
+            .sorted {
+                if $0.season != $1.season { return $0.season.localizedStandardCompare($1.season) == .orderedAscending }
+                if let lhs = $0.number, let rhs = $1.number, lhs != rhs { return lhs < rhs }
+                return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+            }
+    }
+
+    static func rebasedAnimeURL(_ url: URL, baseURL: URL) -> URL {
+        guard let host = url.host, host.hasPrefix("animevietsub.") || host.hasPrefix("www.animevietsub."),
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else { return url }
+        components.scheme = baseURL.scheme
+        components.host = baseURL.host
+        return components.url ?? url
     }
 
     static func containsVerification(_ html: String) -> Bool {

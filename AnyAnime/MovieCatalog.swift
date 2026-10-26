@@ -120,7 +120,7 @@ enum MovieCatalog {
     }
 
     // The IPA's Free1 and Free2 use two different public JSON formats.
-    static func legacyItems(_ json: Object, base: URL, format: Phim4KFormat) -> [Anime] {
+    static func legacyItems(_ json: Object, base: URL, format: Phim4KFormat, source: ContentSource = .phim4k) -> [Anime] {
         let data = json["data"] as? Object ?? json
         let rows = data["items"] as? [Object] ?? data["movies"] as? [Object] ?? json["items"] as? [Object] ?? []
         let rawImageBase = url(data["APP_DOMAIN_CDN_IMAGE"] ?? json["pathImage"], base: base) ?? base
@@ -134,9 +134,9 @@ enum MovieCatalog {
             let poster = url(row["poster_url"] ?? row["thumb_url"], base: imageBase)
             let banner = url(row["thumb_url"] ?? row["poster_url"], base: imageBase)
             let epText = text(row["episode_current"] ?? row["current_episode"])
-            let qual = text(row["quality"]).nonempty ?? text(row["lang"])
+            let qual = text(row["quality"]).nonempty ?? text(row["lang"] ?? row["language"])
             let yearText = text(row["year"])
-            let langText = text(row["lang"])
+            let langText = text(row["lang"] ?? row["language"])
             let countries = (row["country"] as? [Object] ?? []).compactMap { text($0["name"]).nonempty }
             let genres = (row["category"] as? [Object] ?? []).compactMap { text($0["name"]).nonempty }
             let originName = text(row["origin_name"] ?? row["original_name"])
@@ -156,7 +156,7 @@ enum MovieCatalog {
                          score: rating((row["tmdb"] as? Object)?["vote_average"]),
                          summary: summaryText,
                          info: infoParts.joined(separator: " • "),
-                         source: .phim4k)
+                         source: source)
         }
     }
 
@@ -164,7 +164,7 @@ enum MovieCatalog {
         guard let movie = json["movie"] as? Object else { throw MovieSourceError.invalidData }
         let servers = json["episodes"] as? [Object] ?? movie["episodes"] as? [Object] ?? []
         let movieQuality = text(movie["quality"]).nonempty ?? anime.quality
-        let movieLang = text(movie["lang"])
+        let movieLang = text(movie["lang"] ?? movie["language"])
         var episodes: [Episode] = []
         for (serverIndex, server) in servers.enumerated() {
             let rows = server["server_data"] as? [Object] ?? server["items"] as? [Object] ?? []
@@ -175,7 +175,7 @@ enum MovieCatalog {
                 guard legacyStream(row, base: anime.url) != nil else { continue }
                 let title = text(row["name"]).nonempty ?? "Tập \(index + 1)"
                 episodes.append(Episode(title: title, url: anime.url, number: index + 1, season: group,
-                                        qualityBadge: badge, source: .phim4k,
+                                        qualityBadge: badge, source: anime.source,
                                         playback: .phim4k(detailURL: anime.url, server: serverIndex, index: index)))
             }
         }
@@ -185,7 +185,7 @@ enum MovieCatalog {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let countries = (movie["country"] as? [Object] ?? []).compactMap { text($0["name"]).nonempty }.joined(separator: ", ")
         let categories = (movie["category"] as? [Object] ?? []).compactMap { text($0["name"]).nonempty }.prefix(3).joined(separator: ", ")
-        let infoList = [text(movie["year"]), text(movie["quality"]), text(movie["lang"]), countries, categories]
+        let infoList = [text(movie["year"]), text(movie["quality"]), text(movie["lang"] ?? movie["language"]), countries, categories]
             .filter { !$0.isEmpty }
         return AnimeDetail(title: text(movie["name"]).nonempty ?? anime.title,
                            posterURL: url(movie["poster_url"], base: anime.url) ?? anime.imageURL,
@@ -357,11 +357,19 @@ enum Phim4KFormat: String, CaseIterable, Identifiable {
             .init(title: "Phim lẻ", path: prefixList + "phim-le"),
             .init(title: "Phim bộ mới nhất", path: prefixList + "phim-bo"),
             .init(title: "TV Shows", path: self == .free1 ? prefixList + "tv-shows" : prefixGenre + "tv-shows"),
-            .init(title: "Phim Âu Mỹ", path: prefixCountry + "au-my"),
+            .init(title: self == .free1 ? "Phim Âu Mỹ" : "Phim Mỹ", path: prefixCountry + (self == .free1 ? "au-my" : "my")),
             .init(title: "Phim Nhật Bản", path: prefixCountry + "nhat-ban"),
             .init(title: "Phim Thái Lan", path: prefixCountry + "thai-lan")
         ]
-        let genres: [(String, String)] = [
+        let genres: [(String, String)] = self == .free2 ? [
+            ("Hành động", "hanh-dong"), ("Tình cảm", "tinh-cam"), ("Hài", "phim-hai"),
+            ("Cổ trang", "co-trang"), ("Tâm lý", "tam-ly"), ("Hình sự", "hinh-su"),
+            ("Chiến tranh", "chien-tranh"), ("Giả tưởng", "gia-tuong"), ("Phiêu lưu", "phieu-luu"),
+            ("Khoa học viễn tưởng", "khoa-hoc-vien-tuong"), ("Kinh dị", "kinh-di"), ("Âm nhạc", "phim-nhac"),
+            ("Tài liệu", "tai-lieu"), ("Gia đình", "gia-dinh"), ("Chính kịch", "chinh-kich"),
+            ("Bí ẩn", "bi-an"), ("Lịch sử", "lich-su"), ("Miền Tây", "mien-tay"),
+            ("Lãng mạn", "lang-man"), ("Gay cấn", "gay-can")
+        ] : [
             ("Hành Động", "hanh-dong"),
             ("Tình Cảm", "tinh-cam"),
             ("Hài Hước", "hai-huoc"),

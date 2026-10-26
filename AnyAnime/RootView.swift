@@ -52,18 +52,22 @@ struct RootView: View {
     private var library: some View {
         TabView {
             NavigationView { HomeView(onChooseLibrary: { enteredLibrary = false }) }
+                .navigationViewStyle(.stack)
                 .tabItem { Label("Trang chủ", systemImage: "house.fill") }
 
             NavigationView { AnimeSearchView() }
+                .navigationViewStyle(.stack)
                 .tabItem { Label("Tìm kiếm", systemImage: "magnifyingglass") }
 
             NavigationView { BrowseView() }
+                .navigationViewStyle(.stack)
                 .tabItem { Label("Thể loại", systemImage: "square.grid.2x2.fill") }
 
             NavigationView { AppSettingsView() }
+                .navigationViewStyle(.stack)
                 .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
         }
-        .id(service.source.isMovie)
+        .id(service.source)
         .tint(.anpinimeAccent)
     }
 }
@@ -140,7 +144,6 @@ struct HomeView: View {
                         if !featuredItems.isEmpty {
                             FeaturedCarouselView(items: featuredItems)
                         }
-                        DomainStatusView()
                         if service.source.isMovie {
                             NavigationLink(destination: AnimeGridView(title: "Tất cả phim", path: "")) {
                                 HStack {
@@ -173,7 +176,7 @@ struct HomeView: View {
                     }.accessibilityLabel("Chọn Anime hoặc Phim")
                     if service.source.isMovie {
                         Menu {
-                            ForEach([ContentSource.film4k, .phim4k]) { source in
+                            ForEach([ContentSource.film4k, .phim4k, .kkphim]) { source in
                                 Button { service.selectSource(source) } label: {
                                     Label(source.title, systemImage: source == service.source ? "checkmark.circle.fill" : "circle")
                                 }
@@ -551,6 +554,7 @@ struct AnimeSearchView: View {
     @State private var results: [Anime] = []
     @State private var loading = false
     @State private var message = "Nhập tên phim để tìm trong nguồn đang chọn"
+    @State private var searchID = UUID()
 
     var body: some View {
         ZStack {
@@ -568,7 +572,16 @@ struct AnimeSearchView: View {
         }
         .navigationTitle("Tìm kiếm")
         .searchable(text: $query, prompt: "Tên \(service.contentName)")
-        .onSubmit(of: .search) { Task { await search() } }
+        .task(id: query) {
+            results = []
+            guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                loading = false
+                message = "Nhập tên phim để tìm trong nguồn đang chọn"
+                return
+            }
+            do { try await Task.sleep(nanoseconds: 350_000_000) } catch { return }
+            await search()
+        }
         .onChange(of: service.verificationGeneration) { _ in
             if !query.isEmpty { Task { await search() } }
         }
@@ -577,12 +590,19 @@ struct AnimeSearchView: View {
     private func search() async {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
+        let selected = service.source
+        let id = UUID()
+        searchID = id
         loading = true
-        defer { loading = false }
+        defer { if searchID == id { loading = false } }
         do {
-            results = try await service.search(clean)
+            let found = try await service.search(clean)
+            try Task.checkCancellation()
+            guard selected == service.source, searchID == id, query.trimmingCharacters(in: .whitespacesAndNewlines) == clean else { return }
+            results = found
             message = results.isEmpty ? "Không tìm thấy kết quả cho \"\(clean)\"" : ""
         } catch {
+            guard !Task.isCancelled, selected == service.source, searchID == id else { return }
             results = []
             message = error.localizedDescription
             service.register(error)
@@ -709,28 +729,6 @@ private struct SearchResultRow: View {
             }
         }
         .padding(.vertical, 4)
-    }
-}
-
-struct DomainStatusView: View {
-    @EnvironmentObject private var service: AnimeService
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.shield.fill").foregroundColor(.green)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(service.status).font(.caption.weight(.semibold))
-                if !service.source.isMovie {
-                    Text(service.baseURL.host ?? service.baseURL.absoluteString)
-                        .font(.caption2).foregroundColor(.secondary)
-                }
-            }
-            Spacer()
-        }
-        .padding(10)
-        .background(Color.secondary.opacity(0.12))
-        .cornerRadius(10)
-        .padding(.horizontal)
     }
 }
 

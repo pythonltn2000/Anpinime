@@ -77,3 +77,27 @@ let qualities = FilmMediaTransform.qualities(qualityManifest)
 check(qualities.map(\.title) == ["Tự động", "1080p", "720p"], "Quality choices come from actual HLS variants and deduplicate audio/codec variants")
 check(qualities[1].bandwidth == 4200000, "A resolution limit preserves the available codec/audio alternatives")
 check(FilmMediaTransform.qualities("#EXTM3U\n#EXTINF:8,\nsegment.ts").count == 1, "Media playlists do not fabricate unsupported resolutions")
+
+let animeBase = URL(string: "https://animevietsub.example")!
+let animeFixture = Anime(title: "Long series", url: animeBase.appendingPathComponent("phim/series-a1/"), imageURL: nil, episodeText: "", quality: "", score: "")
+let previewHTML = "<a href='/phim/series-a1/xem-phim.html'>Xem phim</a>" + (1198...1200).map { "<a class='btn-episode' href='/phim/series-a1/tap-\($0).html'>\($0)</a>" }.joined()
+let fullHTML = (1...1200).reversed().map { "<a class='btn-episode' href='/phim/series-a1/tap-\($0).html'>\($0)</a>" }.joined()
+let previewEpisodes = HTMLParser.detail(from: previewHTML, anime: animeFixture, baseURL: animeBase).episodes
+let allEpisodes = HTMLParser.detail(from: fullHTML, anime: animeFixture, baseURL: animeBase).episodes
+let merged = HTMLParser.mergedEpisodes(previewEpisodes, allEpisodes)
+check(merged.count == 1200 && merged.first?.number == 1 && merged.last?.number == 1200, "All 1200 anime episodes survive preview merge and sort numerically")
+check(HTMLParser.watchURL(from: previewHTML, baseURL: animeBase)?.path == "/phim/series-a1/xem-phim.html", "Detail page resolves its full watch page")
+check(HTMLParser.rebasedAnimeURL(URL(string: "https://animevietsub.old/phim/test/tap-2.html?q=1")!, baseURL: animeBase).absoluteString == "https://animevietsub.example/phim/test/tap-2.html?q=1", "Anime domain recovery preserves episode path and query")
+let numericHTML = "<a class='btn-episode' href='/phim/series/xem-phim-99999.html'>12</a>"
+check(HTMLParser.detail(from: numericHTML, anime: animeFixture, baseURL: animeBase).episodes.first?.number == 12, "Numeric label is used instead of an opaque watch-page ID")
+let sourceRows: MovieCatalog.Object = ["items": [["slug": "same-title", "name": "Same title", "language": "Vietsub"]]]
+let nguoncItems = MovieCatalog.legacyItems(sourceRows, base: URL(string: "https://phim.nguonc.com")!, format: .free2, source: .film4k)
+let kkItems = MovieCatalog.legacyItems(sourceRows, base: URL(string: "https://phimapi.com")!, format: .free1, source: .kkphim)
+check(nguoncItems[0].source == .film4k && nguoncItems[0].url.path == "/api/film/same-title", "Source 1 routes to NguonC detail API")
+check(kkItems[0].source == .kkphim && kkItems[0].url.path == "/phim/same-title", "Source 3 routes to KKPhim detail API")
+check(Set([nguoncItems[0].id, kkItems[0].id]).count == 2, "Same movie slug remains isolated across providers")
+let nguoncDetail: MovieCatalog.Object = ["movie": ["name": "Same title", "episodes": [["server_name": "Vietsub", "items": [["name": "1", "embed": "https://player.example/1"], ["name": "2", "m3u8": "https://cdn.example/2.m3u8"]]]]]]
+let parsedNguonc = try MovieCatalog.legacyDetail(nguoncDetail, anime: nguoncItems[0])
+check(parsedNguonc.episodes.count == 2 && parsedNguonc.episodes.allSatisfy { $0.source == .film4k }, "NguonC nested episode servers preserve source identity")
+let parsedKK = try MovieCatalog.legacyDetail(nguoncDetail, anime: kkItems[0])
+check(parsedKK.episodes.allSatisfy { $0.source == .kkphim }, "KKPhim episodes never use source 2 identity")

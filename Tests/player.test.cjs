@@ -27,6 +27,10 @@ function fixture(html) {
 }
 
 const f = fixture('<title>Xem phim</title><body><header>Navigation</header><main><div id="media-player"><video src="https://cdn.example/movie.mp4"></video><div>Old controls</div></div></main><footer>Ad links</footer></body>');
+assert.equal(f.w.document.querySelector('meta[name="viewport"]').content, 'width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover');
+assert.equal(f.video.style.objectFit, 'contain', 'Default fit preserves the original video ratio');
+assert.equal(f.video.style.transform, 'none', 'Site transforms must not offset the video');
+assert.equal(f.video.style.boxSizing, 'border-box');
 assert.equal(f.video.style.position, 'fixed');
 assert.equal(f.video.style.width, '100vw');
 assert.equal(f.w.document.querySelector('header').style.display, 'none');

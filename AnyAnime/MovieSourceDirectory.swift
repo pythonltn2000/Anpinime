@@ -55,16 +55,7 @@ enum MovieSourceDirectory {
         if !result.contains(where: { $0.0 == defaultFree1 }) {
             result.append((defaultFree1, .free1))
         }
-        if let phimAPI = URL(string: "https://phimapi.com"), !result.contains(where: { $0.0 == phimAPI }) {
-            result.append((phimAPI, .free1))
-        }
-        let defaultFree2 = Phim4KFormat.free2.defaultURL
-        if !result.contains(where: { $0.0 == defaultFree2 }) {
-            result.append((defaultFree2, .free2))
-        }
-        if let raw = addresses["free2"], let url = address(raw), !result.contains(where: { $0.0 == url }) {
-            result.append((url, .free2))
-        }
+        // Do not silently substitute NguonC or KKPhim for source 2.
         return result
     }
 

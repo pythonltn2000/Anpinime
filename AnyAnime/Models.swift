@@ -1,13 +1,14 @@
 import Foundation
 
 enum ContentSource: String, CaseIterable, Identifiable {
-    case anime, film4k, phim4k
+    case anime, film4k, phim4k, kkphim
     var id: String { rawValue }
     var title: String {
         switch self {
         case .anime: return "AnimeVietsub"
         case .film4k: return "Nguồn phim 1"
         case .phim4k: return "Nguồn phim 2"
+        case .kkphim: return "Nguồn phim 3"
         }
     }
     var subtitle: String {
@@ -15,6 +16,7 @@ enum ContentSource: String, CaseIterable, Identifiable {
         case .anime: return "Anime"
         case .film4k: return "Nguồn phim 1"
         case .phim4k: return "Nguồn phim 2"
+        case .kkphim: return "Nguồn phim 3"
         }
     }
     var isMovie: Bool { self != .anime }

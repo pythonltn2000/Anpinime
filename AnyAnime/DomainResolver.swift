@@ -15,8 +15,12 @@ actor DomainResolver {
 
     func resolve(force: Bool = false) async -> URL {
         if !force, let resolvedThisLaunch { return resolvedThisLaunch }
+        if !force, let cached = cachedURL() {
+            resolvedThisLaunch = cached
+            return cached
+        }
 
-        var request = URLRequest(url: shortLink, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 25)
+        var request = URLRequest(url: shortLink, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 8)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("vi-VN,vi;q=0.9,en;q=0.8", forHTTPHeaderField: "Accept-Language")
 

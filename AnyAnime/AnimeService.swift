@@ -18,6 +18,16 @@ final class AnimeService: ObservableObject {
     var contentName: String { source.isMovie ? "phim" : "anime" }
     private let film4k = MovieProvider(source: .film4k)
     private let phim4k = MovieProvider(source: .phim4k)
+    private let kkphim = MovieProvider(source: .kkphim)
+    private struct HomeSnapshot {
+        let sections: [AnimeSection]
+        let categories: [AnimeCategory]
+        let baseURL: URL
+        let date: Date
+    }
+    private var homeCache: [ContentSource: HomeSnapshot] = [:]
+    private var htmlCache: [URL: (Date, String)] = [:]
+    private var detailCache: [String: (Date, AnimeDetail)] = [:]
     private var homeRequestID = UUID()
     private var homeTask: Task<Void, Never>?
 
@@ -58,12 +68,18 @@ final class AnimeService: ObservableObject {
         let generation = UUID()
         homeRequestID = generation
         source = value
-        homeSections = []
-        movieCategories = []
-        homeLoading = true
+        let cached = homeCache[value]
+        homeSections = cached?.sections ?? []
+        movieCategories = cached?.categories ?? (value.isMovie ? provider(value).categories : [])
+        homeLoading = cached == nil
         status = "Đang kết nối \(value.subtitle)…"
         if value.isMovie { baseURL = provider(value).baseURL }
         else { baseURL = URL(string: "https://animevietsub.vip")! }
+        if let cached {
+            baseURL = cached.baseURL
+            status = ""
+            if Date().timeIntervalSince(cached.date) < 300 { return }
+        }
         imageGeneration += 1
         homeTask = Task { [weak self] in
             guard let self else { return }
@@ -71,7 +87,17 @@ final class AnimeService: ObservableObject {
         }
     }
 
-    private func provider(_ source: ContentSource) -> MovieProvider { source == .film4k ? film4k : phim4k }
+    private func provider(_ source: ContentSource) -> MovieProvider {
+        switch source {
+        case .film4k: return film4k
+        case .kkphim: return kkphim
+        case .phim4k, .anime: return phim4k
+        }
+    }
+
+    private func saveHome(_ selected: ContentSource) {
+        homeCache[selected] = HomeSnapshot(sections: homeSections, categories: movieCategories, baseURL: baseURL, date: Date())
+    }
 
     func resolvePlayback(_ episode: Episode, refresh: Bool = false) async throws -> ResolvedPlayback {
         try await provider(episode.source).resolve(episode, refresh: refresh)
@@ -93,7 +119,15 @@ final class AnimeService: ObservableObject {
     }
 
     func loadHome(forceDomainRefresh: Bool = false) async {
-        if !forceDomainRefresh, homeLoading, let existing = homeTask {
+        if forceDomainRefresh {
+            homeCache[source] = nil
+            htmlCache.removeAll()
+            detailCache.removeAll()
+            if source.isMovie { provider(source).invalidate() }
+        } else if let cached = homeCache[source], Date().timeIntervalSince(cached.date) < 300 {
+            return
+        }
+        if !forceDomainRefresh, let existing = homeTask {
             await existing.value
             return
         }
@@ -111,6 +145,7 @@ final class AnimeService: ObservableObject {
     }
 
     private func performLoadHome(generation: UUID, selectedSource: ContentSource, forceDomainRefresh: Bool) async {
+        guard homeRequestID == generation, !Task.isCancelled else { return }
         status = forceDomainRefresh ? "Đang cập nhật tên miền…" : "Đang tải anime…"
         defer {
             if homeRequestID == generation {
@@ -123,14 +158,23 @@ final class AnimeService: ObservableObject {
             status = "Đang tải \(selectedSource.title)…"
             do {
                 let provider = provider(selectedSource)
-                let sections = try await provider.home()
+                let sections = try await provider.home { [weak self] initial in
+                    guard let self, self.homeRequestID == generation, !Task.isCancelled else { return }
+                    self.homeSections = initial
+                    self.movieCategories = provider.categories
+                    self.baseURL = provider.baseURL
+                    self.homeLoading = false
+                    self.status = ""
+                    self.saveHome(selectedSource)
+                }
                 try Task.checkCancellation()
                 guard homeRequestID == generation else { return }
                 homeSections = sections
                 movieCategories = provider.categories
                 baseURL = provider.baseURL
                 imageGeneration += 1
-                status = "Đã kết nối \(selectedSource.subtitle)"
+                status = ""
+                saveHome(selectedSource)
             } catch {
                 guard homeRequestID == generation else { return }
                 register(error)
@@ -144,26 +188,13 @@ final class AnimeService: ObservableObject {
         do {
             let html = try await fetchHTML(url: baseURL)
             guard homeRequestID == generation else { return }
-            var parsed = HTMLParser.sections(from: html, baseURL: baseURL)
-
-            if parsed.count < 2 {
-                let fallbacks: [(String, String)] = [
-                    ("Hoạt hình Trung Quốc", "/hoat-hinh-trung-quoc/"),
-                    ("Đang chiếu", "/danh-sach/list-dang-chieu/"),
-                    ("Trọn bộ", "/danh-sach/list-tron-bo/")
-                ]
-                for (title, path) in fallbacks {
-                    if let items = try? await list(path: path), !items.isEmpty {
-                        parsed.append(AnimeSection(title: title, items: items))
-                    }
-                    guard homeRequestID == generation else { return }
-                }
-            }
+            let parsed = HTMLParser.sections(from: html, baseURL: baseURL)
 
             guard !parsed.isEmpty else { throw AnimeServiceError.emptyData }
             homeSections = parsed
             imageGeneration += 1
-            status = "Đã kết nối \(baseURL.host ?? "AnimeVietsub")"
+            status = ""
+            saveHome(selectedSource)
         } catch {
             guard homeRequestID == generation else { return }
             register(error)
@@ -174,7 +205,9 @@ final class AnimeService: ObservableObject {
         if source.isMovie { return try await provider(source).list(path: path, page: page) }
         let url = try makeURL(path)
         let html = try await fetchHTML(url: url)
-        let items = HTMLParser.animes(from: html, baseURL: baseURL)
+        try Task.checkCancellation()
+        let currentBase = await resolver.resolve()
+        let items = HTMLParser.animes(from: html, baseURL: currentBase)
         guard !items.isEmpty else { throw AnimeServiceError.emptyData }
         return items
     }
@@ -183,7 +216,7 @@ final class AnimeService: ObservableObject {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return [] }
         if source.isMovie { return try await provider(source).search(clean) }
-        guard let encoded = clean.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+        guard let encoded = clean.addingPercentEncoding(withAllowedCharacters: .alphanumerics) else {
             throw AnimeServiceError.invalidURL
         }
         return try await list(path: "/tim-kiem/\(encoded)/")
@@ -191,8 +224,36 @@ final class AnimeService: ObservableObject {
 
     func detail(for anime: Anime) async throws -> AnimeDetail {
         if anime.source.isMovie { return try await provider(anime.source).detail(anime) }
-        let html = try await fetchHTML(url: anime.url)
-        return HTMLParser.detail(from: html, anime: anime, baseURL: baseURL)
+        if let (date, detail) = detailCache[anime.id], Date().timeIntervalSince(date) < 120 { return detail }
+        let resolved = await resolver.resolve()
+        let detailURL = HTMLParser.rebasedAnimeURL(anime.url, baseURL: resolved)
+        let html = try await fetchHTML(url: detailURL)
+        let pageBase = await resolver.resolve()
+        let metadata = HTMLParser.detail(from: html, anime: anime, baseURL: pageBase)
+        var episodes = metadata.episodes
+        if let watchURL = HTMLParser.watchURL(from: html, baseURL: pageBase), watchURL != detailURL {
+            // Detail pages often contain only a preview of the latest episodes.
+            let watchHTML = try await fetchHTML(url: watchURL)
+            let full = HTMLParser.detail(from: watchHTML, anime: anime, baseURL: pageBase).episodes
+            episodes = HTMLParser.mergedEpisodes(episodes, full)
+            let numbered = full.compactMap(\.number)
+            let appearsTruncated = (numbered.max() ?? 0) > Set(numbered).count
+            if full.count <= 1 || appearsTruncated {
+                // Read the rendered DOM when the server list is populated by JavaScript.
+                let (rendered, renderedURL) = try await website.load(watchURL, waitForEpisodes: true)
+                let dynamic = HTMLParser.detail(from: rendered, anime: anime, baseURL: renderedURL).episodes
+                episodes = HTMLParser.mergedEpisodes(episodes, dynamic)
+            }
+        } else if episodes.count <= 1 {
+            let (rendered, renderedURL) = try await website.load(detailURL, waitForEpisodes: true)
+            episodes = HTMLParser.mergedEpisodes(episodes, HTMLParser.detail(from: rendered, anime: anime, baseURL: renderedURL).episodes)
+        }
+        try Task.checkCancellation()
+        let detail = AnimeDetail(title: metadata.title, posterURL: metadata.posterURL, bannerURL: metadata.bannerURL,
+                                 summary: metadata.summary, info: metadata.info, episodes: episodes)
+        if detailCache.count >= 40 { detailCache.removeAll() }
+        detailCache[anime.id] = (Date(), detail)
+        return detail
     }
 
     func html(for url: URL) async throws -> String {
@@ -208,10 +269,32 @@ final class AnimeService: ObservableObject {
     }
 
     private func fetchHTML(url: URL) async throws -> String {
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 35)
+        do { return try await fetchHTMLOnce(url: url) }
+        catch {
+            try Task.checkCancellation()
+            if let network = error as? URLError,
+               [.timedOut, .cannotFindHost, .cannotConnectToHost, .networkConnectionLost, .dnsLookupFailed].contains(network.code) {
+                let resolved = await resolver.resolve(force: true)
+                try Task.checkCancellation()
+                if source == .anime { baseURL = resolved }
+                return try await fetchHTMLOnce(url: HTMLParser.rebasedAnimeURL(url, baseURL: resolved))
+            }
+            if case AnimeServiceError.http(let code) = error, (500...599).contains(code) {
+                try await Task.sleep(nanoseconds: 400_000_000)
+                return try await fetchHTMLOnce(url: url)
+            }
+            throw error
+        }
+    }
+
+    private func fetchHTMLOnce(url: URL) async throws -> String {
+        try Task.checkCancellation()
+        if let (date, html) = htmlCache[url], Date().timeIntervalSince(date) < 120 { return html }
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 15)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue(baseURL.absoluteString, forHTTPHeaderField: "Referer")
         let (data, response) = try await session.data(for: request)
+        try Task.checkCancellation()
         guard let http = response as? HTTPURLResponse else { throw AnimeServiceError.invalidResponse }
         let responseURL = http.url ?? url
         let html = String(data: data, encoding: .utf8)
@@ -222,6 +305,8 @@ final class AnimeService: ObservableObject {
             let (browserHTML, browserURL) = try await website.load(responseURL)
             if let accepted = await resolver.acceptResolvedURL(browserURL), source == .anime { baseURL = accepted }
             if source == .anime { imageGeneration += 1 }
+            try Task.checkCancellation()
+            cacheHTML(browserHTML, for: url)
             return browserHTML
         }
         guard (200..<400).contains(http.statusCode) else { throw AnimeServiceError.http(http.statusCode) }
@@ -230,7 +315,13 @@ final class AnimeService: ObservableObject {
         if let accepted = await resolver.acceptResolvedURL(responseURL), source == .anime, accepted.host != baseURL.host {
             baseURL = accepted
         }
+        cacheHTML(html, for: url)
         return html
+    }
+
+    private func cacheHTML(_ html: String, for url: URL) {
+        if htmlCache.count >= 60 { htmlCache.removeAll() }
+        htmlCache[url] = (Date(), html)
     }
 
     private func makeURL(_ path: String) throws -> URL {

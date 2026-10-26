@@ -267,6 +267,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         webView.translatesAutoresizingMaskIntoConstraints = false
         webView.isHidden = true
         webView.scrollView.isScrollEnabled = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.backgroundColor = .black
         webView.isOpaque = false
         webView.backgroundColor = .black
@@ -336,7 +337,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
     private func shouldUseMediaRelay(for url: URL) -> Bool {
         guard episode.source.isMovie else { return false }
         let ext = url.pathExtension.lowercased()
-        if episode.source == .film4k {
+        if case .film4k = episode.playback {
             return ext == "m3u8" || url.path.hasSuffix("/stream/hls")
         }
         // For Nguồn phim 2 (.phim4k), standard .m3u8/.mp4 streams play directly from CDN via HTTP/2 for maximum speed.
@@ -597,6 +598,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             } else if !challenge && self.playback.verification {
                 self.playback.verification = false
                 webView.scrollView.isScrollEnabled = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
                 self.scheduleFallbackReveal(for: webView)
                 webView.evaluateJavaScript("window.__anyanimeFocusPlayer && window.__anyanimeFocusPlayer()")
             }
@@ -691,6 +693,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         (function(){
           if(window.__anyanimeInstalled)return; window.__anyanimeInstalled=true;
           var hidden=['.Adv','.ad-center','.ads','.advertisement','[class*="ads"]','[class*="banner"]','[id*="ads"]','iframe[src*="ads"]','.popup','.modal-backdrop','.header-ads-pc','.Adv.ad-center-header','header','footer','.footer','.header','.sidebar','.breadcrumb','.comments','.film-info','.heading-film','.list-episode-box','.server-list','.film-thumb','.film-desc','.film-buttons','.category-heading','.block-film','nav','.navbar','.menu'];
+          var viewport=document.querySelector('meta[name="viewport"]');
+          if(!viewport){viewport=document.createElement('meta');viewport.name='viewport';(document.head||document.documentElement).appendChild(viewport);}
+          viewport.content='width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover';
           var reportedFrames={};
           var activeVideo=null;
           var detectedStreams=[],reportedSources={};
@@ -769,7 +774,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             important(el,'position','fixed'); important(el,'inset','0'); important(el,'width','100vw');
             important(el,'height','100vh'); important(el,'max-width','none'); important(el,'max-height','none');
             important(el,'margin','0'); important(el,'padding','0'); important(el,'z-index','2147483647');
-            important(el,'background','#000');
+            important(el,'background','#000'); important(el,'transform','none'); important(el,'box-sizing','border-box'); important(el,'min-width','0'); important(el,'min-height','0');
             send('playerReady','ready'); return true;
           }
           function mediaURL(v){
