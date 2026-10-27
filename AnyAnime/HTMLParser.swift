@@ -81,25 +81,25 @@ enum HTMLParser {
 
         var episodes: [Episode] = []
         var seen = Set<String>()
-        for match in matches(#"(?is)<a\b([^>]*)>(.*?)</a>"#, in: html) {
-            guard match.numberOfRanges > 2 else { continue }
-            let attributes = substring(html, range: match.range(at: 1))
-            let body = substring(html, range: match.range(at: 2))
-            guard let href = first(#"(?is)href\s*=\s*[\"']([^\"']+)[\"']"#, in: attributes),
-                  let url = absoluteURL(href, relativeTo: baseURL) else { continue }
-            let lower = (attributes + " " + href).lowercased()
-            guard lower.contains("btn-episode") || lower.contains("data-hash") || lower.contains("xem-phim") || lower.range(of: #"/(?:tap|ep)-?\d+"#, options: .regularExpression) != nil else { continue }
-
-            let rawTitle = cleanText(body)
-            let numberText = first(#"(?i)(?:tập|tap|ep)[^0-9]*([0-9]+)"#, in: rawTitle)
-                ?? first(#"^([0-9]+)(?:\s|$)"#, in: rawTitle)
-                ?? first(#"(?i)(?:tap|ep)-?([0-9]+)"#, in: href)
+        for link in HTMLDocument.links(html) {
+            guard !link.excluded, let href = link.attributes["href"],
+                  let url = episodeURL(href, animeURL: anime.url, baseURL: baseURL) else { continue }
+            let rawTitle = link.text
+            let episodeLabel = rawTitle.range(of: #"(?i)^(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?[0-9]+(?:[.,][0-9]+)?(?:[ ._-]*(?:end|cuối|final))?$|^(?:ova|ona|sp|special|movie|full|trọn bộ|trailer)(?:[ .:_-]*[0-9]+)?$"#, options: .regularExpression) != nil
+            let button = link.marker.split(whereSeparator: \.isWhitespace).contains("btn-episode")
+            let episodeContainer = link.ancestors.contains {
+                $0.marker.range(of: #"(?:list-episode|episode-list|episodes|server-list|list-server|episodios)"#, options: .regularExpression) != nil
+            }
+            let hash = !(link.attributes["data-hash"] ?? "").isEmpty
+            // A watch URL in a login redirect or a comment permalink is not an episode.
+            guard episodeLabel, button || episodeContainer || hash else { continue }
+            let numberText = first(#"(?i)^(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?([0-9]+)"#, in: rawTitle)
             let number = numberText.flatMap(Int.init)
-            let episodeTitle = rawTitle.isEmpty ? number.map { "Tập \($0)" } ?? "Xem phim" : rawTitle
-            let season = first(#"(?is)data-(?:season|season-id)\s*=\s*[\"']([^\"']+)[\"']"#, in: attributes).map(cleanText) ?? "Phần 1"
+            let season = link.attributes["data-season"] ?? link.attributes["data-season-id"]
+                ?? link.ancestors.reversed().compactMap { $0.attributes["data-season"] ?? $0.attributes["data-season-id"] ?? $0.attributes["data-server"] }.first ?? "Phần 1"
             let key = url.absoluteString + "|" + season
             if seen.insert(key).inserted {
-                episodes.append(Episode(title: episodeTitle, url: url, number: number, season: season))
+                episodes.append(Episode(title: rawTitle, url: url, number: number, season: season))
             }
         }
 
@@ -108,6 +108,7 @@ enum HTMLParser {
         }
         episodes.sort {
             if let left = $0.number, let right = $1.number, left != right { return left < right }
+            if ($0.number != nil) != ($1.number != nil) { return $0.number != nil }
             return $0.title.localizedStandardCompare($1.title) == .orderedAscending
         }
         return AnimeDetail(
@@ -120,14 +121,30 @@ enum HTMLParser {
         )
     }
 
-    static func watchURL(from html: String, baseURL: URL) -> URL? {
-        for match in matches(#"(?is)<a\b([^>]*)>(.*?)</a>"#, in: html) {
-            let attributes = substring(html, range: match.range(at: 1))
-            guard let href = first(#"(?is)href\s*=\s*["']([^"']+)["']"#, in: attributes),
-                  let url = absoluteURL(href, relativeTo: baseURL), url.host == baseURL.host else { continue }
-            if href.lowercased().contains("xem-phim") { return url }
+    static func watchURL(from html: String, baseURL: URL, animeURL: URL? = nil) -> URL? {
+        for link in HTMLDocument.links(html) where !link.excluded {
+            guard let href = link.attributes["href"], !href.hasPrefix("#"), !href.hasPrefix("?"),
+                  let url = absoluteURL(href, relativeTo: baseURL), url.host == baseURL.host,
+                  url.fragment == nil, url.query == nil,
+                  url.path.range(of: #"/xem-phim(?:-[0-9]+)?\.html/?$"#, options: .regularExpression) != nil else { continue }
+            if let animeURL, episodeURL(href, animeURL: animeURL, baseURL: baseURL) == nil { continue }
+            let label = link.text.lowercased()
+            if ["xem phim", "xem ngay", "watch now"].contains(label) || link.marker.contains("btn-episode") { return url }
         }
         return nil
+    }
+
+    private static func episodeURL(_ href: String, animeURL: URL, baseURL: URL) -> URL? {
+        guard !href.isEmpty, !href.hasPrefix("#"), !href.hasPrefix("?"),
+              let candidate = absoluteURL(href, relativeTo: baseURL),
+              ["http", "https"].contains(candidate.scheme ?? ""), candidate.query == nil, candidate.fragment == nil else { return nil }
+        let url = rebasedAnimeURL(candidate, baseURL: baseURL)
+        guard url.host == baseURL.host else { return nil }
+        let show = animeURL.pathComponents.filter { $0 != "/" }
+        let path = url.pathComponents.filter { $0 != "/" }
+        guard show.count >= 2, path.count >= 3, Array(show.prefix(2)) == Array(path.prefix(2)),
+              url.lastPathComponent.range(of: #"(?i)^(?:xem-phim(?:-[0-9]+)?|(?:tap|ep)-?[0-9]+(?:[.-][0-9]+){0,2}|(?:ova|ona|special|movie|full)(?:-[0-9]+)?)\.html$"#, options: .regularExpression) != nil else { return nil }
+        return url
     }
 
     static func mergedEpisodes(_ preview: [Episode], _ full: [Episode]) -> [Episode] {
@@ -141,6 +158,7 @@ enum HTMLParser {
             .sorted {
                 if $0.season != $1.season { return $0.season.localizedStandardCompare($1.season) == .orderedAscending }
                 if let lhs = $0.number, let rhs = $1.number, lhs != rhs { return lhs < rhs }
+                if ($0.number != nil) != ($1.number != nil) { return $0.number != nil }
                 return $0.title.localizedStandardCompare($1.title) == .orderedAscending
             }
     }

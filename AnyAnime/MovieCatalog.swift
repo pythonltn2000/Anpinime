@@ -35,6 +35,7 @@ enum MovieCatalog {
 
     static func isCatalogPath(_ path: String, format: Phim4KFormat) -> Bool {
         guard !path.contains("://"), !path.contains(".."), !path.contains("?"), !path.contains("#") else { return false }
+        if format == .free1, path == "v1/api/danh-sach" { return true }
         let prefixes = format == .free1 ? ["danh-sach/", "v1/api/danh-sach/", "v1/api/the-loai/", "v1/api/quoc-gia/"]
             : ["api/films/phim-moi-cap-nhat", "api/films/danh-sach/", "api/films/the-loai/", "api/films/quoc-gia/", "api/films/nam-phat-hanh/", "api/films/ngon-ngu/"]
         return prefixes.contains { path.hasPrefix($0) }

@@ -100,3 +100,12 @@ KKPhim: đọc được API danh sách, chi tiết, HLS master/media và phần 
 Phim4K: directory hiện trả `api.phim4k.space`, `free.cryboiz.workers.dev`, `free2.p4k.dpdns.org`. Core trả trang chủ, tìm kiếm, thể loại/quốc gia, chi tiết phim lẻ và phim bộ. Các mẫu Core giữ được các bản 1080p/2160p/Remux; link `cdn.phim4k.lol` trong mẫu và Free2 hiện lỗi DNS tại môi trường kiểm tra. Không suy đoán đường dẫn thay thế hay tuyên bố các link này đã phát được. AVPlayer chưa hỗ trợ đầy đủ MKV/ASS như mpv trong app gốc.
 
 `Tests/ProviderTests.swift` chạy provider thật qua URLSession giả lập, ghi nhận host/path/header cho trang chủ → tìm kiếm → danh mục → chi tiết → phát; kiểm tra khi lỗi không đổi nguồn, Core giữ nguyên link VIP và API-KEY chỉ gửi đến Core. `Tests/main.swift` kiểm tra ID phần/tập, đảo thứ tự server và lịch sử tìm kiếm. `Tests/player.test.cjs` kiểm tra quảng cáo đứng trước phim, preroll dùng chung thẻ video, kết thúc quảng cáo không chuyển tập, và giữ màn hình xác minh. Fixture Film4k cũ chỉ kiểm tra ticket/relay, không đại diện cho nguồn 1 hiện tại.
+
+### Bản 2.3.2 (build 8): danh mục riêng và tập anime
+
+- KKPhim có đủ 12 danh sách theo website, 26 thể loại và 36 quốc gia dự phòng; thể loại/quốc gia cập nhật từ API của KKPhim. Hai mục phim bộ đang chiếu/đã hoàn thành hiện trả 404 ở API danh sách, nên lấy bảng phim và phân trang từ chính `kkphim.com`, sau đó mở chi tiết qua `phimapi.com`.
+- NguonC có 22 thể loại, bốn danh sách TV shows/phim lẻ/phim bộ/phim AI, quốc gia, năm và ngôn ngữ. Menu cập nhật từ website NguonC và có dữ liệu dự phòng khi website lỗi.
+- Phim4K đánh dấu kho VIP/Premium riêng với Free1/Free2. Mẫu Wakanda Forever (Core ID 10403) giữ đủ 5 máy chủ: ba bản 1080p và hai bản 2160p, gồm UHD Remux. Đây là xác nhận danh sách, chưa xác nhận phát VIP.
+- Parser tập anime chỉ nhận nút/tập trong đúng bộ phim, loại liên kết đăng nhập, bình luận, người dùng và chuỗi HTML trong script. Hỗ trợ dạng URL Bleach `tap-01-114773.html`, không lấy ID 114773 làm số tập. Bộ đợi DOM dùng cùng parser này nên bình luận không còn làm nó tưởng danh sách tập đã tải xong.
+
+Trang Bleach: Sennen Kessen-hen - Kashin-tan hiện trả trang xác minh trong môi trường kiểm tra; fixture kiểm thử dùng dạng URL đã đối chiếu và bình luận mô phỏng, không được xem là xác nhận đủ tập trực tiếp trên iPhone. Luồng ký yêu cầu CDN của VIP và hỗ trợ MKV/ASS vẫn chưa hoàn tất.

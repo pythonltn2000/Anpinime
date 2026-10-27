@@ -186,7 +186,7 @@ struct AnimeDetailView: View {
                         pendingEpisodeNumber = visible.first?.number
                         showingServerSheet = true
                     } label: {
-                        Label("Tất cả server", systemImage: "list.bullet.rectangle")
+                        Label("Tất cả server (\(seasons.count))", systemImage: "list.bullet.rectangle")
                             .font(.caption.weight(.semibold))
                     }
                 }

@@ -22,14 +22,14 @@ enum Phim4KCatalog {
                          quality: MovieCatalog.text(row["video_quality"]), score: MovieCatalog.rating(row["imdb_rating"]),
                          summary: plain(row["description"]),
                          info: [MovieCatalog.text(row["release"]), MovieCatalog.text(row["runtime"])].filter { !$0.isEmpty }.joined(separator: " • "),
-                         source: .phim4k, catalogLabel: "Phim4K")
+                         source: .phim4k, catalogLabel: "Phim4K · VIP/Premium")
         }
     }
 
     static func sections(_ json: Object, base: URL) -> [AnimeSection] {
         var result: [AnimeSection] = []
-        for (key, title, type, path) in [("latest_movies", "Phim4K · Phim lẻ", "movie", "core/movies"),
-                                        ("latest_tvseries", "Phim4K · Phim bộ", "tvseries", "core/tvseries")] {
+        for (key, title, type, path) in [("latest_movies", "VIP/Premium · Phim lẻ", "movie", "core/movies"),
+                                        ("latest_tvseries", "VIP/Premium · Phim bộ", "tvseries", "core/tvseries")] {
             let rows = items(json[key] as? [Object] ?? [], base: base, type: type)
             if !rows.isEmpty { result.append(AnimeSection(title: title, items: rows, categoryPath: path)) }
         }
@@ -45,10 +45,10 @@ enum Phim4KCatalog {
     }
 
     static func categories(_ json: Object) -> [AnimeCategory] {
-        var result = [AnimeCategory(title: "Phim lẻ", path: "core/movies", group: "Phim4K"),
-                      AnimeCategory(title: "Phim bộ", path: "core/tvseries", group: "Phim4K")]
-        for (key, idKey, path, group) in [("all_genre", "genre_id", "genre", "Phim4K · Thể loại"),
-                                          ("all_country", "country_id", "country", "Phim4K · Quốc gia")] {
+        var result = [AnimeCategory(title: "Phim lẻ", path: "core/movies", group: "Phim4K · VIP/Premium"),
+                      AnimeCategory(title: "Phim bộ", path: "core/tvseries", group: "Phim4K · VIP/Premium")]
+        for (key, idKey, path, group) in [("all_genre", "genre_id", "genre", "VIP/Premium · Thể loại"),
+                                          ("all_country", "country_id", "country", "VIP/Premium · Quốc gia")] {
             for row in json[key] as? [Object] ?? [] {
                 let id = MovieCatalog.text(row[idKey]), title = MovieCatalog.text(row["name"])
                 guard !id.isEmpty, !title.isEmpty else { continue }
@@ -93,7 +93,7 @@ enum Phim4KCatalog {
             let label = MovieCatalog.text(video["label"])
             guard !id.isEmpty, MovieCatalog.url(video["file_url"], base: detailURL) != nil else { continue }
             result.append(Episode(title: "Xem phim", url: detailURL, number: 1,
-                                  season: "Phim4K · " + (label.isEmpty ? "Máy chủ " + id : label),
+                                  season: "VIP/Premium · " + (label.isEmpty ? "Máy chủ " + id : label),
                                   qualityBadge: MovieCatalog.detectQualityBadge(from: label), source: .phim4k,
                                   playback: .phim4kCore(detailURL: detailURL, seasonID: nil, episodeID: id)))
         }
@@ -106,7 +106,7 @@ enum Phim4KCatalog {
                 let title = MovieCatalog.text(row["episodes_name"])
                 guard !episodeID.isEmpty, MovieCatalog.url(row["file_url"], base: detailURL) != nil else { continue }
                 result.append(Episode(title: title.isEmpty ? "Tập \(index + 1)" : title, url: detailURL, number: index + 1,
-                                      season: "Phim4K · " + name, qualityBadge: MovieCatalog.detectQualityBadge(from: name + " " + title),
+                                      season: "VIP/Premium · " + name, qualityBadge: MovieCatalog.detectQualityBadge(from: name + " " + title),
                                       source: .phim4k, playback: .phim4kCore(detailURL: detailURL, seasonID: id, episodeID: episodeID)))
             }
         }

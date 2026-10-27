@@ -88,7 +88,7 @@ let merged = HTMLParser.mergedEpisodes(previewEpisodes, allEpisodes)
 check(merged.count == 1200 && merged.first?.number == 1 && merged.last?.number == 1200, "All 1200 anime episodes survive preview merge and sort numerically")
 check(HTMLParser.watchURL(from: previewHTML, baseURL: animeBase)?.path == "/phim/series-a1/xem-phim.html", "Detail page resolves its full watch page")
 check(HTMLParser.rebasedAnimeURL(URL(string: "https://animevietsub.old/phim/test/tap-2.html?q=1")!, baseURL: animeBase).absoluteString == "https://animevietsub.example/phim/test/tap-2.html?q=1", "Anime domain recovery preserves episode path and query")
-let numericHTML = "<a class='btn-episode' href='/phim/series/xem-phim-99999.html'>12</a>"
+let numericHTML = "<a class='btn-episode' href='/phim/series-a1/xem-phim-99999.html'>12</a>"
 check(HTMLParser.detail(from: numericHTML, anime: animeFixture, baseURL: animeBase).episodes.first?.number == 12, "Numeric label is used instead of an opaque watch-page ID")
 let sourceRows: MovieCatalog.Object = ["items": [["slug": "same-title", "name": "Same title", "language": "Vietsub"]]]
 let nguoncItems = MovieCatalog.legacyItems(sourceRows, base: URL(string: "https://phim.nguonc.com")!, format: .free2, source: .film4k)
@@ -153,3 +153,33 @@ let reordered: MovieCatalog.Object = ["movie": ["name": "Reordered"], "episodes"
 ]]
 check(MovieCatalog.episodeRow(reordered, serverName: "Vietsub", key: "tap-1")?["link_m3u8"] as? String == "https://media.example/one.m3u8", "Refreshing reordered public servers and episodes retains the selected film link")
 check(MovieCatalog.episodeRow(reordered, serverName: "Missing", key: "tap-1") == nil, "A missing server never plays another dub or subtitle version")
+
+let commentFixture = try String(contentsOfFile: "Tests/Fixtures/anime-episodes-comments.html", encoding: .utf8)
+let commentDetail = HTMLParser.detail(from: commentFixture, anime: animeFixture, baseURL: animeBase)
+check(commentDetail.episodes.map(\.title) == ["1", "Tập 2", "OVA 1"], "Anime excludes login redirects, usernames, comment permalinks, quoted episodes and script strings")
+check(commentDetail.episodes.allSatisfy { $0.season == "Vietsub" }, "Anime preserves server identity from the actual episode container")
+check(HTMLParser.watchURL(from: commentFixture, baseURL: animeBase, animeURL: animeFixture.url)?.path == "/phim/series-a1/xem-phim.html", "Watch-page discovery skips login redirects and comment links")
+let kkMenu = MovieBrowseCatalog.defaults(for: .kkphim)
+check(kkMenu.filter { $0.group == "Danh sách phim" }.count == 12, "KKPhim exposes all twelve lists shown on its website")
+check(kkMenu.filter { $0.group == "Thể loại" }.count == 26 && kkMenu.filter { $0.group == "Quốc gia" }.count == 36, "KKPhim retains its complete genre and country menus")
+let ncMenu = MovieBrowseCatalog.defaults(for: .film4k)
+check(ncMenu.filter { $0.group == "Thể loại" }.count == 22, "NguonC exposes all 22 website genres")
+check(ncMenu.contains { $0.title == "Phim AI" && $0.path == "api/films/danh-sach/phim-ai" }, "NguonC uses its own AI movie list")
+check(ncMenu.contains { $0.title == "Hài" && $0.path == "api/films/the-loai/phim-hai" } && !ncMenu.contains { $0.path.contains("hai-huoc") }, "NguonC genre slugs are not replaced by KKPhim slugs")
+let kkOngoing = MovieBrowseCatalog.kkWebsiteItems(try String(contentsOfFile: "Tests/Fixtures/kkphim-ongoing.html", encoding: .utf8))
+check(kkOngoing.count == 2 && kkOngoing.allSatisfy { $0.source == .kkphim && $0.url.host == "phimapi.com" }, "KKPhim website-only lists resolve to its own detail API")
+check(kkOngoing[0].title == "Ván Cờ Của Cô Ấy" && kkOngoing[0].episodeText == "Tập 16", "Website list parsing keeps the actual movie title and episode status")
+let wakanda = try MovieCatalog.object(Data(contentsOf: URL(fileURLWithPath: "Tests/Fixtures/phim4k-wakanda.json")))
+let wakandaEpisodes = Phim4KCatalog.episodes(wakanda, detailURL: coreBase.appendingPathComponent("rest-api/v130/single_details"))
+check(wakandaEpisodes.count == 5, "Wakanda Forever retains all five original Phim4K Premium servers")
+check(wakandaEpisodes.filter { $0.qualityBadge.contains("4K") }.count == 2, "Wakanda keeps both original 2160p variants distinct from the three 1080p variants")
+
+// URL shape observed on the reported Bleach page; markup is a synthetic regression fixture.
+let bleach = Anime(title: "Bleach: Sennen Kessen-hen - Kashin-tan", url: animeBase.appendingPathComponent("phim/bleach-sennen-kessen-hen-kashin-tan-a5985/"), imageURL: nil, episodeText: "", quality: "", score: "")
+let bleachHTML = "<div class='list-episode'><a class='btn-episode' data-hash='ep1' href='/phim/bleach-sennen-kessen-hen-kashin-tan-a5985/tap-01-114773.html'>01</a></div><div class='comment-list'><a href='/phim/bleach-sennen-kessen-hen-kashin-tan-a5985/xem-phim.html'>Lostsky</a></div>"
+let bleachEpisodes = HTMLParser.detail(from: bleachHTML, anime: bleach, baseURL: animeBase).episodes
+check(bleachEpisodes.count == 1 && bleachEpisodes[0].url.lastPathComponent == "tap-01-114773.html" && bleachEpisodes[0].number == 1, "Bleach episode links keep both the display number and opaque episode ID")
+
+let nguoncMenuHTML = "<nav><a href='/the-loai/phim-hai'>Hài</a><a href='/quoc-gia/my'>Mỹ</a><a href='/nam-phat-hanh/2026'>2026</a><a href='https://phimapi.com/the-loai/foreign'>Foreign</a></nav>"
+let parsedNguoncMenu = MovieBrowseCatalog.nguoncMenu(nguoncMenuHTML)
+check(parsedNguoncMenu.map(\.path) == ["api/films/the-loai/phim-hai", "api/films/quoc-gia/my", "api/films/nam-phat-hanh/2026"], "NguonC website menus convert to its own API routes and discard foreign links")

@@ -66,3 +66,25 @@ this environment. The announced CDN host rejected the bounded request; no guesse
 rewrite has been installed. Restoring catalog entries is not proof of live Core
 playback, and AVPlayer still does not implement mpv's full MKV/ASS capabilities.
 The user has been asked for a currently working original-app VIP sample.
+
+## Wakanda and VIP transport follow-up — 2026-10-27
+
+The user supplied Black Panther: Wakanda Forever as an original-app sample.
+Core `single_details?type=movie&id=10403` returned five `videos` entries, preserved
+in `Tests/Fixtures/phim4k-wakanda.json`: file IDs 31937, 33090, 27463, 31938,
+31939. Three are 1080p; two are 2160p including UHD Remux. All report MKV.
+Four entries also expose `stream_key`; ID 27463 does not. No positional or
+quality-based deduplication is applied.
+
+Further static inspection explains why replacing the `.lol` host alone is
+insufficient. In the arm64 image, code at image-relative 0x6d3a28 parses the
+original URL's last path component, calls the signing path at 0x6d3e08 and then
+reads a `url` from the CDN response JSON. That path constructs a time-dependent
+request on the configured CDN with `token` and `ts` query parameters. These are
+image-relative addresses (fat-slice file offset +0x4000), not object-pool offsets.
+This behavior has not been integrated or validated against live VIP playback;
+no signing secret or account credentials are added to this repository.
+
+Catalog/menu changes are independent of this unresolved transport. Tests cover
+all five Wakanda IDs and preserve each original server without relabelling a
+Free1 stream as VIP. The original IPA remains unchanged.

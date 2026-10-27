@@ -85,7 +85,8 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             if !HTMLParser.containsVerification(html) {
                 if self.waitForEpisodes {
                     if self.renderedSince == nil { self.renderedSince = Date() }
-                    let count = (page["episodeCount"] as? Int) ?? 0
+                    let identity = Anime(title: "", url: self.targetURL ?? url, imageURL: nil, episodeText: "", quality: "", score: "")
+                    let count = HTMLParser.detail(from: html, anime: identity, baseURL: url.deletingLastPathComponent()).episodes.count
                     self.stableEpisodePolls = count == self.lastEpisodeCount ? self.stableEpisodePolls + 1 : 0
                     self.lastEpisodeCount = count
                     let elapsed = Date().timeIntervalSince(self.renderedSince ?? Date())
@@ -146,7 +147,7 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     static let pageInspection = """
     (() => {
       const visible = e => { const r=e.getBoundingClientRect(); const s=getComputedStyle(e); return r.width>10 && r.height>10 && s.display!=='none' && s.visibility!=='hidden'; };
-      return {html:document.documentElement.outerHTML, episodeCount:document.querySelectorAll('a.btn-episode,a[data-hash]').length, interactive:Array.from(document.querySelectorAll('iframe[src*="challenges.cloudflare.com"],iframe[src*="recaptcha"],iframe[src*="hcaptcha"],.cf-turnstile,.g-recaptcha,.h-captcha,#challenge-stage input[type="checkbox"]')).some(visible)};
+      return {html:document.documentElement.outerHTML, interactive:Array.from(document.querySelectorAll('iframe[src*="challenges.cloudflare.com"],iframe[src*="recaptcha"],iframe[src*="hcaptcha"],.cf-turnstile,.g-recaptcha,.h-captcha,#challenge-stage input[type="checkbox"]')).some(visible)};
     })()
     """
 }

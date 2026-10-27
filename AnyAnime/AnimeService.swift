@@ -238,7 +238,7 @@ final class AnimeService: ObservableObject {
         let pageBase = await resolver.resolve()
         let metadata = HTMLParser.detail(from: html, anime: anime, baseURL: pageBase)
         var episodes = metadata.episodes
-        if let watchURL = HTMLParser.watchURL(from: html, baseURL: pageBase), watchURL != detailURL {
+        if let watchURL = HTMLParser.watchURL(from: html, baseURL: pageBase, animeURL: anime.url), watchURL != detailURL {
             // Detail pages often contain only a preview of the latest episodes.
             let watchHTML = try await fetchHTML(url: watchURL)
             let full = HTMLParser.detail(from: watchHTML, anime: anime, baseURL: pageBase).episodes

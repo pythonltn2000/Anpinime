@@ -20,8 +20,14 @@ final class ProviderProtocol: URLProtocol {
         let url = request.url!, host = url.host!, path = url.path
         var status = 200
         var body: Any
+        var html: String?
         if host == failing { status = 503; body = ["error": "Unavailable"] }
-        else if host == "core.example" {
+        else if host == "kkphim.com" {
+            html = try! String(contentsOfFile: "Tests/Fixtures/kkphim-ongoing.html", encoding: .utf8)
+            body = [:]
+        } else if path == "/the-loai" || path == "/quoc-gia" {
+            body = ["items": [["slug": "own-taxonomy", "name": "Own category"]]]
+        } else if host == "core.example" {
             let movie: [String: Any] = ["videos_id": "41", "title": "Core movie 4K", "is_tvseries": "0"]
             switch path {
             case "/rest-api/v130/home_content_for_android":
@@ -39,7 +45,7 @@ final class ProviderProtocol: URLProtocol {
         } else {
             body = ["items": [["slug": "shared-slug", "name": host]]]
         }
-        let data = try! JSONSerialization.data(withJSONObject: body)
+        let data = html.map { Data($0.utf8) } ?? (try! JSONSerialization.data(withJSONObject: body))
         client?.urlProtocol(self, didReceive: HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
@@ -81,6 +87,16 @@ struct ProviderTests {
             require(playback.url.host == host && playback.url.path == "/movie.m3u8" && playback.webURL == nil, "Native content never falls back to an advertising page")
             let searchRequest = ProviderProtocol.captured().first { $0.url!.path.contains("search") || $0.url!.path.contains("tim-kiem") }!
             require(URLComponents(url: searchRequest.url!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "keyword" })?.value == "Tên phim & dấu tiếng Việt", "Search keyword remains intact")
+            if source == .kkphim {
+                require(provider.categories.contains { $0.path == "v1/api/the-loai/own-taxonomy" }, "KKPhim refreshes its taxonomy from its own API")
+                ProviderProtocol.reset()
+                let ongoing = try await provider.list(path: "site/danh-sach/phim-bo-dang-chieu", page: 2)
+                require(ongoing.count == 2 && ongoing.allSatisfy { $0.source == .kkphim && $0.url.host == "phimapi.com" }, "KKPhim website-only lists retain provider identity")
+                let website = ProviderProtocol.captured().first!.url!
+                require(website.host == "kkphim.com" && website.path == "/danh-sach/phim-bo-dang-chieu" && website.query == "page=2", "Ongoing list paginates on KKPhim's actual website route")
+                _ = try await provider.detail(ongoing[0])
+                require(ProviderProtocol.captured().last!.url!.host == "phimapi.com", "Website results open details through the same provider's API")
+            }
             ProviderProtocol.reset(failing: host)
             provider.invalidate()
             do { _ = try await provider.search("fail"); fatalError("Expected source failure") } catch {}
@@ -89,10 +105,10 @@ struct ProviderTests {
         ProviderProtocol.reset()
         let app = MovieProvider(source: .phim4k, session: session, source2Configuration: source2)
         let home = try await app.home()
-        require(home.first?.title == "Phim4K · Phim lẻ", "Source 2 starts with Phim4K Core, not Free1/KKPhim")
+        require(home.first?.title == "VIP/Premium · Phim lẻ", "Source 2 starts with Phim4K Core, not Free1/KKPhim")
         require(home.map(\.title).contains("Phim4K · Free1") && home.map(\.title).contains("Phim4K · Free2"), "All catalogs announced by the app remain separately available")
         let search = try await app.search("Avatar")
-        require(search.map(\.catalogLabel) == ["Phim4K", "Phim4K · Free1", "Phim4K · Free2"], "Search preserves the app's three catalog identities")
+        require(search.map(\.catalogLabel) == ["Phim4K · VIP/Premium", "Phim4K · Free1", "Phim4K · Free2"], "Search preserves the app's three catalog identities")
         _ = try await app.list(path: "core/genre/45", page: 2)
         _ = try await app.list(path: "free1/v1/api/the-loai/hanh-dong")
         _ = try await app.list(path: "free2/api/films/the-loai/hanh-dong")

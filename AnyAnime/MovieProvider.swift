@@ -21,7 +21,7 @@ final class MovieProvider {
         #if DEBUG
         if PlaybackSmokeTest.providerFixture { baseURL = URL(string: "http://127.0.0.1:8765")! }
         #endif
-        publicCategories = source == .phim4k ? [] : format.defaultCategories
+        publicCategories = MovieBrowseCatalog.defaults(for: source)
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 12
         config.timeoutIntervalForResource = 20
@@ -59,6 +59,7 @@ final class MovieProvider {
         #if DEBUG
         if PlaybackSmokeTest.providerFixture { return initial }
         #endif
+        async let updatedCategories = loadBrowseCategories()
         let configs = Array(format.homeSectionsConfig.dropFirst())
         var extra: [Int: AnimeSection] = [:]
         await withTaskGroup(of: (Int, AnimeSection?).self) { group in
@@ -74,11 +75,16 @@ final class MovieProvider {
             }
         }
         try Task.checkCancellation()
+        publicCategories = await updatedCategories
         return initial + extra.keys.sorted().compactMap { extra[$0] }
     }
 
     func list(path: String, page: Int = 1) async throws -> [Anime] {
         if source == .phim4k { return try await appProvider.list(path: path, page: page) }
+        if source == .kkphim, MovieBrowseCatalog.kkWebsiteLists.contains(path) {
+            let url = MovieCatalog.route(String(path.dropFirst(5)), base: URL(string: "https://kkphim.com")!, query: [.init(name: "page", value: String(page))])
+            return MovieBrowseCatalog.kkWebsiteItems(try await websiteHTML(url))
+        }
         let target = path.isEmpty || path == "latest" ? format.listPath : path
         guard MovieCatalog.isCatalogPath(target, format: format) else { throw MovieSourceError.invalidData }
         let json = try await catalogRequest(MovieCatalog.route(target, base: baseURL, query: [.init(name: "page", value: String(page))]))
@@ -101,6 +107,37 @@ final class MovieProvider {
         #endif
         let json = try await catalogRequest(anime.url)
         return try MovieCatalog.legacyDetail(json, anime: anime)
+    }
+
+    private func loadBrowseCategories() async -> [AnimeCategory] {
+        let fallback = MovieBrowseCatalog.defaults(for: source)
+        if source == .film4k {
+            guard let html = try? await websiteHTML(URL(string: "https://phim.nguonc.com/api-document")!) else { return fallback }
+            let parsed = MovieBrowseCatalog.nguoncMenu(html)
+            guard parsed.contains(where: { $0.group == "Thể loại" }) else { return fallback }
+            return fallback.filter { $0.path == format.listPath } + parsed + fallback.filter { $0.group == "Ngôn ngữ" }
+        }
+        guard source == .kkphim else { return fallback }
+        var result = fallback.filter { $0.group == "Danh sách phim" }
+        for (endpoint, group) in [("the-loai", "Thể loại"), ("quoc-gia", "Quốc gia")] {
+            if let json = try? await catalogRequest(MovieCatalog.route(endpoint, base: baseURL)) {
+                let items = MovieBrowseCatalog.kkTaxonomy(json, group: group, path: "v1/api/" + endpoint + "/")
+                result += items.isEmpty ? fallback.filter { $0.group == group } : items
+            } else { result += fallback.filter { $0.group == group } }
+        }
+        return result
+    }
+
+    private func websiteHTML(_ url: URL) async throws -> String {
+        let expected = source == .kkphim ? "kkphim.com" : "phim.nguonc.com"
+        guard url.host == expected, url.scheme == "https" else { throw MovieSourceError.invalidData }
+        var req = URLRequest(url: url, timeoutInterval: 12)
+        req.setValue(AnimeService.userAgent, forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await session.data(for: req)
+        try Task.checkCancellation()
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+              let html = String(data: data, encoding: .utf8) else { throw MovieSourceError.invalidData }
+        return html
     }
 
     private func catalogRequest(_ url: URL) async throws -> MovieCatalog.Object {
