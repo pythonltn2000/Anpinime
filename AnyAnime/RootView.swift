@@ -157,6 +157,9 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                             .padding(.horizontal)
                         }
+                        if !service.status.isEmpty && !service.homeLoading {
+                            Text(service.status).font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
+                        }
                         ForEach(service.homeSections) { section in
                             AnimeRow(section: section)
                         }
@@ -446,9 +449,15 @@ struct BrowseView: View {
             if service.categories.isEmpty && service.homeLoading {
                 LoadingView(text: "Đang tải thể loại…")
             } else {
-                List(service.categories) { category in
-                    NavigationLink(destination: AnimeGridView(title: category.title, path: category.path)) {
-                        Label(category.title, systemImage: icon(for: category.path))
+                List {
+                    ForEach(categoryGroups, id: \.self) { group in
+                        Section(header: Text(group.isEmpty ? service.source.title : group)) {
+                            ForEach(service.categories.filter { $0.group == group }) { category in
+                                NavigationLink(destination: AnimeGridView(title: category.title, path: category.path)) {
+                                    Label(category.title, systemImage: icon(for: category.path))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -457,6 +466,11 @@ struct BrowseView: View {
         .task(id: service.source) {
             if service.categories.isEmpty { await service.loadHome() }
         }
+    }
+
+    private var categoryGroups: [String] {
+        var seen = Set<String>()
+        return service.categories.map(\.group).filter { seen.insert($0).inserted }
     }
 
     private func icon(for path: String) -> String {
@@ -555,10 +569,30 @@ struct AnimeSearchView: View {
     @State private var loading = false
     @State private var message = "Nhập tên phim để tìm trong nguồn đang chọn"
     @State private var searchID = UUID()
+    @State private var history: [String] = []
+    private let historyStore = SearchHistory()
 
     var body: some View {
         ZStack {
-            if loading { LoadingView(text: "Đang tìm kiếm…") }
+            if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !history.isEmpty {
+                List {
+                    Section(header: Text("Tìm kiếm gần đây · " + service.source.title)) {
+                        ForEach(history, id: \.self) { value in
+                            Button { query = value; remember(value) } label: {
+                                Label(value, systemImage: "clock.arrow.circlepath").foregroundStyle(.primary)
+                            }
+                        }
+                        .onDelete { offsets in
+                            for index in offsets { historyStore.remove(history[index], source: service.source) }
+                            history = historyStore.queries(for: service.source)
+                        }
+                        Button("Xóa lịch sử", role: .destructive) {
+                            historyStore.clear(source: service.source)
+                            history = []
+                        }
+                    }
+                }
+            } else if loading { LoadingView(text: "Đang tìm kiếm…") }
             else if results.isEmpty {
                 EmptyStateView(icon: "magnifyingglass", title: "Tìm \(service.contentName)", message: message, actionTitle: nil, action: nil)
             } else {
@@ -566,13 +600,17 @@ struct AnimeSearchView: View {
                     NavigationLink(destination: AnimeDetailView(anime: anime)) {
                         SearchResultRow(anime: anime)
                     }
+                    .simultaneousGesture(TapGesture().onEnded { remember(query) })
                 }
                 .listStyle(.plain)
             }
         }
         .navigationTitle("Tìm kiếm")
-        .searchable(text: $query, prompt: "Tên \(service.contentName)")
+        .searchable(text: $query, prompt: service.source.title)
+        .onSubmit(of: .search) { remember(query) }
         .task(id: query) {
+            searchID = UUID()
+            history = historyStore.queries(for: service.source)
             results = []
             guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 loading = false
@@ -587,6 +625,11 @@ struct AnimeSearchView: View {
         }
     }
 
+    private func remember(_ query: String) {
+        historyStore.record(query, source: service.source)
+        history = historyStore.queries(for: service.source)
+    }
+
     private func search() async {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
@@ -596,7 +639,7 @@ struct AnimeSearchView: View {
         loading = true
         defer { if searchID == id { loading = false } }
         do {
-            let found = try await service.search(clean)
+            let found = try await service.search(clean, source: selected)
             try Task.checkCancellation()
             guard selected == service.source, searchID == id, query.trimmingCharacters(in: .whitespacesAndNewlines) == clean else { return }
             results = found
@@ -665,7 +708,7 @@ struct AppSettingsView: View {
                     }.disabled(service.homeLoading)
                     if !sourceMessage.isEmpty { Text(sourceMessage).font(.footnote).foregroundStyle(.secondary) }
                 } header: { Text("Nguồn phim 2") }
-                  footer: { Text("Để trống để dùng kết nối mặc định. Khi nguồn đổi địa chỉ, bạn có thể nhập địa chỉ API mới ở đây.") }
+                  footer: { Text("Để trống để dùng đầy đủ kho Phim4K, Free1 và Free2. Địa chỉ thủ công chỉ dùng một kho Free1/Free2 tương thích.") }
             }
             Section("Giới thiệu") {
                 LabeledContentCompat(title: "Ứng dụng", value: "AnPinime")
@@ -720,6 +763,8 @@ private struct SearchResultRow: View {
                 .cornerRadius(6)
             VStack(alignment: .leading, spacing: 7) {
                 Text(anime.title).font(.headline).lineLimit(2)
+                Text(anime.catalogLabel.isEmpty ? anime.source.title : anime.catalogLabel)
+                    .font(.caption2).foregroundStyle(.secondary)
                 Text([anime.episodeText, anime.quality].filter { !$0.isEmpty }.joined(separator: " • "))
                     .font(.caption)
                     .foregroundColor(.secondary)

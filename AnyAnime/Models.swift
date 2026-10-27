@@ -6,17 +6,17 @@ enum ContentSource: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .anime: return "AnimeVietsub"
-        case .film4k: return "Nguồn phim 1"
-        case .phim4k: return "Nguồn phim 2"
-        case .kkphim: return "Nguồn phim 3"
+        case .film4k: return "Nguồn 1 · NguonC"
+        case .phim4k: return "Nguồn 2 · Phim4K"
+        case .kkphim: return "Nguồn 3 · KKPhim"
         }
     }
     var subtitle: String {
         switch self {
         case .anime: return "Anime"
-        case .film4k: return "Nguồn phim 1"
-        case .phim4k: return "Nguồn phim 2"
-        case .kkphim: return "Nguồn phim 3"
+        case .film4k: return "Nguồn 1 · NguonC"
+        case .phim4k: return "Nguồn 2 · Phim4K"
+        case .kkphim: return "Nguồn 3 · KKPhim"
         }
     }
     var isMovie: Bool { self != .anime }
@@ -25,7 +25,8 @@ enum ContentSource: String, CaseIterable, Identifiable {
 enum EpisodePlayback: Hashable {
     case animePage
     case film4k(slug: String, season: Int?, episode: Int?, server: Int)
-    case phim4k(detailURL: URL, server: Int, index: Int)
+    case catalogEpisode(detailURL: URL, serverName: String, episodeKey: String)
+    case phim4kCore(detailURL: URL, seasonID: String?, episodeID: String)
     case directStream(url: URL, webURL: URL?, isWeb: Bool, referer: URL?)
 }
 
@@ -62,6 +63,7 @@ struct Anime: Identifiable, Hashable {
     var summary: String = ""
     var info: String = ""
     var source: ContentSource = .anime
+    var catalogLabel: String = ""
 
     var id: String { source.rawValue + ":" + url.absoluteString }
 }
@@ -98,6 +100,7 @@ struct AnimeDetail: Hashable {
 struct AnimeCategory: Identifiable, Hashable {
     let title: String
     let path: String
+    var group: String = ""
     var id: String { path }
 }
 

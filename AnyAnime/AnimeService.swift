@@ -24,6 +24,8 @@ final class AnimeService: ObservableObject {
         let categories: [AnimeCategory]
         let baseURL: URL
         let date: Date
+        let notice: String
+        let complete: Bool
     }
     private var homeCache: [ContentSource: HomeSnapshot] = [:]
     private var htmlCache: [URL: (Date, String)] = [:]
@@ -77,8 +79,8 @@ final class AnimeService: ObservableObject {
         else { baseURL = URL(string: "https://animevietsub.vip")! }
         if let cached {
             baseURL = cached.baseURL
-            status = ""
-            if Date().timeIntervalSince(cached.date) < 300 { return }
+            status = cached.notice
+            if cached.complete, Date().timeIntervalSince(cached.date) < 300 { return }
         }
         imageGeneration += 1
         homeTask = Task { [weak self] in
@@ -95,8 +97,8 @@ final class AnimeService: ObservableObject {
         }
     }
 
-    private func saveHome(_ selected: ContentSource) {
-        homeCache[selected] = HomeSnapshot(sections: homeSections, categories: movieCategories, baseURL: baseURL, date: Date())
+    private func saveHome(_ selected: ContentSource, complete: Bool = true) {
+        homeCache[selected] = HomeSnapshot(sections: homeSections, categories: movieCategories, baseURL: baseURL, date: Date(), notice: status, complete: complete)
     }
 
     func resolvePlayback(_ episode: Episode, refresh: Bool = false) async throws -> ResolvedPlayback {
@@ -124,7 +126,7 @@ final class AnimeService: ObservableObject {
             htmlCache.removeAll()
             detailCache.removeAll()
             if source.isMovie { provider(source).invalidate() }
-        } else if let cached = homeCache[source], Date().timeIntervalSince(cached.date) < 300 {
+        } else if let cached = homeCache[source], cached.complete, Date().timeIntervalSince(cached.date) < 300 {
             return
         }
         if !forceDomainRefresh, let existing = homeTask {
@@ -165,7 +167,7 @@ final class AnimeService: ObservableObject {
                     self.baseURL = provider.baseURL
                     self.homeLoading = false
                     self.status = ""
-                    self.saveHome(selectedSource)
+                    self.saveHome(selectedSource, complete: false)
                 }
                 try Task.checkCancellation()
                 guard homeRequestID == generation else { return }
@@ -173,7 +175,7 @@ final class AnimeService: ObservableObject {
                 movieCategories = provider.categories
                 baseURL = provider.baseURL
                 imageGeneration += 1
-                status = ""
+                status = provider.notice
                 saveHome(selectedSource)
             } catch {
                 guard homeRequestID == generation else { return }
@@ -212,14 +214,19 @@ final class AnimeService: ObservableObject {
         return items
     }
 
-    func search(_ query: String) async throws -> [Anime] {
+    func search(_ query: String, source requestedSource: ContentSource? = nil) async throws -> [Anime] {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return [] }
-        if source.isMovie { return try await provider(source).search(clean) }
-        guard let encoded = clean.addingPercentEncoding(withAllowedCharacters: .alphanumerics) else {
+        let selected = requestedSource ?? source
+        if selected.isMovie { return try await provider(selected).search(clean) }
+        let currentBase = await resolver.resolve()
+        guard let encoded = clean.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+              let url = URL(string: "/tim-kiem/" + encoded + "/", relativeTo: currentBase)?.absoluteURL else {
             throw AnimeServiceError.invalidURL
         }
-        return try await list(path: "/tim-kiem/\(encoded)/")
+        let html = try await fetchHTML(url: url)
+        try Task.checkCancellation()
+        return HTMLParser.animes(from: html, baseURL: currentBase)
     }
 
     func detail(for anime: Anime) async throws -> AnimeDetail {

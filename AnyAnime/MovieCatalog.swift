@@ -33,6 +33,13 @@ enum MovieCatalog {
         return components.url!
     }
 
+    static func isCatalogPath(_ path: String, format: Phim4KFormat) -> Bool {
+        guard !path.contains("://"), !path.contains(".."), !path.contains("?"), !path.contains("#") else { return false }
+        let prefixes = format == .free1 ? ["danh-sach/", "v1/api/danh-sach/", "v1/api/the-loai/", "v1/api/quoc-gia/"]
+            : ["api/films/phim-moi-cap-nhat", "api/films/danh-sach/", "api/films/the-loai/", "api/films/quoc-gia/", "api/films/nam-phat-hanh/", "api/films/ngon-ngu/"]
+        return prefixes.contains { path.hasPrefix($0) }
+    }
+
     static func rating(_ value: Any?) -> String {
         guard let number = Double(text(value)), number.isFinite, number > 0 else { return "" }
         return String(format: "%.1f", number)
@@ -172,11 +179,11 @@ enum MovieCatalog {
             let group = serverPrefix.isEmpty ? rawGroup : "\(serverPrefix) · \(rawGroup)"
             let badge = detectQualityBadge(from: rawGroup + " " + movieQuality + " " + movieLang)
             for (index, row) in rows.enumerated() {
-                guard legacyStream(row, base: anime.url) != nil else { continue }
+                guard legacyStream(row, base: anime.url) != nil, !episodeKey(row).isEmpty else { continue }
                 let title = text(row["name"]).nonempty ?? "Tập \(index + 1)"
                 episodes.append(Episode(title: title, url: anime.url, number: index + 1, season: group,
                                         qualityBadge: badge, source: anime.source,
-                                        playback: .phim4k(detailURL: anime.url, server: serverIndex, index: index)))
+                                        playback: .catalogEpisode(detailURL: anime.url, serverName: rawGroup, episodeKey: episodeKey(row))))
             }
         }
         let rawSummary = text(movie["content"] ?? movie["description"])
@@ -193,6 +200,21 @@ enum MovieCatalog {
                            summary: rawSummary.nonempty ?? anime.summary.nonempty ?? "Chưa có nội dung giới thiệu.",
                            info: infoList.joined(separator: " • "),
                            episodes: episodes)
+    }
+
+    static func episodeKey(_ row: Object) -> String {
+        text(row["slug"]).nonempty ?? text(row["name"])
+    }
+
+    static func episodeRow(_ json: Object, serverName: String, key: String) -> Object? {
+        let movie = json["movie"] as? Object ?? [:]
+        let groups = json["episodes"] as? [Object] ?? movie["episodes"] as? [Object] ?? []
+        let matches = groups.enumerated().filter { index, group in
+            (text(group["server_name"]).nonempty ?? "Máy chủ \(index + 1)") == serverName
+        }.flatMap { _, group in
+            (group["server_data"] as? [Object] ?? group["items"] as? [Object] ?? []).filter { episodeKey($0) == key }
+        }
+        return matches.count == 1 ? matches[0] : nil
     }
 
     static func directEpisodes(from json: Object, detailURL: URL, serverPrefix: String) -> [Episode] {
@@ -217,66 +239,6 @@ enum MovieCatalog {
         return result
     }
 
-    static func corePhim4KEpisodes(from detail: Object, detailURL: URL, fallbackEpisodes: [Episode]) -> [Episode] {
-        var result: [Episode] = []
-        // Single movie `videos` array from api.phim4k.online/rest-api/v130/single_details
-        let videos = detail["videos"] as? [Object] ?? []
-        for (idx, video) in videos.enumerated() {
-            let label = text(video["label"]).nonempty ?? "Server 4K #\(idx + 1)"
-            let badge = detectQualityBadge(from: label)
-            let rawURL = url(video["file_url"], base: detailURL)
-            let isInternalCDN = rawURL?.host?.contains("phim4k.lol") == true || rawURL?.pathExtension.lowercased() == "mkv"
-            if let rawURL, !isInternalCDN {
-                let isWeb = text(video["file_type"]).lowercased().contains("embed")
-                result.append(Episode(title: "Xem phim", url: detailURL, number: 1, season: "Phim4K · \(label)",
-                                      qualityBadge: badge, source: .phim4k,
-                                      playback: .directStream(url: rawURL, webURL: nil, isWeb: isWeb, referer: detailURL)))
-            } else if let matched = matchFallbackEpisode(label: label, episodeIndex: 0, in: fallbackEpisodes) {
-                result.append(Episode(title: "Xem phim", url: detailURL, number: 1, season: "Phim4K · \(label)",
-                                      qualityBadge: badge, source: .phim4k,
-                                      playback: matched.playback))
-            }
-        }
-        // TV series `season` array from api.phim4k.online/rest-api/v130/single_details
-        let seasons = detail["season"] as? [Object] ?? []
-        for seasonObj in seasons {
-            let seasonName = text(seasonObj["seasons_name"]).nonempty ?? "Season 1"
-            let badge = detectQualityBadge(from: seasonName)
-            let eps = seasonObj["episodes"] as? [Object] ?? []
-            for (idx, epObj) in eps.enumerated() {
-                let epTitle = text(epObj["episodes_name"]).nonempty ?? "Tập \(idx + 1)"
-                let rawURL = url(epObj["file_url"], base: detailURL)
-                let isInternalCDN = rawURL?.host?.contains("phim4k.lol") == true || rawURL?.pathExtension.lowercased() == "mkv"
-                if let rawURL, !isInternalCDN {
-                    result.append(Episode(title: epTitle, url: detailURL, number: idx + 1, season: "Phim4K · \(seasonName)",
-                                          qualityBadge: badge, source: .phim4k,
-                                          playback: .directStream(url: rawURL, webURL: nil, isWeb: false, referer: detailURL)))
-                } else if let matched = matchFallbackEpisode(label: seasonName, episodeIndex: idx, in: fallbackEpisodes) {
-                    result.append(Episode(title: epTitle, url: detailURL, number: idx + 1, season: "Phim4K · \(seasonName)",
-                                          qualityBadge: badge, source: .phim4k,
-                                          playback: matched.playback))
-                }
-            }
-        }
-        return result
-    }
-
-    private static func matchFallbackEpisode(label: String, episodeIndex: Int, in fallback: [Episode]) -> Episode? {
-        guard !fallback.isEmpty else { return nil }
-        let normalized = label.folding(options: .diacriticInsensitive, locale: Locale(identifier: "vi_VN")).lowercased()
-        let wantsDub = normalized.contains("thuyet minh") || normalized.contains("long tieng")
-        let candidates = fallback.filter { ep in
-            let s = ep.season.folding(options: .diacriticInsensitive, locale: Locale(identifier: "vi_VN")).lowercased()
-            let isDub = s.contains("thuyet minh") || s.contains("long tieng")
-            return wantsDub ? isDub : !isDub
-        }
-        let pool = candidates.isEmpty ? fallback : candidates
-        if let exact = pool.first(where: { ($0.number ?? 1) == episodeIndex + 1 }) {
-            return exact
-        }
-        return pool.indices.contains(episodeIndex) ? pool[episodeIndex] : pool.first
-    }
-
     static func detectQualityBadge(from text: String) -> String {
         let upper = text.uppercased()
         var parts: [String] = []
@@ -289,7 +251,7 @@ enum MovieCatalog {
         if folded.contains("thuyet minh") { parts.append("Thuyết minh") }
         else if folded.contains("long tieng") { parts.append("Lồng tiếng") }
         else if folded.contains("vietsub") { parts.append("Vietsub") }
-        return parts.isEmpty ? "FHD" : parts.joined(separator: " · ")
+        return parts.joined(separator: " · ")
     }
 
     static func legacyStream(_ row: Object, base: URL) -> (url: URL, web: Bool)? {
@@ -301,7 +263,7 @@ enum MovieCatalog {
                     || field.contains("m3u8")
                     || field == "stream_url"
                     || field == "video_url"
-                let isEmbed = field.contains("embed") && !isDirectMedia
+                let isEmbed = !isDirectMedia
                 return (url, isEmbed)
             }
         }
@@ -356,7 +318,7 @@ enum Phim4KFormat: String, CaseIterable, Identifiable {
             .init(title: "Phim hoạt hình", path: self == .free1 ? prefixList + "hoat-hinh" : prefixGenre + "hoat-hinh"),
             .init(title: "Phim lẻ", path: prefixList + "phim-le"),
             .init(title: "Phim bộ mới nhất", path: prefixList + "phim-bo"),
-            .init(title: "TV Shows", path: self == .free1 ? prefixList + "tv-shows" : prefixGenre + "tv-shows"),
+            .init(title: "TV Shows", path: prefixList + "tv-shows"),
             .init(title: self == .free1 ? "Phim Âu Mỹ" : "Phim Mỹ", path: prefixCountry + (self == .free1 ? "au-my" : "my")),
             .init(title: "Phim Nhật Bản", path: prefixCountry + "nhat-ban"),
             .init(title: "Phim Thái Lan", path: prefixCountry + "thai-lan")

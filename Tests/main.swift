@@ -101,3 +101,55 @@ let parsedNguonc = try MovieCatalog.legacyDetail(nguoncDetail, anime: nguoncItem
 check(parsedNguonc.episodes.count == 2 && parsedNguonc.episodes.allSatisfy { $0.source == .film4k }, "NguonC nested episode servers preserve source identity")
 let parsedKK = try MovieCatalog.legacyDetail(nguoncDetail, anime: kkItems[0])
 check(parsedKK.episodes.allSatisfy { $0.source == .kkphim }, "KKPhim episodes never use source 2 identity")
+
+let coreBase = URL(string: "https://api.phim4k.example")!
+let coreRow: MovieCatalog.Object = ["videos_id": "14973", "title": "Avatar (2009)", "is_tvseries": "0", "video_quality": "4K", "slug": "avatar"]
+let coreMovie = Phim4KCatalog.items([coreRow], base: coreBase)[0]
+check(coreMovie.source == .phim4k && coreMovie.url.query == "type=movie&id=14973", "Phim4K Core uses stable app IDs, not a KKPhim slug search")
+let coreJSON: MovieCatalog.Object = ["videos_id": "14973", "title": "Avatar (2009)", "videos": [
+    ["video_file_id": "a", "label": "2160P REMUX HDR MKV", "file_type": "mkv", "file_url": "https://cdn.phim4k.lol/original-a"],
+    ["video_file_id": "b", "label": "1080P MKV", "file_type": "mkv", "file_url": "https://cdn.phim4k.lol/original-b"]
+]]
+let coreEpisodes = try Phim4KCatalog.detail(coreJSON, anime: coreMovie).episodes
+check(coreEpisodes.count == 2, "All original Phim4K 4K and MKV servers are retained")
+check(coreEpisodes[0].qualityBadge.contains("4K") && coreEpisodes[0].season.contains("REMUX"), "Original Phim4K server labels retain 4K/Remux distinctions")
+check(Phim4KCatalog.stream(coreJSON, seasonID: nil, episodeID: "a", base: coreBase)?.url.absoluteString == "https://cdn.phim4k.lol/original-a", "VIP entries resolve the actual app link, never a relabelled Free1 fallback")
+check(Phim4KCatalog.stream(coreJSON, seasonID: nil, episodeID: "missing", base: coreBase) == nil, "Missing VIP server does not fall back to another server")
+let coreSeries: MovieCatalog.Object = ["season": [
+    ["seasons_id": "10", "seasons_name": "Season 1 4K", "episodes": [["episodes_id": "101", "episodes_name": "01.mkv", "file_url": "https://media.example/one.mkv"]]],
+    ["seasons_id": "20", "seasons_name": "Season 2 4K", "episodes": [["episodes_id": "201", "episodes_name": "01.mkv", "file_url": "https://media.example/two.mkv"]]]
+]]
+check(Phim4KCatalog.episodes(coreSeries, detailURL: coreMovie.url).count == 2, "Phim4K series keep every season and its original episode links")
+check(Phim4KCatalog.stream(coreSeries, seasonID: "20", episodeID: "201", base: coreBase)?.url.lastPathComponent == "two.mkv", "Core playback matches season and episode IDs instead of positional indexes")
+check(Phim4KCatalog.stream(coreSeries, seasonID: "10", episodeID: "201", base: coreBase) == nil, "Core resolver cannot cross seasons")
+let coreCats = Phim4KCatalog.categories(["all_genre": [["genre_id": "45", "name": "Hot"]], "all_country": [["country_id": "1", "name": "Hoa Kỳ"]]])
+check(coreCats.map(\.path).contains("core/genre/45") && coreCats.map(\.path).contains("core/country/1"), "Phim4K categories come from the app's own genre and country IDs")
+let coreGenreRoute = try Phim4KCatalog.listRoute("core/genre/45", base: coreBase, page: 2)
+check(coreGenreRoute.path == "/rest-api/v130/content_by_genre_id" && coreGenreRoute.query == "page=2&id=45", "Core category requests use the original app endpoint and pagination")
+check(!MovieCatalog.isCatalogPath("api/films/the-loai/hanh-dong", format: .free1), "KKPhim rejects NguonC category routes")
+check(!MovieCatalog.isCatalogPath("v1/api/the-loai/hanh-dong", format: .free2), "NguonC rejects KKPhim category routes")
+check(!MovieCatalog.isCatalogPath("https://other.example/v1/api/danh-sach/phim-bo", format: .free1), "Absolute foreign catalog routes are rejected")
+check(MovieCatalog.legacyStream(["link_m3u8": "https://cdn.example/movie.m3u8", "link_embed": "https://player.example/preroll"], base: coreBase)?.url.host == "cdn.example", "Explicit movie HLS is preferred over an advertising web embed")
+check(MovieCatalog.legacyStream(["link": "https://player.example/embed/one"], base: coreBase)?.web == true, "Opaque player links are not mistaken for native media")
+let suite = "AnPinime.tests." + UUID().uuidString
+let historyDefaults = UserDefaults(suiteName: suite)!
+let history = SearchHistory(defaults: historyDefaults)
+history.record("  Avatar  ", source: .phim4k)
+history.record("avatar", source: .phim4k)
+history.record("Anime riêng", source: .anime)
+check(history.queries(for: .phim4k) == ["avatar"], "Search history trims and deduplicates completed searches")
+check(history.queries(for: .film4k).isEmpty && history.queries(for: .kkphim).isEmpty, "Search history never leaks across providers")
+check(SearchHistory(defaults: historyDefaults).queries(for: .anime) == ["Anime riêng"], "Search history persists when the store is recreated")
+for index in 0..<25 { history.record("Query \(index)", source: .phim4k) }
+check(history.queries(for: .phim4k).count == 20 && history.queries(for: .phim4k).first == "Query 24", "Recent searches are bounded and sorted newest first")
+history.remove("Query 24", source: .phim4k)
+check(!history.queries(for: .phim4k).contains("Query 24"), "Individual search history entries can be deleted")
+history.clear(source: .phim4k)
+check(history.queries(for: .phim4k).isEmpty && history.queries(for: .anime).count == 1, "Clearing history only clears the selected provider")
+historyDefaults.removePersistentDomain(forName: suite)
+let reordered: MovieCatalog.Object = ["movie": ["name": "Reordered"], "episodes": [
+    ["server_name": "Lồng tiếng", "server_data": [["name": "01", "slug": "tap-1", "link_m3u8": "https://media.example/dub.m3u8"]]],
+    ["server_name": "Vietsub", "server_data": [["name": "02", "slug": "tap-2", "link_m3u8": "https://media.example/two.m3u8"], ["name": "01", "slug": "tap-1", "link_m3u8": "https://media.example/one.m3u8"]]]
+]]
+check(MovieCatalog.episodeRow(reordered, serverName: "Vietsub", key: "tap-1")?["link_m3u8"] as? String == "https://media.example/one.m3u8", "Refreshing reordered public servers and episodes retains the selected film link")
+check(MovieCatalog.episodeRow(reordered, serverName: "Missing", key: "tap-1") == nil, "A missing server never plays another dub or subtitle version")

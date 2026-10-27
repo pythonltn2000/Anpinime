@@ -46,17 +46,25 @@ Dùng API `https://phimapi.com` được công bố tại [tài liệu KKPhim](h
 - Dùng tên miền anime đã lưu trước, resolve lại khi lỗi kết nối; thử lại một lần với lỗi mạng/HTTP 5xx. Yêu cầu WebKit bị hủy khi tác vụ không còn cần.
 - Web player đặt viewport theo thiết bị, bỏ inset tự động và transform của trang; mặc định giữ tỉ lệ video (`contain`). Các tab dùng điều hướng một cột trên điện thoại. Bỏ dòng trạng thái “Đã kết nối”.
 
-### Nguồn phim 2 · Phim4K
+### Nguồn phim 2 · app Phim4K
 
-Đây là nguồn riêng, **không phải Film4k.net**. Tích hợp hai họ endpoint tìm thấy khi phân tích IPA 2.8.4: Free1 (`/danh-sach/phim-moi-cap-nhat-v3`, `/v1/api/tim-kiem`, `/phim/{slug}`) và Free2 (`/api/films/phim-moi-cap-nhat`, `/api/films/search`, `/api/film/{slug}`). Hỗ trợ danh sách, tìm kiếm, máy chủ/tập, HLS và embed theo hai cấu trúc JSON tương ứng.
+Nguồn này sử dụng cấu hình của IPA Phim4K 2.8.4, không phải website Film4k.net. `MovieSourceDirectory` đọc directory AES-GCM của app và lưu địa chỉ hợp lệ gần nhất. Tích hợp ba kho của app:
 
-`MovieSourceDirectory` đọc cấu hình AES-GCM công khai của IPA từ `rip.cryboiz.workers.dev/api/add`, lấy địa chỉ API công khai và lưu địa chỉ hợp lệ gần nhất. Không dùng tài khoản hoặc plugin của app tham chiếu. Phân tích ngày 23/10/2026 xác định máy chủ mới `free.cryboiz.workers.dev` đang trả danh sách/chi tiết thật, với video trong trường `link` trỏ đến HLS không có đuôi `.m3u8`. Relay hỗ trợ cả định dạng này. Những địa chỉ `.lol` ghi cứng trong IPA đã lỗi DNS; backend REST riêng và Free2 chưa được xác nhận hoạt động.
+- **Phim4K Core**: trang chủ, phim lẻ/phim bộ, tìm kiếm, thể loại/quốc gia theo ID của REST API `/rest-api/v130/`. Chi tiết dùng `videos_id`; giữ toàn bộ máy chủ trong `videos` và các phần/tập trong `season`.
+- **Phim4K · Free1**: API định dạng A, qua địa chỉ `free1` do app công bố.
+- **Phim4K · Free2**: API định dạng B, qua địa chỉ `free2` do app công bố. Khi máy chủ này lỗi, hiển thị lỗi; không đổi sang `phim.nguonc.com`.
 
-Nguồn 2 giữ API Phim4K và cấu hình URL tùy chỉnh. Không tự chuyển sang NguonC/KKPhim khi tìm kiếm, đọc danh sách, chi tiết hoặc phát lỗi.
+Kết quả tìm kiếm ghi rõ kho. Mỗi danh mục gắn với đúng kho và endpoint. Free1 hiện có danh mục giống KKPhim ở phía máy chủ; điều này không có nghĩa Core và KKPhim là một nguồn. App không tự gọi trực tiếp NguonC/KKPhim để thay dữ liệu Core.
 
-Một số phim trả HTTP 500 từ máy chủ video, trong khi tập 1 của `thuong-nguyen-do` trả playlist HLS hợp lệ. Không tự thay phim lỗi bằng phim khác. Máy chủ Vietsub/lồng tiếng được giữ riêng trong Danh sách tập. Chọn phụ đề/âm thanh rời khi luồng thực sự có track; phụ đề đã ghép vào hình không thể tắt. Chưa hỗ trợ đầy đủ các tệp MKV/ASS mà trình phát mpv của app tham chiếu có thể xử lý.
+Các bản 4K/Remux/MKV giữ nguyên nhãn và liên kết từ Core. Khi phát, chọn lại đúng ID máy chủ/tập trong phản hồi mới; không gắn nhãn VIP lên một link Free1 thay thế. Máy chủ Vietsub/lồng tiếng ở NguonC, KKPhim và Free1/Free2 cũng được chọn theo tên máy chủ + slug tập, tránh đổi nhầm khi API sắp xếp lại danh sách.
 
-Khi có địa chỉ thay thế tương thích, vào **Cài đặt → Nguồn phim 2**, nhập URL HTTPS và chọn Kiểu API A/B. Để trống để cập nhật tự động. Địa chỉ mới phải thực sự cung cấp API tương ứng, không chỉ là trang giới thiệu ứng dụng.
+Tùy chọn URL thủ công trong Cài đặt vẫn dành cho API Free1/Free2. Để trống để dùng đầy đủ cấu hình tự động của app Phim4K. Tài khoản, đăng ký và plugin từ app tham chiếu không được sử dụng.
+
+### Phát phim và lịch sử tìm kiếm
+
+Ưu tiên link HLS do API cung cấp. Nếu link trực tiếp lỗi, không tự chuyển sang trang embed có quảng cáo. Với phim chỉ có embed, trình phát loại video quảng cáo khỏi việc chuyển sang AVPlayer và khỏi sự kiện tự chuyển tập. JW Player dùng nguồn trong playlist của phim, không lấy video đầu trang hoặc một request m3u8 bất kỳ. Giữ màn hình xác minh khi player còn chờ tải.
+
+Lịch sử tìm kiếm lưu trên thiết bị, riêng cho Anime/NguonC/Phim4K/KKPhim, tối đa 20 từ khóa mỗi nguồn. Lưu khi bấm Tìm trên bàn phím hoặc mở một kết quả; chạm từ khóa cũ để tìm lại, vuốt để xóa từng mục hoặc chọn Xóa lịch sử.
 
 ## Build IPA
 
@@ -75,7 +83,7 @@ Mục Phim có GIF `AnyAnime/Resources/MovieLoading.gif` tạo từ `logo2.png`.
 
 ## Kiểm thử
 
-Workflow kiểm tra parser anime và JSON của hai nguồn phim, URL ảnh, định danh nguồn, thứ tự phần/tập, chuẩn hóa PNG/HLS/Range, trạng thái phát và thao tác tạm dừng. Khi chạy thủ công với `preview=true`, simulator kiểm tra AVPlayer, WebKit và hai provider bằng máy chủ cục bộ. Fixture Film4k yêu cầu cookie/Referer/ticket, cố ý trả video hết hạn ở lần đầu rồi HLS có segment bọc PNG để kiểm tra tự làm mới URL và relay. Chỉ đạt khi thời gian phát vượt một giây và màn hình nằm ngang.
+Workflow kiểm tra parser anime và JSON của ba nguồn phim, URL ảnh, định danh nguồn, thứ tự phần/tập, chuẩn hóa PNG/HLS/Range, trạng thái phát và thao tác tạm dừng. Khi chạy thủ công với `preview=true`, simulator kiểm tra AVPlayer, WebKit và hai provider bằng máy chủ cục bộ. Fixture Film4k yêu cầu cookie/Referer/ticket, cố ý trả video hết hạn ở lần đầu rồi HLS có segment bọc PNG để kiểm tra tự làm mới URL và relay. Chỉ đạt khi thời gian phát vượt một giây và màn hình nằm ngang.
 
 Các bước riêng kiểm tra cả hai nguồn trực tiếp trên mạng và lưu JSON nếu phát thành công; chúng không chặn build vì phụ thuộc website bên ngoài. Phải có `playback-film4k-live.json`/`playback-phim4k-live.json` trong artifact mới tính là xác nhận phát trực tiếp, không chỉ nhìn trạng thái workflow. Fixture cũng kiểm tra chọn/tắt phụ đề, bỏ qua ID cũ và chọn chất lượng. Fixture và chế độ kiểm thử không nằm trong bản Release.
 
@@ -83,6 +91,12 @@ Các bước riêng kiểm tra cả hai nguồn trực tiếp trên mạng và l
 
 Website nguồn có thể thay HTML, player hoặc chính sách chống bot bất kỳ lúc nào. Resolver xử lý việc đổi domain, nhưng selector và cơ chế player vẫn cần cập nhật nếu website thay đổi cấu trúc lớn.
 
-### Kiểm tra thay đổi nguồn (26/10/2026)
+### Kiểm tra thay đổi nguồn (27/10/2026)
 
-Đã kiểm tra trực tiếp NguonC: danh sách, tìm kiếm, thể loại, quốc gia và chi tiết có danh sách tập. KKPhim API và các domain anime trả 403 từ môi trường Linux này, nên chưa xác nhận phát trực tiếp trên iPhone. Build iOS và kiểm tra giao diện/xoay màn hình cần Xcode hoặc workflow macOS. Fixture Film4k cũ vẫn giữ để kiểm tra ticket/relay, không đại diện cho nguồn 1 mới.
+NguonC: đọc được tài liệu, danh sách và chi tiết/tập; trang embed StreamC yêu cầu Cloudflare trong Chromium của môi trường kiểm tra, nên chưa xác nhận phát thực tế trên iPhone.
+
+KKPhim: đọc được API danh sách, chi tiết, HLS master/media và phần đầu segment MPEG-TS. Đây là kiểm tra dữ liệu media, chưa phải xác nhận giải mã/phát trên iPhone.
+
+Phim4K: directory hiện trả `api.phim4k.space`, `free.cryboiz.workers.dev`, `free2.p4k.dpdns.org`. Core trả trang chủ, tìm kiếm, thể loại/quốc gia, chi tiết phim lẻ và phim bộ. Các mẫu Core giữ được các bản 1080p/2160p/Remux; link `cdn.phim4k.lol` trong mẫu và Free2 hiện lỗi DNS tại môi trường kiểm tra. Không suy đoán đường dẫn thay thế hay tuyên bố các link này đã phát được. AVPlayer chưa hỗ trợ đầy đủ MKV/ASS như mpv trong app gốc.
+
+`Tests/ProviderTests.swift` chạy provider thật qua URLSession giả lập, ghi nhận host/path/header cho trang chủ → tìm kiếm → danh mục → chi tiết → phát; kiểm tra khi lỗi không đổi nguồn, Core giữ nguyên link VIP và API-KEY chỉ gửi đến Core. `Tests/main.swift` kiểm tra ID phần/tập, đảo thứ tự server và lịch sử tìm kiếm. `Tests/player.test.cjs` kiểm tra quảng cáo đứng trước phim, preroll dùng chung thẻ video, kết thúc quảng cáo không chuyển tập, và giữ màn hình xác minh. Fixture Film4k cũ chỉ kiểm tra ticket/relay, không đại diện cho nguồn 1 hiện tại.

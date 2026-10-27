@@ -355,6 +355,10 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         var headers = ["User-Agent": AnimeService.userAgent, "Referer": (referer ?? episodeURL).absoluteString]
         if episode.source.isMovie {
             headers.merge(providerHeaders) { _, provider in provider }
+            if let referer {
+                headers["Referer"] = referer.absoluteString
+                if let scheme = referer.scheme, let host = referer.host { headers["Origin"] = scheme + "://" + host }
+            }
             // A provider's session ticket must never be forwarded to a third-party iframe/CDN.
             if url.host != baseURL.host { headers.removeValue(forKey: "X-F4K-PT") }
         }
@@ -598,7 +602,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             } else if !challenge && self.playback.verification {
                 self.playback.verification = false
                 webView.scrollView.isScrollEnabled = false
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
+                webView.scrollView.contentInsetAdjustmentBehavior = .never
                 self.scheduleFallbackReveal(for: webView)
                 webView.evaluateJavaScript("window.__anyanimeFocusPlayer && window.__anyanimeFocusPlayer()")
             }
@@ -698,19 +702,52 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           viewport.content='width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover';
           var reportedFrames={};
           var activeVideo=null;
-          var detectedStreams=[],reportedSources={};
+          var reportedSources={};
+          var playerSelectors='#media-player,.player-container,.watching_player,#player,.jwplayer,[class*="video-player"],[class*="player-wrap"]';
+          var adSelectors='.ad,.ads,.advertisement,.video-ad,.ima-ad-container,.jw-ad,.jw-flag-ads,.vjs-ad-playing,[data-ad="true"]';
           function send(name,value){try{window.webkit.messageHandlers[name].postMessage(value);}catch(e){}}
-          function observeStream(url){
-            try{url=new URL(String(url),location.href).href;if(/\\.m3u8(?:[?#]|$)/i.test(url)&&!/(?:doubleclick|popads|\\/ads?\\/)/i.test(url)&&detectedStreams.indexOf(url)<0)detectedStreams.push(url);}catch(e){}
+          function adURL(s){return /(?:doubleclick|googlesyndication|popads|adservice|vast|\\/ads?[\\/.?]|[?&](?:ad|preroll)=)/i.test(s||'');}
+          function playerAPI(v){
+            try{
+              if(typeof window.jwplayer!=='function')return null;
+              var container=v&&v.closest('.jwplayer');
+              var api=container?window.jwplayer(container.id):window.jwplayer();
+              if(!api||typeof api.getPlaylistItem!=='function')return null;
+              if(!api.__aaAdEvents&&api.on){
+                api.__aaAdEvents=true;
+                ['adPlay','adImpression','adStarted'].forEach(function(e){api.on(e,function(){api.__aaAdActive=true;});});
+                ['adBreakEnd','adComplete','adSkipped','adError'].forEach(function(e){api.on(e,function(){api.__aaAdActive=false;});});
+              }
+              return api;
+            }catch(e){return null;}
           }
-          // Discover the manifest behind blob/MSE players without modifying requests.
-          var originalFetch=window.fetch;
-          if(originalFetch)window.fetch=function(){var input=arguments[0];observeStream(input&&input.url||input);return originalFetch.apply(this,arguments);};
-          var originalOpen=XMLHttpRequest.prototype.open;
-          XMLHttpRequest.prototype.open=function(method,url){observeStream(url);return originalOpen.apply(this,arguments);};
+          function contentSources(api){
+            try{
+              var item=api&&api.getPlaylistItem();if(!item)return [];
+              return (item.sources||[]).map(function(x){return x.file||x.src;}).concat(item.file||[])
+                .filter(function(x){return typeof x==='string'&&x&&!adURL(x);})
+                .map(function(x){return new URL(x,location.href).href;});
+            }catch(e){return [];}
+          }
+          function isAdvertisement(v){
+            if(!v||v.closest(adSelectors)||adURL(mediaURL(v)))return true;
+            var api=playerAPI(v);
+            return !!(api&&api.__aaAdActive);
+          }
+          function contentURL(v){
+            if(isAdvertisement(v))return '';
+            var s=mediaURL(v),api=playerAPI(v),sources=contentSources(api);
+            // A JW preroll can replace currentSrc on the SAME video element.
+            // Only its actual playlist item is eligible for the native handoff.
+            if(api){
+              if(!sources.length)return '';
+              if(sources.indexOf(s)>=0)return s;
+              return sources.find(function(x){return /\\.m3u8(?:[?#]|$)/i.test(x);})||sources[0];
+            }
+            return /^https?:/i.test(s)&&!adURL(s)?s:'';
+          }
           function reportSource(v){
-            var s=mediaURL(v);
-            if(!/^https?:/i.test(s))s=detectedStreams[detectedStreams.length-1]||'';
+            var s=contentURL(v);
             if(/^https?:/i.test(s)&&!reportedSources[s]){reportedSources[s]=true;send('videoFound',{url:s,referer:location.href});}
           }
           function tryPlay(v){
@@ -726,15 +763,18 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
               if(notice&&text.length<500)important(el,'display','none');
             });
           }
-          function challenge(){return /just a moment|xác minh an toàn|xác minh bảo mật|verify you are human|checking your browser/i.test(document.title)||!!document.querySelector('#challenge-form');}
+          function challenge(){return /just a moment|attention required.*cloudflare|xác minh an toàn|xác minh bảo mật|verify you are human|checking your browser/i.test(document.title)||!!document.querySelector('#challenge-form,.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#verification:not([hidden])');}
           function state(){
-            var v=activeVideo;if(!v)return;
+            var v=activeVideo;if(!v||isAdvertisement(v))return;
             reportSource(v);
+            var api=playerAPI(v),sources=contentSources(api),current=mediaURL(v);
+            if(api&&/^https?:/i.test(current)&&sources.indexOf(current)<0)return;
             send('mediaState',{time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3,ready:v.readyState>=2,ended:v.ended});
           }
           window.addEventListener('message',function(event){
             var c=event.data;if(!c||c.type!=='AnPinimeCommand')return;
-            var v=activeVideo||document.querySelector('video');
+            var v=activeVideo;
+            if(v&&isAdvertisement(v))v=null;
             if(v){
               try{
                 switch(c.name){
@@ -783,12 +823,12 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             try{return s?new URL(s,location.href).href:'';}catch(e){return '';}
           }
           function watch(v){
-            if(!v)return false;
+            if(!v||isAdvertisement(v))return false;
             activeVideo=v;
             isolate(v); important(v,'object-fit',v.__anpinimeFill?'cover':'contain'); v.setAttribute('playsinline','');v.controls=false;
             if(!v.__aa){
               v.__aa=true;
-              ['playing','loadedmetadata','loadeddata','canplay','pause','waiting','ended','durationchange'].forEach(function(name){v.addEventListener(name,state);});
+              ['playing','loadedmetadata','loadeddata','canplay','pause','waiting','ended','durationchange'].forEach(function(name){v.addEventListener(name,function(){if(v===activeVideo)state();});});
               ['loadedmetadata','canplay'].forEach(function(name){v.addEventListener(name,function(){tryPlay(v);});});
               tryPlay(v);
             }
@@ -797,7 +837,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           }
           function usefulFrame(frame){
             var src=frame.getAttribute('src')||'';
-            if(!src||/^(?:about:blank|javascript:)/i.test(src)||/(?:doubleclick|googlesyndication|facebook|popads|adservice|\\/ads?[\\/.?])/i.test(src))return false;
+            if(!src||/^(?:about:blank|javascript:)/i.test(src)||adURL(src)||frame.closest(adSelectors))return false;
             var rect=frame.getBoundingClientRect();
             return rect.width>=240&&rect.height>=120;
           }
@@ -805,14 +845,22 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             if(!window.document||!document.documentElement)return false;
             if(challenge())return false;
             hideChrome();
-            var videos=document.querySelectorAll('video');
-            if(videos.length)return watch(videos[0]);
-            var selectors=['#media-player','.player-container','.watching_player','#player','.jwplayer','[class*="video-player"]','[class*="player-wrap"]'];
-            var player=null;
-            for(var i=0;i<selectors.length&&!player;i++){try{player=document.querySelector(selectors[i]);}catch(e){}}
+            var videos=Array.prototype.filter.call(document.querySelectorAll('video'),function(v){
+              if(isAdvertisement(v))return false;
+              for(var node=v;node&&node!==document.body;node=node.parentElement){
+                var style=getComputedStyle(node);if(style.display==='none'||style.visibility==='hidden')return false;
+              }
+              return true;
+            });
+            var inPlayer=videos.filter(function(v){return !!v.closest(playerSelectors);});
+            var video=inPlayer[0]||(videos.length===1?videos[0]:null);
+            if(video)return watch(video);
+            activeVideo=null;
+            var player=document.querySelector(playerSelectors);
             var frames=Array.prototype.filter.call(document.querySelectorAll('iframe[src]'),usefulFrame);
             frames.sort(function(a,b){var ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();return br.width*br.height-ar.width*ar.height;});
-            var frame=frames[0];
+            var playerFrames=frames.filter(function(f){return !!f.closest(playerSelectors);});
+            var frame=playerFrames[0]||(frames.length===1?frames[0]:null);
             if(frame){
               isolate(frame);
               if(window===window.top){
@@ -826,7 +874,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           function install(){
             if(!document.documentElement){setTimeout(install,20);return;}
             focus();
-            new MutationObserver(function(){focus();}).observe(document.documentElement,{childList:true,subtree:true});
+            new MutationObserver(function(){focus();}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src','class']});
             var tries=0,timer=setInterval(function(){focus();if(++tries>120)clearInterval(timer);},500);
             setInterval(state,500);
             setTimeout(function(){if(activeVideo||challenge())return;var b=document.querySelector('.jw-icon-playback,.play-btn,[class*="play-button"],button[aria-label*="Play"],button[title*="Play"]');if(b)b.click();focus();},1800);

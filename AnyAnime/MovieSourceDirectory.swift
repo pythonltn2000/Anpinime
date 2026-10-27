@@ -11,14 +11,13 @@ enum MovieSourceDirectory {
 
     static func coreAPI() -> CoreAPI {
         let saved = UserDefaults.standard.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
-        let host = saved["api"].flatMap(address) ?? URL(string: "https://api.phim4k.online")!
+        let host = saved["api"].flatMap(address) ?? URL(string: "https://api.phim4k.space")!
         let token = saved["tokens"]?.trimmingCharacters(in: .whitespacesAndNewlines)
         let key = (token?.isEmpty == false) ? token! : "bbbb411dea44849"
         return CoreAPI(baseURL: host, apiKey: key)
     }
 
-    static func candidates(session: URLSession) async -> [(URL, Phim4KFormat)] {
-        var addresses = UserDefaults.standard.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
+    static func refresh(session: URLSession) async {
         do {
             var request = URLRequest(url: URL(string: "https://rip.cryboiz.workers.dev/api/add")!)
             request.timeoutInterval = 3.5
@@ -43,19 +42,19 @@ enum MovieSourceDirectory {
                 updated["tokens"] = token
             }
             if !updated.isEmpty {
-                addresses = updated
                 UserDefaults.standard.set(updated, forKey: "AnPinime.source2Directory")
             }
         } catch { /* A last-known directory remains useful during a temporary bootstrap outage. */ }
-        var result: [(URL, Phim4KFormat)] = []
-        if let raw = addresses["free1"], let url = address(raw) {
-            result.append((url, .free1))
-        }
-        let defaultFree1 = Phim4KFormat.free1.defaultURL
-        if !result.contains(where: { $0.0 == defaultFree1 }) {
-            result.append((defaultFree1, .free1))
-        }
-        // Do not silently substitute NguonC or KKPhim for source 2.
+    }
+
+    // These are catalogs actually announced by the reference app, never substitutes
+    // for NguonC/KKPhim. A missing Free2 must not be replaced with phim.nguonc.com.
+    static func catalogs() -> [(id: String, url: URL, format: Phim4KFormat)] {
+        let saved = UserDefaults.standard.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
+        var result: [(String, URL, Phim4KFormat)] = [
+            ("free1", saved["free1"].flatMap(address) ?? Phim4KFormat.free1.defaultURL, .free1)
+        ]
+        if let url = saved["free2"].flatMap(address) { result.append(("free2", url, .free2)) }
         return result
     }
 

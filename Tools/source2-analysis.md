@@ -40,3 +40,29 @@ requires playback time > 1 second and landscape dimensions before writing
 `playback-phim4k-live.json`. A successful build without that artifact is not proof
 of live playback. Website failures remain visible and never trigger substitution
 of another movie or another content provider.
+
+## Recovery audit — 2026-10-27
+
+The last refactor removed Core calls and only retained Free1. This lost the app's
+original high-bitrate server list. Restoring the old cross-site aggregation would
+also be wrong: that code could label a Free1 fallback as a Core 4K/MKV server.
+
+The current authenticated directory points Core to `api.phim4k.space`. Bounded
+GETs with the directory's client API header confirmed `home_content_for_android`,
+`movies`, `tvseries`, `search`, `content_by_genre_id`, `content_by_country_id` and
+`single_details` under `/rest-api/v130/`. List endpoints return a top-level array;
+home supplies `all_genre`/`all_country` and separate movie/TV lists. Details expose
+`video_file_id` for film servers and `seasons_id`/`episodes_id` for series.
+
+`Phim4KCatalog` and `Phim4KProvider` now consume this Core catalog directly alongside
+labelled Free1/Free2 catalogs. They keep original media URLs and refresh by stable
+IDs. There is no title-guess matching or cross-provider replacement. Runtime Free1
+currently shares KKPhim's catalog, but its playback links use the app's stream API.
+This explains overlapping Free1/KKPhim results without treating them as Core.
+
+Sample Core details returned all original 1080p/2160p/Remux entries, including MKV.
+The referenced `cdn.phim4k.lol` links and the directory's Free2 host failed DNS in
+this environment. The announced CDN host rejected the bounded request; no guessed
+rewrite has been installed. Restoring catalog entries is not proof of live Core
+playback, and AVPlayer still does not implement mpv's full MKV/ASS capabilities.
+The user has been asked for a currently working original-app VIP sample.
