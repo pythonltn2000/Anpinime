@@ -204,5 +204,5 @@ check(Phim4KVIPResolver.extractFileID(from: URL(string: "https://cdn.phim4k.lol/
 check(Phim4KVIPResolver.extractFileID(from: URL(string: "https://sv.p4kzz.workers.dev/api/v2/stream/E6E8NBA94K72")!) == "E6E8NBA94K72", "Phim4KVIPResolver extracts file ID from worker path")
 check(Phim4KVIPResolver.extractFileID(from: URL(string: "https://cdn.phim4k.lol/original-a")!) == "original-a", "Phim4KVIPResolver extracts slug file ID")
 let signedVIP = Phim4KVIPResolver.buildGatewayURL(fileID: "E6E8NBA94K72", timestamp: 1774320000)
-check(signedVIP.host == "svatv.cryboiz.workers.dev" && signedVIP.query?.contains("auth=") == true, "VIP signed gateway URL contains auth token and valid worker host")
+check(signedVIP.host == "svatv.cryboiz.workers.dev" && signedVIP.query?.contains("token=") == true, "VIP signed gateway URL contains auth token and valid worker host")
 print("All extended repair regressions passed successfully!")
