@@ -40,7 +40,7 @@ let legacyJSON = try MovieCatalog.object(Data(#"{"data":{"APP_DOMAIN_CDN_IMAGE":
 let legacy = MovieCatalog.legacyItems(legacyJSON, base: legacyBase, format: .free1)[0]
 check(legacy.source == .phim4k && legacy.imageURL?.absoluteString == "https://img.example/uploads/poster.jpg", "Phim4K retains separate provider and image CDN even without trailing slash")
 check(legacy.bannerURL?.absoluteString == "https://img.example/uploads/thumb.jpg", "Phim4K populates horizontal bannerURL for Featured Hero Carousel")
-check(Phim4KFormat.free1.homeSectionsConfig.map(\.title) == ["Mới cập nhật", "Drama xứ Kim Chi", "Thiên đường Drama Tàu", "Phim Việt", "Phim hoạt hình", "Phim lẻ", "Phim bộ mới nhất"], "Nguồn phim 2 provides all 6 requested category rows plus Mới cập nhật")
+check(Phim4KFormat.free1.homeSectionsConfig.map(\.title) == ["Mới cập nhật", "Drama xứ Hàn", "Drama tàu", "Phim Việt", "Hoạt hình", "Phim lẻ mới nhất", "Phim Bộ mới nhất"], "Nguồn phim 2 provides all 6 requested category rows plus Mới cập nhật")
 check(Phim4KFormat.free1.defaultCategories.count > 20, "Nguồn phim 2 provides full genre and country browsing list")
 let legacyDetail = try MovieCatalog.object(Data(#"{"movie":{"name":"Legacy film"},"episodes":[{"server_name":"Vietsub","server_data":[{"name":"01","link_m3u8":"https://media.example/a.m3u8","link_embed":"https://embed.example/a"}]}]}"#.utf8))
 let free1Detail = try MovieCatalog.legacyDetail(legacyDetail, anime: legacy)
