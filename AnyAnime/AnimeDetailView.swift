@@ -479,7 +479,6 @@ struct AnimeDetailView: View {
         loading = false
     }
 }
-}
 
 struct ServerPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
