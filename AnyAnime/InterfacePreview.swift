@@ -11,7 +11,7 @@ struct InterfacePreview: View {
         if Self.mode == "choice" {
             LibraryChoiceView { _ in }
         } else if Self.mode == "intro" {
-            LibraryTransition(from: "AppLogo", to: "MovieLogo", intro: true)
+            IntroVideoView(finished: {}).ignoresSafeArea()
         } else if Self.mode == "switch" {
             LibraryTransition(from: "AppLogo", to: "MovieLogo", intro: false)
         } else if Self.mode == "movies" {

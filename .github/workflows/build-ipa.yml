@@ -43,6 +43,18 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             clean build
 
+      - name: Verify MKV playback, embedded audio and dual subtitles
+        run: |
+          brew install ffmpeg
+          bash Tests/mpv-smoke.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnPinime_MPV_Playback_Check
+          path: previews/*
+          retention-days: 14
+
       - name: Assemble unsigned IPA
         run: |
           mkdir -p Payload

@@ -107,3 +107,53 @@ const verify = fixture('<title>StreamC</title><body><div id="player"></div><div 
 assert.equal(verify.w.__anyanimeFocusPlayer(),false, 'An empty player must not hide StreamC verification before the film loads');
 assert.notEqual(verify.w.document.querySelector('#verification').style.display, 'none');
 verify.dom.window.close();
+
+// NguonC/JW can start the ad before creating a movie video element.
+const configuredDuringAd = fixture('<body><div class="jwplayer jw-flag-ads"><video src="https://cdn.example/promo.mp4"></video></div></body>', w => {
+  w.jwplayer = () => ({getPlaylistItem: () => ({file: 'https://content.example/film.m3u8'}), on: () => {}});
+});
+assert(configuredDuringAd.messages.some(m => m.name === 'videoFound' && m.value.url === 'https://content.example/film.m3u8'), 'Resolve the configured movie immediately, while preroll is active');
+assert(!configuredDuringAd.messages.some(m => m.name === 'videoFound' && m.value.url.endsWith('promo.mp4')));
+configuredDuringAd.dom.window.close();
+const configuredBeforeVideo = fixture('<body><div class="jwplayer" id="player"></div></body>', w => {
+  w.jwplayer = () => ({getPlaylistItem: () => ({sources: [{file: 'https://content.example/real.m3u8'}]}), on: () => {}});
+});
+assert(configuredBeforeVideo.messages.some(m => m.name === 'videoFound' && m.value.url === 'https://content.example/real.m3u8'));
+configuredBeforeVideo.dom.window.close();
+console.log('PASS: configured movie handoff during preroll and before video creation');
+const streamCDom = new JSDOM('<html><body><div id="player"></div></body></html>', {url:'https://embed11.streamc.xyz/embed.php?hash=test', runScripts:'outside-only'});
+const sc = streamCDom.window;
+sc.setInterval=()=>1; sc.setTimeout=()=>1;
+let configured;
+const originalLoader = function SealedLoader() {};
+const scAPI = {setup: value => {configured=value; return scAPI;}, getPlaylistItem:()=>({file:'https://content.example/sealed.m3u8'}),on:()=>{}};
+sc.eval(script);
+sc.jwplayer=()=>scAPI;
+sc.jwplayer.key='fixture-license';
+sc.jwplayer('player').setup({file:'https://content.example/sealed.m3u8',advertising:{schedule:[{offset:'pre'}]},autostart:false,hlsjsConfig:{pLoader:originalLoader}});
+assert.equal(configured.advertising,undefined,'StreamC ad configuration is removed before setup');
+assert.equal(configured.autostart,true,'The movie starts automatically');
+assert.equal(configured.hlsjsConfig.pLoader,originalLoader,'Keep the site decoder for sealed playlists');
+assert.equal(sc.jwplayer.key,'fixture-license','JW license and static properties survive wrapping');
+let scMessages=[];
+sc.webkit={messageHandlers:new Proxy({},{get:(_,name)=>({postMessage:value=>scMessages.push({name,value})})})};
+sc.streamAccess={shouldUseSealedLoader:()=>true};
+sc.__anyanimeFocusPlayer();
+assert(!scMessages.some(m=>m.name==='videoFound'),'A sealed playlist cannot be handed to a decoder that does not understand it');
+streamCDom.window.close();
+console.log('PASS: StreamC ad-free autoplay preserves the sealed decoder and license');
+
+const trackFixture = fixture('<body><div class="jwplayer"><video src="blob:movie"></video><div class="jw-captions">Caption</div></div></body>', w => {
+  let audio=0,caption=1;
+  w.jwplayer=()=>({getPlaylistItem:()=>({file:'https://cdn.example/movie.m3u8'}),getAudioTracks:()=>[{name:'English'},{name:'Vietnamese'}],getCurrentAudioTrack:()=>audio,setCurrentAudioTrack:i=>audio=i,
+    getCaptionsList:()=>[{label:'Off'},{label:'English'},{label:'Vietnamese'}],getCurrentCaptions:()=>caption,setCurrentCaptions:i=>caption=i,setCaptions:()=>{}});
+});
+function selectTrack(kind,id){trackFixture.w.dispatchEvent(new trackFixture.w.MessageEvent('message',{data:{type:'AnPinimeCommand',name:'track',kind,id}}));}
+selectTrack('audio','1');selectTrack('subtitles','2');
+let tracks=trackFixture.messages.filter(m=>m.name==='mediaState').at(-1).value.tracks;
+assert.equal(tracks.audio.length,2);assert.equal(tracks.audioID,'1');assert.equal(tracks.subtitleID,'2');
+selectTrack('subtitles','off');assert.equal(trackFixture.messages.filter(m=>m.name==='mediaState').at(-1).value.tracks.subtitleID,'off');
+assert.notEqual(trackFixture.w.document.querySelector('.jw-captions').style.display,'none');
+trackFixture.command('rate',3);assert.equal(trackFixture.video.playbackRate,3);
+trackFixture.dom.window.close();
+console.log('PASS: actual JW audio/caption selection, off, caption visibility and 3x speed');

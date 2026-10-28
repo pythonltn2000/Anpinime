@@ -21,14 +21,8 @@ struct RootView: View {
         .tint(.anpinimeAccent)
         .background(VerificationGate(browser: service.website))
         .overlay {
-            if introVisible { LibraryTransition(from: "AppLogo", to: "MovieLogo", intro: true).transition(.opacity) }
+            if introVisible { IntroVideoView { withAnimation(.easeOut(duration: 0.22)) { introVisible = false } }.ignoresSafeArea().transition(.opacity) }
             else if let transition { LibraryTransition(from: transition.from, to: transition.to, intro: false).transition(.opacity) }
-        }
-        .task {
-            guard introVisible else { return }
-            try? await Task.sleep(nanoseconds: reduceMotion ? 350_000_000 : 1_850_000_000)
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.22)) { introVisible = false }
         }
         .onDisappear { transitionTask?.cancel() }
     }
@@ -62,6 +56,12 @@ struct RootView: View {
             NavigationView { BrowseView() }
                 .navigationViewStyle(.stack)
                 .tabItem { Label("Thể loại", systemImage: "square.grid.2x2.fill") }
+
+            if !service.source.isMovie {
+                NavigationView { AnimeScheduleView() }
+                    .navigationViewStyle(.stack)
+                    .tabItem { Label("Lịch chiếu", systemImage: "calendar") }
+            }
 
             NavigationView { AppSettingsView() }
                 .navigationViewStyle(.stack)

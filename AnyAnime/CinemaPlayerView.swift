@@ -7,6 +7,7 @@ final class PlaybackState: ObservableObject {
     @Published var loading = true
     @Published var buffering = false
     @Published var playing = false
+    var userPaused = false
     @Published var currentTime = 0.0
     @Published var duration = 0.0
     @Published var error: String?
@@ -23,15 +24,26 @@ final class PlaybackState: ObservableObject {
     @Published var quality = "auto"
     @Published var subtitleSize = 100.0
     @Published var subtitleBackground = false
+    @Published var engine = "WebKit"
+    @Published var mediaInfo = ""
+    @Published var supportsAdvancedSubtitles = false
+    @Published var secondarySubtitleTrack = "off"
+    @Published var subtitleStyle = SubtitleStyle.load()
+    var importSubtitle: ((URL, String) -> Void)?
     var chooseOption: ((String, String) -> Void)?
     var command: ((String, Double) -> Void)?
 
-    func send(_ name: String, _ value: Double = 0) { command?(name, value) }
+    func send(_ name: String, _ value: Double = 0) {
+        if name == "pause" { userPaused = true }
+        if name == "play" { userPaused = false }
+        command?(name, value)
+    }
     func reset() {
-        loading = true; buffering = false; playing = false
+        loading = true; buffering = false; playing = false; userPaused = false
         currentTime = 0; duration = 0; error = nil; verification = false
         audioTracks = []; subtitleTracks = []; audioTrack = ""; subtitleTrack = "off"
         qualities = [.automatic]; quality = "auto"
+        secondarySubtitleTrack = "off"; supportsAdvancedSubtitles = false; engine = "WebKit"; mediaInfo = ""
     }
 }
 
@@ -121,11 +133,16 @@ struct PlayerView: View {
                         Color.black.opacity(0.4).ignoresSafeArea().onTapGesture { closePanel() }
                         HStack {
                             if geometry.size.width > geometry.size.height { Spacer(minLength: 0) }
-                            playerPanel(panel)
-                                .frame(width: min(360, geometry.size.width - 24))
-                                .frame(maxHeight: min(geometry.size.height - 16, 620))
-                                .cinemaGlass(cornerRadius: 28)
-                                .padding(12)
+                            if ["settings", "audio", "subtitles", "display", "speed", "general", "info"].contains(panel) {
+                                PlayerSettingsPanel(playback: playback, initialTab: panel, title: title, source: current.season,
+                                                    close: closePanel, reload: { closePanel(); retry() })
+                                    .frame(width: min(720, geometry.size.width - 24), height: min(geometry.size.height - 24, 620)).padding(12)
+                            } else {
+                                playerPanel(panel)
+                                    .frame(width: min(360, geometry.size.width - 24))
+                                    .frame(maxHeight: min(geometry.size.height - 16, 620))
+                                    .cinemaGlass(cornerRadius: 28).padding(12)
+                            }
                         }
                     }
                 } else {
@@ -141,9 +158,10 @@ struct PlayerView: View {
             originalBrightness = UIScreen.main.brightness
             UIApplication.shared.isIdleTimerDisabled = true
             playback.rate = rememberSpeed ? savedRate : 1
+            playback.send("rate", playback.rate)
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--ui-preview") {
-                if ["episodes", "settings", "subtitles", "quality"].contains(InterfacePreview.mode) { openPanel(InterfacePreview.mode) }
+                if ["episodes", "settings", "audio", "subtitles", "display", "speed", "general", "info", "quality"].contains(InterfacePreview.mode) { openPanel(InterfacePreview.mode) }
             }
             #endif
         }
@@ -530,7 +548,7 @@ private struct PulsingMovieTitle: View {
 }
 
 /// System volume works for both AVPlayer and iOS WebKit media.
-private struct SystemVolumeSlider: UIViewRepresentable {
+struct SystemVolumeSlider: UIViewRepresentable {
     func makeUIView(context: Context) -> MPVolumeView {
         let view = MPVolumeView(frame: .zero)
         view.showsRouteButton = false

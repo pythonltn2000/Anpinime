@@ -28,8 +28,8 @@ enum Phim4KCatalog {
 
     static func sections(_ json: Object, base: URL) -> [AnimeSection] {
         var result: [AnimeSection] = []
-        for (key, title, type, path) in [("latest_movies", "VIP/Premium · Phim lẻ", "movie", "core/movies"),
-                                        ("latest_tvseries", "VIP/Premium · Phim bộ", "tvseries", "core/tvseries")] {
+        for (key, title, type, path) in [("latest_movies", "Phim lẻ mới nhất", "movie", "core/movies"),
+                                        ("latest_tvseries", "Phim Bộ mới nhất", "tvseries", "core/tvseries")] {
             let rows = items(json[key] as? [Object] ?? [], base: base, type: type)
             if !rows.isEmpty { result.append(AnimeSection(title: title, items: rows, categoryPath: path)) }
         }
@@ -42,6 +42,21 @@ enum Phim4KCatalog {
             }
         }
         return result
+    }
+
+
+    static func homeRows(_ json: Object) -> [(title: String, path: String)] {
+        let definitions = [("Drama xứ Hàn", "all_country", "country_id", "country", ["han quoc", "south korea", "korea"]),
+                           ("Drama tàu", "all_country", "country_id", "country", ["trung quoc", "china"]),
+                           ("Phim Việt", "all_country", "country_id", "country", ["viet nam", "vietnam"]),
+                           ("Hoạt hình", "all_genre", "genre_id", "genre", ["hoat hinh", "animation"])]
+        return definitions.compactMap { title, collection, idKey, kind, names in
+            guard let row = (json[collection] as? [Object] ?? []).first(where: {
+                let name = MovieCatalog.text($0["name"]).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi"))
+                return names.contains(name)
+            }), !MovieCatalog.text(row[idKey]).isEmpty else { return nil }
+            return (title, "core/" + kind + "/" + MovieCatalog.text(row[idKey]))
+        }
     }
 
     static func categories(_ json: Object) -> [AnimeCategory] {

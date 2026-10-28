@@ -80,27 +80,28 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
             return
-        if path in ("/sample.mp4", "/provider.mp4", "/legacy.mp4"):
+        if path in ("/sample.mp4", "/provider.mp4", "/legacy.mp4", "/multitrack.mkv"):
+            media = Path(__file__).with_name("multitrack.mkv").read_bytes() if path == "/multitrack.mkv" else VIDEO
             if path == "/sample.mp4" and ("smoke_session=1" not in self.headers.get("Cookie", "") or "/embed.html" not in self.headers.get("Referer", "")):
                 self.send_error(403, "Fixture requires embed Referer and session cookie")
                 return
             if path == "/provider.mp4" and (self.headers.get("X-F4K-PT") != "fixture-ticket" or "movie_session=1" not in self.headers.get("Cookie", "") or "/watch/fixture-movie" not in self.headers.get("Referer", "")):
                 self.send_error(403, "Movie fixture requires ticket, cookie and watch Referer")
                 return
-            start, end = 0, len(VIDEO) - 1
+            start, end = 0, len(media) - 1
             value = self.headers.get("Range", "")
             if value.startswith("bytes="):
                 left, right = value[6:].split("-", 1)
                 start = int(left or 0)
                 end = min(int(right) if right else end, end)
             self.send_response(206 if value else 200)
-            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Content-Type", "video/x-matroska" if path.endswith(".mkv") else "video/mp4")
             self.send_header("Accept-Ranges", "bytes")
             self.send_header("Content-Length", str(end - start + 1))
             if value:
-                self.send_header("Content-Range", f"bytes {start}-{end}/{len(VIDEO)}")
+                self.send_header("Content-Range", f"bytes {start}-{end}/{len(media)}")
             self.end_headers()
-            self.wfile.write(VIDEO[start:end + 1])
+            self.wfile.write(media[start:end + 1])
             return
         if self.path == "/embed.html":
             body = '<html><head><meta name="viewport" content="width=device-width"></head><body style="margin:0;background:black"><video playsinline autoplay preload="auto" src="/sample.mp4" style="width:100vw;height:100vh"></video></body></html>'

@@ -3,8 +3,9 @@ import SwiftUI
 
 enum PlaybackSmokeTest {
     static var enabled: Bool {
-        ProcessInfo.processInfo.arguments.contains("--playback-smoke") || webOnly || movieSource != nil
+        mpvFixture || ProcessInfo.processInfo.arguments.contains("--playback-smoke") || webOnly || movieSource != nil
     }
+    static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") }
     static var webOnly: Bool { ProcessInfo.processInfo.arguments.contains("--web-playback-smoke") }
     static var providerFixture: Bool { ProcessInfo.processInfo.arguments.contains("--movie-provider-smoke") || ProcessInfo.processInfo.arguments.contains("--phim4k-provider-smoke") }
     static var movieSource: ContentSource? {
@@ -20,6 +21,17 @@ enum PlaybackSmokeTest {
         var result: [String: Any] = ["time": time, "backend": backend, "landscape": true,
                                      "width": size.width, "height": size.height]
         if let playback {
+            if mpvFixture {
+                guard backend == "mpv", playback.playing, playback.audioTracks.count == 2, playback.subtitleTracks.count >= 3 else { return }
+                let audio = playback.audioTracks.last!, subtitles = playback.subtitleTracks.filter { $0.id != "off" }
+                playback.chooseOption?("audio", audio.id)
+                playback.chooseOption?("subtitles", subtitles[0].id)
+                playback.chooseOption?("secondarySubtitles", subtitles[1].id)
+                guard playback.audioTrack == audio.id, playback.subtitleTrack == subtitles[0].id,
+                      playback.secondarySubtitleTrack == subtitles[1].id else { return }
+                result["mkvAudioAndDualSubtitlesVerified"] = true
+                result["autoplayVerified"] = true
+            }
             result["audioChoices"] = playback.audioTracks.count
             result["subtitleChoices"] = playback.subtitleTracks.count
             result["qualityChoices"] = playback.qualities.count
@@ -47,7 +59,12 @@ enum PlaybackSmokeTest {
 struct PlaybackSmokeView: View {
     private let episode = Episode(title: "Tập kiểm thử", url: URL(string: "http://127.0.0.1:8765/episode.html")!, number: 1, season: "Phần 1")
     var body: some View {
-        if let source = PlaybackSmokeTest.movieSource { MovieSmokeView(source: source) }
+        if PlaybackSmokeTest.mpvFixture {
+            let media = URL(string: "http://127.0.0.1:8765/multitrack.mkv")!
+            let item = Episode(title: "MKV · Hai âm thanh · Hai phụ đề", url: media, number: 1, season: "Kiểm thử", source: .kkphim,
+                               playback: .directStream(url: media, webURL: nil, isWeb: false, referer: media))
+            PlayerView(episode: item, title: "Kiểm thử mpv", artworkURL: nil, episodes: [item])
+        } else if let source = PlaybackSmokeTest.movieSource { MovieSmokeView(source: source) }
         else { PlayerView(episode: episode, title: "Kiểm thử phát video", artworkURL: nil, episodes: [episode]) }
     }
 }

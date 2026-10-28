@@ -88,3 +88,30 @@ no signing secret or account credentials are added to this repository.
 Catalog/menu changes are independent of this unresolved transport. Tests cover
 all five Wakanda IDs and preserve each original server without relabelling a
 Free1 stream as VIP. The original IPA remains unchanged.
+
+## Player upgrade — 2026-10-28
+
+The supplied IPA uses media_kit/libmpv. Direct streams now use MPVKit's LGPL
+product, pinned to d9194243bdc68b87d8989376ab52aee7da6c8e0b, with Matroska,
+embedded audio/subtitles, external SRT/ASS/SSA/VTT, and primary/secondary subtitle
+selection. The original five Wakanda entries remain independent. A required iOS
+simulator check generates its own MKV with two audio and two subtitle tracks,
+requires playback without pressing Play, and switches real libmpv track IDs.
+This checks decoder integration; it does not prove expired CDN URLs are usable.
+The original-app time-dependent CDN resolver above is still a separate concern.
+
+NguonC's public StreamC embed currently configures JW Player advertising and
+`autostart:false`. It can also use a custom sealed playlist loader. The app removes
+only the advertising setup and enables autoplay, preserving access verification,
+license and custom loader. Sealed playback stays in WebKit. Its audio/captions
+are read from the actual JW track lists. Dual subtitles and local subtitle files
+are available on direct libmpv playback; the web player exposes its primary lane.
+Regression tests cover preroll on the same video element, configured movie
+handoff before video creation, sealed-loader preservation and JW track selection.
+Film4k.net's public client uses a server HLS proxy and a media envelope decoder;
+its server implementation was not available for inspection.
+
+The new intro is the user's original MP4, copied without transcoding. Anime
+schedule uses the source's actual /lich-chieu-phim.html page, including its day
+selectors, rather than an invented timetable. Duplicate HTML loads share one
+request and cached episode pages can be reused by the player.

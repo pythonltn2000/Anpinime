@@ -105,7 +105,7 @@ struct ProviderTests {
         ProviderProtocol.reset()
         let app = MovieProvider(source: .phim4k, session: session, source2Configuration: source2)
         let home = try await app.home()
-        require(home.first?.title == "VIP/Premium · Phim lẻ", "Source 2 starts with Phim4K Core, not Free1/KKPhim")
+        require(home.first?.title == "Phim lẻ mới nhất", "Source 2 starts with Phim4K Core, not Free1/KKPhim")
         require(home.map(\.title).contains("Phim4K · Free1") && home.map(\.title).contains("Phim4K · Free2"), "All catalogs announced by the app remain separately available")
         let search = try await app.search("Avatar")
         require(search.map(\.catalogLabel) == ["Phim4K · VIP/Premium", "Phim4K · Free1", "Phim4K · Free2"], "Search preserves the app's three catalog identities")

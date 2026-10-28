@@ -73,6 +73,18 @@ final class Phim4KProvider {
                 guard !sections.isEmpty else { throw MovieSourceError.invalidData }
                 categories = Phim4KCatalog.categories(json)
                 onInitial(sections)
+                let rows = Phim4KCatalog.homeRows(json)
+                var additional: [Int: AnimeSection] = [:]
+                await withTaskGroup(of: (Int, AnimeSection?).self) { group in
+                    for (index, row) in rows.enumerated() {
+                        group.addTask { [weak self] in
+                            guard let self, let items = try? await self.list(path: row.path, page: 1), !items.isEmpty else { return (index, nil) }
+                            return (index, AnimeSection(title: row.title, items: items, categoryPath: row.path))
+                        }
+                    }
+                    for await (index, section) in group { if let section { additional[index] = section } }
+                }
+                sections = additional.keys.sorted().compactMap { additional[$0] } + sections
             } catch {
                 try Task.checkCancellation()
                 failures.append("Kho Phim4K: " + error.localizedDescription)

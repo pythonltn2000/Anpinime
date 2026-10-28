@@ -287,22 +287,22 @@ enum Phim4KFormat: String, CaseIterable, Identifiable {
         if self == .free1 {
             return [
                 ("Mới cập nhật", "danh-sach/phim-moi-cap-nhat-v3"),
-                ("Drama xứ Kim Chi", "v1/api/quoc-gia/han-quoc"),
-                ("Thiên đường Drama Tàu", "v1/api/quoc-gia/trung-quoc"),
+                ("Drama xứ Hàn", "v1/api/quoc-gia/han-quoc"),
+                ("Drama tàu", "v1/api/quoc-gia/trung-quoc"),
                 ("Phim Việt", "v1/api/quoc-gia/viet-nam"),
-                ("Phim hoạt hình", "v1/api/danh-sach/hoat-hinh"),
-                ("Phim lẻ", "v1/api/danh-sach/phim-le"),
-                ("Phim bộ mới nhất", "v1/api/danh-sach/phim-bo")
+                ("Hoạt hình", "v1/api/danh-sach/hoat-hinh"),
+                ("Phim lẻ mới nhất", "v1/api/danh-sach/phim-le"),
+                ("Phim Bộ mới nhất", "v1/api/danh-sach/phim-bo")
             ]
         } else {
             return [
                 ("Mới cập nhật", "api/films/phim-moi-cap-nhat"),
-                ("Drama xứ Kim Chi", "api/films/quoc-gia/han-quoc"),
-                ("Thiên đường Drama Tàu", "api/films/quoc-gia/trung-quoc"),
+                ("Drama xứ Hàn", "api/films/quoc-gia/han-quoc"),
+                ("Drama tàu", "api/films/quoc-gia/trung-quoc"),
                 ("Phim Việt", "api/films/quoc-gia/viet-nam"),
-                ("Phim hoạt hình", "api/films/the-loai/hoat-hinh"),
-                ("Phim lẻ", "api/films/danh-sach/phim-le"),
-                ("Phim bộ mới nhất", "api/films/danh-sach/phim-bo")
+                ("Hoạt hình", "api/films/the-loai/hoat-hinh"),
+                ("Phim lẻ mới nhất", "api/films/danh-sach/phim-le"),
+                ("Phim Bộ mới nhất", "api/films/danh-sach/phim-bo")
             ]
         }
     }
@@ -313,8 +313,8 @@ enum Phim4KFormat: String, CaseIterable, Identifiable {
         let prefixList = self == .free1 ? "v1/api/danh-sach/" : "api/films/danh-sach/"
         var list: [AnimeCategory] = [
             .init(title: "Phim mới cập nhật", path: listPath),
-            .init(title: "Drama xứ Kim Chi (Hàn Quốc)", path: prefixCountry + "han-quoc"),
-            .init(title: "Thiên đường Drama Tàu (Trung Quốc)", path: prefixCountry + "trung-quoc"),
+            .init(title: "Drama xứ Hàn (Hàn Quốc)", path: prefixCountry + "han-quoc"),
+            .init(title: "Drama tàu (Trung Quốc)", path: prefixCountry + "trung-quoc"),
             .init(title: "Phim Việt Nam", path: prefixCountry + "viet-nam"),
             .init(title: "Phim hoạt hình", path: self == .free1 ? prefixList + "hoat-hinh" : prefixGenre + "hoat-hinh"),
             .init(title: "Phim lẻ", path: prefixList + "phim-le"),

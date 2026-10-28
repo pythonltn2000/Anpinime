@@ -29,6 +29,7 @@ final class AnimeService: ObservableObject {
     }
     private var homeCache: [ContentSource: HomeSnapshot] = [:]
     private var htmlCache: [URL: (Date, String)] = [:]
+    private var htmlRequests: [URL: Task<String, Error>] = [:]
     private var detailCache: [String: (Date, AnimeDetail)] = [:]
     private var homeRequestID = UUID()
     private var homeTask: Task<Void, Never>?
@@ -248,11 +249,13 @@ final class AnimeService: ObservableObject {
             if full.count <= 1 || appearsTruncated {
                 // Read the rendered DOM when the server list is populated by JavaScript.
                 let (rendered, renderedURL) = try await website.load(watchURL, waitForEpisodes: true)
+                cacheHTML(rendered, for: watchURL)
                 let dynamic = HTMLParser.detail(from: rendered, anime: anime, baseURL: renderedURL).episodes
                 episodes = HTMLParser.mergedEpisodes(episodes, dynamic)
             }
         } else if episodes.count <= 1 {
             let (rendered, renderedURL) = try await website.load(detailURL, waitForEpisodes: true)
+            cacheHTML(rendered, for: detailURL)
             episodes = HTMLParser.mergedEpisodes(episodes, HTMLParser.detail(from: rendered, anime: anime, baseURL: renderedURL).episodes)
         }
         try Task.checkCancellation()
@@ -261,6 +264,11 @@ final class AnimeService: ObservableObject {
         if detailCache.count >= 40 { detailCache.removeAll() }
         detailCache[anime.id] = (Date(), detail)
         return detail
+    }
+
+    func cachedHTML(for url: URL) -> String? {
+        guard let (date, html) = htmlCache[url], Date().timeIntervalSince(date) < 120 else { return nil }
+        return html
     }
 
     func html(for url: URL) async throws -> String {
@@ -276,6 +284,22 @@ final class AnimeService: ObservableObject {
     }
 
     private func fetchHTML(url: URL) async throws -> String {
+        try Task.checkCancellation()
+        if let html = cachedHTML(for: url) { return html }
+        if let pending = htmlRequests[url] {
+            let html = try await pending.value
+            try Task.checkCancellation()
+            return html
+        }
+        let task = Task { try await fetchHTMLWithRetry(url: url) }
+        htmlRequests[url] = task
+        defer { htmlRequests[url] = nil }
+        let html = try await task.value
+        try Task.checkCancellation()
+        return html
+    }
+
+    private func fetchHTMLWithRetry(url: URL) async throws -> String {
         do { return try await fetchHTMLOnce(url: url) }
         catch {
             try Task.checkCancellation()
