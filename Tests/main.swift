@@ -227,3 +227,32 @@ check(Phim4KCatalog.mediaKind(status: 403, contentType: "text/html", url: hlsURL
 check(Phim4KCatalog.mediaKind(status: 200, contentType: "application/json", url: hlsURL) == .intermediate, "JSON is an intermediate response rather than video")
 check(Phim4KCatalog.mediaKind(status: 200, contentType: "text/html", url: hlsURL, isWeb: true) == .embed, "Declared embed remains a web player")
 print("Extended anime and source isolation regressions passed")
+
+// Synthetic legacy layout based on the publicly indexed weekday/time structure.
+let legacyScheduleHTML = try String(contentsOfFile: "Tests/Fixtures/anime-schedule-legacy.html", encoding: .utf8)
+let legacySchedule = HTMLParser.schedule(from: legacyScheduleHTML, baseURL: animeBase)
+check(legacySchedule[.wednesday]?.first?.airTime == "21:00", "Legacy schedule reads Vietnamese weekday and time")
+check(legacySchedule[.thursday]?.count == 2 && legacySchedule[.thursday]?.first?.airTime == "18:30", "Legacy schedule preserves cards with and without a time")
+check(legacySchedule[.thursday]?.last?.anime.url.path == "/phim/fixture-no-time-a3", "Legacy schedule links open the same anime")
+let scheduleDefaults = UserDefaults(suiteName: "AnPinime.ScheduleTests")!
+scheduleDefaults.removePersistentDomain(forName: "AnPinime.ScheduleTests")
+let cachedAt = Date(timeIntervalSince1970: 1000)
+AnimeScheduleStore.save(legacySchedule, at: cachedAt, defaults: scheduleDefaults)
+let restored = AnimeScheduleStore.load(defaults: scheduleDefaults)
+check(restored?.0 == cachedAt && restored?.1[.wednesday]?.first?.anime.title == "Anime Thứ Tư", "Schedule cache survives a store reload")
+AnimeScheduleStore.save([:], at: Date(), defaults: scheduleDefaults)
+check(AnimeScheduleStore.load(defaults: scheduleDefaults)?.0 == cachedAt, "Empty schedule never replaces the last good cache")
+check(Phim4KCatalog.mediaKind(prefix: Data([0,0,0,24,0x66,0x74,0x79,0x70])) == .mp4, "MP4 signature works without a video filename extension")
+check(Phim4KCatalog.mediaKind(prefix: Data("#EXTM3U\n".utf8)) == .hls, "Range prefix identifies an HLS playlist")
+
+let verifiedAnimeURL = animeBase.appendingPathComponent("phim/series-a1")
+check(HTMLParser.isVerifiedAnimeDetail("<h1>Anime</h1><a>Xem phim</a>", url: verifiedAnimeURL), "A real detail shape can validate its anime domain")
+check(!HTMLParser.isVerifiedAnimeDetail("<title>Xác Minh An Toàn</title><h1>Anime</h1><a>Xem phim</a>", url: verifiedAnimeURL), "A verification page never validates an anime domain")
+check(!HTMLParser.isVerifiedAnimeDetail("<h1>Anime</h1><a>Xem phim</a>", url: animeBase), "The home page is not accepted as proof of a detail page")
+
+let nestedScheduleRow = #"{"id":"nested","slug":"fixture-nested-a1","title":"Anime {đặc biệt}","extra":{"production":"JP"},"pubTimeFormat":"Thứ Tư 21:00","airTime":"21:00"}"#
+let encodedNested = try JSONSerialization.data(withJSONObject: [nestedScheduleRow])
+let escapedNested = String(data: encodedNested, encoding: .utf8)!.dropFirst().dropLast()
+let nestedPage = "<script>self.__next_f.push([1," + escapedNested + "])</script>"
+let nestedItems = HTMLParser.schedule(from: nestedPage, baseURL: animeBase)
+check(nestedItems[.wednesday]?.first?.anime.title == "Anime {đặc biệt}", "Schedule JSON preserves nested objects and braces inside strings")

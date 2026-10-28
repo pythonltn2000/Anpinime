@@ -195,39 +195,46 @@ final class Phim4KProvider {
         guard let stream = Phim4KCatalog.stream(json, seasonID: seasonID, episodeID: episodeID, base: detailURL) else {
             throw MovieSourceError.unavailable("Máy chủ đã chọn chưa cung cấp URL phát trực tiếp hoặc yêu cầu resolver hợp lệ.")
         }
+        // A capture observed "oxoo" on one host, but did not prove it was required.
         let headers = ["User-Agent": "exoplayer", "Referer": baseURL.absoluteString + "/"]
         guard ["https", "http"].contains(stream.url.scheme?.lowercased() ?? ""), stream.url.host != nil else {
             throw MovieSourceError.unavailable("URL phát của máy chủ không hợp lệ.")
         }
-        // Web embeds must remain web pages. For direct media, inspect headers
-        // without downloading the film or inventing a signed URL.
         if !stream.web {
             var request = URLRequest(url: stream.url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
             request.httpMethod = "HEAD"
             for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
-            let response: URLResponse
-            do { (_, response) = try await session.data(for: request) }
-            catch {
-                throw MovieSourceError.unavailable("Không kết nối được máy chủ đã chọn: " + error.localizedDescription)
+            let http: HTTPURLResponse
+            do {
+                let (_, response) = try await session.data(for: request)
+                guard let response = response as? HTTPURLResponse else { throw MovieSourceError.invalidData }
+                http = response
+            } catch is CancellationError { throw CancellationError() }
+            catch { throw MovieSourceError.unavailable("Không kết nối được máy chủ đã chọn: " + error.localizedDescription) }
+            let type = http.value(forHTTPHeaderField: "Content-Type") ?? ""
+            var status = http.statusCode
+            var kind = Phim4KCatalog.mediaKind(status: status, contentType: type, url: http.url ?? stream.url)
+            if [401, 403, 405, 501].contains(status) || kind == .unknown || kind == .intermediate {
+                // A HEAD response can be unsupported or describe an HTML endpoint
+                // while GET is media. Keep Range bounded even for 200 responses.
+                let result: Phim4KMediaProbe.Result
+                do { result = try await Phim4KMediaProbe().inspect(stream.url, headers: headers, configuration: session.configuration) }
+                catch is CancellationError { throw CancellationError() }
+                catch { throw MovieSourceError.unavailable("Không kiểm tra được video: " + error.localizedDescription) }
+                status = result.response.statusCode
+                let contentType = result.response.value(forHTTPHeaderField: "Content-Type") ?? ""
+                kind = Phim4KCatalog.mediaKind(status: status, contentType: contentType, url: result.response.url ?? stream.url)
+                if (200..<300).contains(status), let signature = Phim4KCatalog.mediaKind(prefix: result.prefix) {
+                    kind = signature
+                }
             }
-            guard let http = response as? HTTPURLResponse else { throw MovieSourceError.invalidData }
-            let contentType = (http.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
             #if DEBUG
-            print("[Phim4K] source_id=phim4k server_id=\(episodeID) media_http_status=\(http.statusCode) media_content_type=\(contentType)")
+            print("[Phim4K] server_id=\(episodeID) host=\(stream.url.host ?? "") media_http_status=\(status) playback_kind=\(kind)")
             #endif
-            let kind = Phim4KCatalog.mediaKind(status: http.statusCode, contentType: contentType, url: http.url ?? stream.url)
-            if kind == .authenticationRequired {
-                throw MovieSourceError.unavailable("AUTH_REQUIRED: Máy chủ yêu cầu quyền truy cập hoặc phiên đăng nhập hợp lệ.")
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                throw MovieSourceError.unavailable("Máy chủ video trả HTTP \(http.statusCode). Hãy thử lại hoặc chọn máy chủ khác.")
-            }
-            if kind == .intermediate {
-                throw MovieSourceError.unavailable("Máy chủ trả về trang web hoặc JSON thay vì video; cần resolver hợp lệ.")
-            }
-            if kind == .unknown {
-                throw MovieSourceError.unavailable("Không xác định được định dạng video từ phản hồi máy chủ.")
-            }
+            if kind == .authenticationRequired { throw MovieSourceError.unavailable("AUTH_REQUIRED: Máy chủ yêu cầu quyền truy cập hoặc phiên đăng nhập hợp lệ.") }
+            guard (200..<300).contains(status) else { throw MovieSourceError.unavailable("Máy chủ video trả HTTP \(status). Hãy thử lại hoặc chọn máy chủ khác.") }
+            if kind == .intermediate { throw MovieSourceError.unavailable("Máy chủ trả về trang web hoặc JSON thay vì video; cần resolver hợp lệ.") }
+            if kind == .unknown { throw MovieSourceError.unavailable("Không xác định được định dạng video từ phản hồi máy chủ.") }
         }
         return ResolvedPlayback(url: stream.url, headers: headers, webURL: nil, isWeb: stream.web)
     }

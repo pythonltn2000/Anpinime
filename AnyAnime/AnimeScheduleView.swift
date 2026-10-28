@@ -8,6 +8,7 @@ struct AnimeScheduleView: View {
     @State private var errorMessage: String? = nil
     @State private var selectedAnime: Anime? = nil
     @State private var lastUpdated: Date?
+    @State private var showingCached = false
 
     private let days: [DayOfWeek] = [
         .monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday
@@ -22,6 +23,10 @@ struct AnimeScheduleView: View {
 
             Divider()
             Text("Giờ theo website nguồn").font(.caption2).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14)
+            if showingCached, let lastUpdated {
+                Text("Lịch đã lưu · cập nhật " + lastUpdated.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption).foregroundColor(.secondary).padding(.horizontal, 8)
+            }
             if let error = errorMessage, !scheduleData.isEmpty {
                 Text("Không cập nhật được lịch: " + error + (lastUpdated.map { " · Lần cuối: " + $0.formatted(date: .abbreviated, time: .shortened) } ?? ""))
                     .font(.caption).foregroundColor(.secondary).padding(8)
@@ -260,14 +265,16 @@ struct AnimeScheduleView: View {
 
     // MARK: - Data Loading
     private func load(forceRefresh: Bool) async {
-        if scheduleData.isEmpty || forceRefresh {
-            loading = true
+        if scheduleData.isEmpty, let cached = service.restoreSchedule() {
+            lastUpdated = cached.0; scheduleData = cached.1; showingCached = true
         }
+        if scheduleData.isEmpty || forceRefresh { loading = true }
         errorMessage = nil
         do {
             let data = try await service.schedule(forceRefresh: forceRefresh)
             scheduleData = data
             lastUpdated = service.scheduleUpdatedAt
+            showingCached = false
             loading = false
         } catch {
             errorMessage = error.localizedDescription

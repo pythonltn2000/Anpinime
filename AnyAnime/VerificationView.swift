@@ -16,6 +16,7 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     private var timer: Timer?
     private var deadline = Date()
     private var inspecting = false
+    private var lastWasChallenge = false
     private var targetURL: URL?
     private var generation = UUID()
 
@@ -59,6 +60,7 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         lastEpisodeCount = -1
         stableEpisodePolls = 0
         renderedSince = nil
+        lastWasChallenge = false
         generation = UUID()
         deadline = Date().addingTimeInterval(45)
         webView.load(URLRequest(url: request.1, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 40))
@@ -70,7 +72,8 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     private func inspectPage() {
         guard pending != nil, !inspecting else { return }
         if Date() > deadline {
-            finish(.failure(AnimeServiceError.http(403)))
+            if lastWasChallenge, let url = targetURL { finish(.failure(AnimeServiceError.verificationRequired(url))) }
+            else { finish(.failure(URLError(.timedOut))) }
             return
         }
         guard !webView.isLoading else { return }
@@ -82,7 +85,8 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             guard self.generation == requestGeneration, self.pending != nil, let page = result as? [String: Any],
                   let html = page["html"] as? String, let url = self.webView.url,
                   url.scheme == "https", !html.isEmpty else { return }
-            if !HTMLParser.containsVerification(html) {
+            self.lastWasChallenge = HTMLParser.containsVerification(html)
+            if !self.lastWasChallenge {
                 if self.waitForEpisodes {
                     if self.renderedSince == nil { self.renderedSince = Date() }
                     let identity = Anime(title: "", url: self.targetURL ?? url, imageURL: nil, episodeText: "", quality: "", score: "")

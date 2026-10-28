@@ -278,11 +278,7 @@ enum HTMLParser {
         let payload = streamedPayload(from: html)
         // Each item is a JSON object, including in the streamed React payload.
         // Missing optional values stay empty; unknown weekdays are not guessed.
-        let pattern = #"(?s)\{[^{}]*"pubTimeFormat"[^{}]*\}"#
-        for match in matches(pattern, in: payload) {
-            let raw = substring(payload, range: match.range)
-            guard let data = raw.data(using: .utf8),
-                  let row = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { continue }
+        for row in scheduleObjects(payload) {
             func field(_ key: String) -> String {
                 if let value = row[key] as? String { return value }
                 if let number = row[key] as? NSNumber { return number.stringValue }
@@ -300,6 +296,47 @@ enum HTMLParser {
                               episodeText: latest, quality: "", score: "")
             result[day, default: []].append(AnimeScheduleItem(id: id, anime: anime, airTime: airTime, pubTimeFormat: pubTime,
                                                                expectedEpisode: latest, statusText: status, dayOfWeek: day))
+        }
+
+        // AnimeVietsub's legacy schedule groups cards below weekday headings.
+        // Read actual /phim/ anchors only; the date heading is not an episode.
+        if result.values.allSatisfy({ $0.isEmpty }) {
+            let headingPattern = #"(?is)<h[1-6]\b[^>]*>(.*?)</h[1-6]\s*>"#
+            let headings = matches(headingPattern, in: html).compactMap { match -> (NSTextCheckingResult, DayOfWeek)? in
+                guard match.numberOfRanges > 1, let day = parseDayOfWeek(from: cleanText(substring(html, range: match.range(at: 1)))) else { return nil }
+                return (match, day)
+            }
+            let source = html as NSString
+            for (index, heading) in headings.enumerated() {
+                let start = NSMaxRange(heading.0.range)
+                let end = index + 1 < headings.count ? headings[index + 1].0.range.location : source.length
+                guard end > start else { continue }
+                let section = source.substring(with: NSRange(location: start, length: end - start))
+                let cards = matches(#"(?is)<li\b[^>]*>.*?</li\s*>"#, in: section)
+                for cardMatch in cards {
+                    let card = substring(section, range: cardMatch.range)
+                    guard let link = HTMLDocument.links(card).first(where: { link in
+                        guard !link.excluded, let href = link.attributes["href"],
+                              let url = absoluteURL(href, relativeTo: baseURL) else { return false }
+                        return url.host == baseURL.host && url.path.hasPrefix("/phim/")
+                    }), let href = link.attributes["href"], let url = absoluteURL(href, relativeTo: baseURL) else { continue }
+                    let title = link.attributes["title"] ?? first(#"(?is)(?:alt|title)\s*=\s*["']([^"']+)["']"#, in: link.body) ?? link.text
+                    guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                    let text = cleanText(card)
+                    let hour = first(#"(?i)([0-9]{1,2})\s*giờ\s*[0-9]{1,2}\s*phút"#, in: text)
+                    let minute = first(#"(?i)[0-9]{1,2}\s*giờ\s*([0-9]{1,2})\s*phút"#, in: text)
+                    let time: String
+                    if let hour, let minute, let h = Int(hour), let m = Int(minute), h < 24, m < 60 {
+                        time = String(format: "%02d:%02d", h, m)
+                    } else { time = first(#"\b([0-9]{1,2}:[0-9]{2})\b"#, in: text) ?? "" }
+                    let id = url.path + "|" + String(heading.1.rawValue) + "|" + time
+                    guard seenIDs.insert(id).inserted else { continue }
+                    let image = imageSource(in: card).flatMap { absoluteURL($0, relativeTo: baseURL) }
+                    let anime = Anime(title: cleanText(title), url: url, imageURL: image, episodeText: "", quality: "", score: "")
+                    result[heading.1, default: []].append(AnimeScheduleItem(id: id, anime: anime, airTime: time,
+                        pubTimeFormat: cleanText(substring(html, range: heading.0.range(at: 1))), expectedEpisode: "", statusText: "", dayOfWeek: heading.1))
+                }
+            }
         }
 
         if result.values.allSatisfy({ $0.isEmpty }) {
@@ -327,6 +364,30 @@ enum HTMLParser {
         }
 
         return result
+    }
+
+    /// Decode complete nested JSON objects in streamed data, honoring escaped
+    /// quotes and braces inside strings rather than assuming flat key order.
+    private static func scheduleObjects(_ payload: String) -> [[String: Any]] {
+        let bytes = Array(payload.utf8)
+        var starts: [Int] = [], objects: [[String: Any]] = []
+        var quoted = false, escaped = false
+        for (index, byte) in bytes.enumerated() {
+            if quoted {
+                if escaped { escaped = false }
+                else if byte == 92 { escaped = true }
+                else if byte == 34 { quoted = false }
+            } else if byte == 34 { quoted = true }
+            else if byte == 123 { starts.append(index) }
+            else if byte == 125, let start = starts.popLast(), index - start < 65_536 {
+                let data = Data(bytes[start...index])
+                guard data.range(of: Data("pubTimeFormat".utf8)) != nil,
+                      let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                      object["pubTimeFormat"] != nil else { continue }
+                objects.append(object)
+            }
+        }
+        return objects
     }
 
     private static func parseDayOfWeek(from text: String) -> DayOfWeek? {
@@ -363,6 +424,13 @@ enum HTMLParser {
         components.scheme = baseURL.scheme
         components.host = baseURL.host
         return components.url ?? url
+    }
+
+    static func isVerifiedAnimeDetail(_ html: String, url: URL) -> Bool {
+        guard url.path.hasPrefix("/phim/"), !containsVerification(html),
+              let title = first(#"(?is)<h1\b[^>]*>(.*?)</h1>"#, in: html), !cleanText(title).isEmpty else { return false }
+        let lower = html.lowercased()
+        return lower.contains("xem phim") || lower.contains("tập") || lower.contains("filminfo.filmid")
     }
 
     static func containsVerification(_ html: String) -> Bool {

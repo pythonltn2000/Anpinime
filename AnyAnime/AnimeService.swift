@@ -268,7 +268,7 @@ final class AnimeService: ObservableObject {
         if !forceRefresh, let cached = cachedDetail(for: anime.id), !cached.episodes.isEmpty {
             return cached.episodes
         }
-        let resolved = await resolver.resolve(force: forceRefresh)
+        let resolved = await resolver.resolve()
         let detailURL = HTMLParser.rebasedAnimeURL(anime.url, baseURL: resolved)
         var episodes = initialDetail.episodes
 
@@ -370,6 +370,7 @@ final class AnimeService: ObservableObject {
     }
 
     var scheduleUpdatedAt: Date? { scheduleCache.isEmpty ? nil : scheduleCacheDate }
+    func restoreSchedule() -> (Date, [DayOfWeek: [AnimeScheduleItem]])? { AnimeScheduleStore.load() }
 
     func schedule(forceRefresh: Bool = false) async throws -> [DayOfWeek: [AnimeScheduleItem]] {
         if !forceRefresh, !scheduleCache.isEmpty, Date().timeIntervalSince(scheduleCacheDate) < 600 {
@@ -385,6 +386,7 @@ final class AnimeService: ObservableObject {
         }
         scheduleCache = parsed
         scheduleCacheDate = Date()
+        AnimeScheduleStore.save(parsed, at: scheduleCacheDate)
         return parsed
     }
 
@@ -460,7 +462,7 @@ final class AnimeService: ObservableObject {
 
         if http.statusCode == 403 || HTMLParser.containsVerification(html) {
             let (browserHTML, browserURL) = try await website.load(responseURL)
-            if let accepted = await resolver.acceptResolvedURL(browserURL), source == .anime { baseURL = accepted }
+            if let accepted = await resolver.acceptResolvedURL(browserURL, html: browserHTML), source == .anime { baseURL = accepted }
             if source == .anime { imageGeneration += 1 }
             try Task.checkCancellation()
             cacheHTML(browserHTML, for: url)
@@ -469,7 +471,7 @@ final class AnimeService: ObservableObject {
         guard (200..<400).contains(http.statusCode) else { throw AnimeServiceError.http(http.statusCode) }
         guard !html.isEmpty else { throw AnimeServiceError.emptyData }
 
-        if let accepted = await resolver.acceptResolvedURL(responseURL), source == .anime, accepted.host != baseURL.host {
+        if let accepted = await resolver.acceptResolvedURL(responseURL, html: html), source == .anime, accepted.host != baseURL.host {
             baseURL = accepted
         }
         cacheHTML(html, for: url)

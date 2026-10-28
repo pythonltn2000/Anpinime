@@ -168,6 +168,16 @@ enum Phim4KCatalog {
         }
     }
 
+    static func mediaKind(prefix: Data) -> MediaKind? {
+        if prefix.starts(with: [0x1a, 0x45, 0xdf, 0xa3]) { return .mkv }
+        if prefix.count >= 8, String(data: prefix[4..<8], encoding: .ascii) == "ftyp" { return .mp4 }
+        let text = String(data: prefix.prefix(512), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if text.hasPrefix("#EXTM3U") { return .hls }
+        if text.contains("<MPD") { return .dash }
+        if text.hasPrefix("{") || text.hasPrefix("[") || text.lowercased().hasPrefix("<!doctype html") || text.lowercased().hasPrefix("<html") { return .intermediate }
+        return nil
+    }
+
     private static func plain(_ value: Any?) -> String {
         MovieCatalog.text(value).replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
