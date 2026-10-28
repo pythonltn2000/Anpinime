@@ -192,29 +192,44 @@ final class Phim4KProvider {
         _ = try await configure()
         guard isCore(detailURL) else { throw MovieSourceError.invalidData }
         let json = try await object(detailURL, fresh: true)
-        guard let stream = Phim4KCatalog.stream(json, seasonID: seasonID, episodeID: episodeID, base: detailURL) else { throw MovieSourceError.noVideo }
-        
-        var streamURL = stream.url
-        let isInternalCDN = Phim4KVIPResolver.shared.isVIPURL(stream.url)
-        if isInternalCDN {
-            if let resolved = await Phim4KVIPResolver.shared.resolveSecureStreamURL(stream.url.absoluteString, session: session) {
-                streamURL = resolved
+        guard let stream = Phim4KCatalog.stream(json, seasonID: seasonID, episodeID: episodeID, base: detailURL) else {
+            throw MovieSourceError.unavailable("Máy chủ đã chọn chưa cung cấp URL phát trực tiếp hoặc yêu cầu resolver hợp lệ.")
+        }
+        let headers = ["User-Agent": "exoplayer", "Referer": baseURL.absoluteString + "/"]
+        guard ["https", "http"].contains(stream.url.scheme?.lowercased() ?? ""), stream.url.host != nil else {
+            throw MovieSourceError.unavailable("URL phát của máy chủ không hợp lệ.")
+        }
+        // Web embeds must remain web pages. For direct media, inspect headers
+        // without downloading the film or inventing a signed URL.
+        if !stream.web {
+            var request = URLRequest(url: stream.url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
+            request.httpMethod = "HEAD"
+            for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+            let response: URLResponse
+            do { (_, response) = try await session.data(for: request) }
+            catch {
+                throw MovieSourceError.unavailable("Không kết nối được máy chủ đã chọn: " + error.localizedDescription)
+            }
+            guard let http = response as? HTTPURLResponse else { throw MovieSourceError.invalidData }
+            let contentType = (http.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
+            #if DEBUG
+            print("[Phim4K] source_id=phim4k server_id=\(episodeID) media_http_status=\(http.statusCode) media_content_type=\(contentType)")
+            #endif
+            let kind = Phim4KCatalog.mediaKind(status: http.statusCode, contentType: contentType, url: http.url ?? stream.url)
+            if kind == .authenticationRequired {
+                throw MovieSourceError.unavailable("AUTH_REQUIRED: Máy chủ yêu cầu quyền truy cập hoặc phiên đăng nhập hợp lệ.")
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                throw MovieSourceError.unavailable("Máy chủ video trả HTTP \(http.statusCode). Hãy thử lại hoặc chọn máy chủ khác.")
+            }
+            if kind == .intermediate {
+                throw MovieSourceError.unavailable("Máy chủ trả về trang web hoặc JSON thay vì video; cần resolver hợp lệ.")
+            }
+            if kind == .unknown {
+                throw MovieSourceError.unavailable("Không xác định được định dạng video từ phản hồi máy chủ.")
             }
         }
-
-        #if DEBUG
-        print("[Phim4K] source_id=\(ContentSource.phim4k.rawValue)")
-        print("[Phim4K] video_id=\(seasonID ?? ""):\(episodeID)")
-        print("[Phim4K] server_id=\(episodeID)")
-        print("[Phim4K] declared_quality=\(stream.web ? "embed" : "VIP")")
-        print("[Phim4K] playback_kind=\(isInternalCDN ? "phim4k_vip" : "direct")")
-        print("[Phim4K] resolver_status=success")
-        print("[Phim4K] media_http_status=200")
-        print("[Phim4K] media_content_type=\(stream.web ? "text/html" : "video/mp4")")
-        #endif
-
-        let headers = ["User-Agent": "exoplayer", "Referer": baseURL.absoluteString + "/"]
-        return ResolvedPlayback(url: streamURL, headers: headers, webURL: nil, isWeb: stream.web)
+        return ResolvedPlayback(url: stream.url, headers: headers, webURL: nil, isWeb: stream.web)
     }
 
     func episodeJSON(_ url: URL) async throws -> MovieCatalog.Object {

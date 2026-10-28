@@ -9,6 +9,8 @@ final class ProviderProtocol: URLProtocol {
     static let lock = NSLock()
     static var requests: [URLRequest] = []
     static var failingHost: String?
+    static var mediaStatus = 200
+    static var mediaType = "video/x-matroska"
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func stopLoading() {}
@@ -16,11 +18,18 @@ final class ProviderProtocol: URLProtocol {
         Self.lock.lock()
         Self.requests.append(request)
         let failing = Self.failingHost
+        let mediaStatus = Self.mediaStatus
+        let mediaType = Self.mediaType
         Self.lock.unlock()
         let url = request.url!, host = url.host!, path = url.path
         var status = 200
         var body: Any
         var html: String?
+        if host == "vip.example", request.httpMethod == "HEAD" {
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: url, statusCode: mediaStatus, httpVersion: nil, headerFields: ["Content-Type": mediaType])!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
         if host == failing { status = 503; body = ["error": "Unavailable"] }
         else if host == "kkphim.com" {
             html = try! String(contentsOfFile: "Tests/Fixtures/kkphim-ongoing.html", encoding: .utf8)
@@ -52,7 +61,7 @@ final class ProviderProtocol: URLProtocol {
     }
     static func reset(failing: String? = nil) {
         lock.lock(); defer { lock.unlock() }
-        requests = []; failingHost = failing
+        requests = []; failingHost = failing; mediaStatus = 200; mediaType = "video/x-matroska"
     }
     static func captured() -> [URLRequest] {
         lock.lock(); defer { lock.unlock() }
@@ -117,9 +126,16 @@ struct ProviderTests {
         let playback = try await app.resolve(detail.episodes[0])
         require(playback.url.absoluteString == "https://vip.example/original.mkv", "VIP selection retains the exact Core link")
         let captured = ProviderProtocol.captured()
-        require(Set(captured.compactMap { $0.url?.host }) == ["core.example", "free1.example", "free2.example"], "Source 2 never directly queries NguonC or KKPhim")
+        require(Set(captured.compactMap { $0.url?.host }) == ["core.example", "free1.example", "free2.example", "vip.example"], "Source 2 never directly queries NguonC or KKPhim")
         require(captured.filter { $0.url?.host != "core.example" }.allSatisfy { $0.value(forHTTPHeaderField: "API-KEY") == nil }, "Core API credentials stay on the Core host")
         require(captured.filter { $0.url?.host == "core.example" }.allSatisfy { $0.value(forHTTPHeaderField: "API-KEY") == "fixture-key" }, "Core app requests retain the required API header")
+        ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 403; ProviderProtocol.lock.unlock()
+        do { _ = try await app.resolve(detail.episodes[0]); fatalError("Expected auth error") }
+        catch { require(error.localizedDescription.contains("AUTH_REQUIRED"), "VIP 403 surfaces AUTH_REQUIRED without fallback") }
+        ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 200; ProviderProtocol.mediaType = "application/json"; ProviderProtocol.lock.unlock()
+        do { _ = try await app.resolve(detail.episodes[0]); fatalError("Expected invalid media response") }
+        catch { require(error.localizedDescription.contains("JSON"), "JSON response is not handed to the video decoder") }
+        ProviderProtocol.reset()
         do { _ = try await app.list(path: "v1/api/the-loai/hanh-dong"); fatalError("Expected foreign category rejection") } catch {}
         let wrongProvider = MovieProvider(source: .kkphim, session: session)
         do { _ = try await wrongProvider.detail(search[0]); fatalError("Expected identity rejection") } catch {}

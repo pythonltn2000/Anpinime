@@ -199,10 +199,31 @@ let scheduleParsed = HTMLParser.schedule(from: scheduleNextJSHTML, baseURL: anim
 check(scheduleParsed[.monday]?.count == 1 && scheduleParsed[.monday]?[0].anime.title == "Anime Thứ 2", "Schedule parses Monday Next.js streaming hydration payload")
 check(scheduleParsed[.sunday]?.count == 1 && scheduleParsed[.sunday]?[0].statusText == "Sắp chiếu", "Schedule parses Sunday Next.js streaming hydration payload")
 
-// Additional regressions for Task 3: Phim4K VIP Resolver file ID and Gateway URL signing
-check(Phim4KVIPResolver.extractFileID(from: URL(string: "https://cdn.phim4k.lol/E6E8NBA94K72")!) == "E6E8NBA94K72", "Phim4KVIPResolver extracts file ID from CDN URL")
-check(Phim4KVIPResolver.extractFileID(from: URL(string: "https://sv.p4kzz.workers.dev/api/v2/stream/E6E8NBA94K72")!) == "E6E8NBA94K72", "Phim4KVIPResolver extracts file ID from worker path")
-check(Phim4KVIPResolver.extractFileID(from: URL(string: "https://cdn.phim4k.lol/original-a")!) == "original-a", "Phim4KVIPResolver extracts slug file ID")
-let signedVIP = Phim4KVIPResolver.buildGatewayURL(fileID: "E6E8NBA94K72", timestamp: 1774320000)
-check(signedVIP.host == "svatv.cryboiz.workers.dev" && signedVIP.query?.contains("token=") == true, "VIP signed gateway URL contains auth token and valid worker host")
-print("All extended repair regressions passed successfully!")
+// Next.js fixture derived from a publicly served episode list; only IDs/numbers are retained.
+let nextShow = Anime(title: "Fixture", url: animeBase.appendingPathComponent("phim/luc-do-toi-da-chuyen-sinh-thanh-slime-s4-2342192"), imageURL: nil, episodeText: "", quality: "", score: "")
+let nextHTML = try String(contentsOfFile: "Tests/Fixtures/anime-next-episodes.html", encoding: .utf8)
+let nextEpisodes = HTMLParser.detail(from: nextHTML, anime: nextShow, baseURL: animeBase).episodes
+check(nextEpisodes.count == 12 && nextEpisodes.first?.number == 1 && nextEpisodes.last?.number == 12, "Streamed episode metadata restores 12 real entries across different detail/watch routes")
+check(HTMLParser.hasCompleteStreamedEpisodes(nextHTML + #"<script type="application/ld+json">{"numberOfEpisodes":12}</script>"#, episodes: nextEpisodes), "Complete streamed episode lists do not need a second watch request")
+check(!HTMLParser.hasCompleteStreamedEpisodes(nextHTML + #"<script type="application/ld+json">{"numberOfEpisodes":13}</script>"#, episodes: nextEpisodes), "Partial lists still allow a watch page refresh")
+check(nextEpisodes.allSatisfy { $0.url.path.hasPrefix("/xem-phim/luc-do-toi-da-chuyen-sinh-thanh-slime-s4-2342192/tap-") }, "Episode URLs belong to the requested show")
+check(HTMLParser.detail(from: nextHTML, anime: nextShow, baseURL: animeBase, includeEpisodes: false).episodes.isEmpty, "Metadata parsing does not block on the episode list")
+let foreign = nextHTML.replacingOccurrences(of: "luc-do-toi-da-chuyen-sinh-thanh-slime-s4-2342192", with: "different-show")
+check(HTMLParser.detail(from: foreign, anime: nextShow, baseURL: animeBase).episodes.isEmpty, "Another show never supplies episodes")
+let multiHTML = "<div class='list-episode' data-server='A'><a href='/phim/series-a1/tap-1.html'>1</a><a href='/phim/series-a1/special.html'>Special</a></div><div class='list-episode' data-server='B'><a href='/phim/series-a1/tap-1.html'>1</a></div>"
+let multiple = HTMLParser.detail(from: multiHTML, anime: animeFixture, baseURL: animeBase).episodes
+check(multiple.count == 3 && Set(multiple.map(\.season)) == ["A", "B"], "Distinct episode servers and special are preserved")
+let unavailableCore: MovieCatalog.Object = ["videos": [["video_file_id": "resolver-only", "label": "VIP"]]]
+check(Phim4KCatalog.episodes(unavailableCore, detailURL: coreMovie.url).count == 1, "Core server with an ID remains visible without a direct URL")
+check(Phim4KCatalog.stream(unavailableCore, seasonID: nil, episodeID: "resolver-only", base: coreBase) == nil, "Missing VIP URL never silently changes server")
+let unknownDayHTML = scheduleNextJSHTML.replacingOccurrences(of: "Thứ Hai 23:00", with: "Đã cập nhật")
+let unknownDay = HTMLParser.schedule(from: unknownDayHTML, baseURL: animeBase)
+check(unknownDay[.monday]?.isEmpty == true && unknownDay[.sunday]?.count == 1, "A schedule item with no weekday is not assigned Monday")
+let hlsURL = URL(string: "https://media.example/manifest")!
+check(Phim4KCatalog.mediaKind(status: 200, contentType: "application/vnd.apple.mpegurl", url: hlsURL) == .hls, "HLS can be identified without a filename extension")
+check(Phim4KCatalog.mediaKind(status: 206, contentType: "video/x-matroska", url: hlsURL) == .mkv, "MKV uses response MIME")
+check(Phim4KCatalog.mediaKind(status: 200, contentType: "application/dash+xml", url: hlsURL) == .dash, "DASH uses response MIME")
+check(Phim4KCatalog.mediaKind(status: 403, contentType: "text/html", url: hlsURL) == .authenticationRequired, "HTTP 403 signals authentication required")
+check(Phim4KCatalog.mediaKind(status: 200, contentType: "application/json", url: hlsURL) == .intermediate, "JSON is an intermediate response rather than video")
+check(Phim4KCatalog.mediaKind(status: 200, contentType: "text/html", url: hlsURL, isWeb: true) == .embed, "Declared embed remains a web player")
+print("Extended anime and source isolation regressions passed")

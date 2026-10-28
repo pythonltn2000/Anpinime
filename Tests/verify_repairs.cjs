@@ -1,7 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
-const https = require('https');
 
 function assert(cond, msg) {
   if (!cond) {
@@ -72,60 +70,9 @@ async function run() {
   assert(dayItems['cn'] && dayItems['cn'].includes('Anime Sunday'), 'Sunday schedule extracted from Next.js push chunk');
 
   // -------------------------------------------------------------
-  // TEST 3: PHIM4K VIP GATEWAY SIGNING & RESOLUTION
-  // -------------------------------------------------------------
-  console.log('\n--- Test Group 3: Phim4K VIP Resolver ---');
-
-  const HMAC_SECRET = '5e8d1b4f9c2a6e730b1f8d4a92c5e3d1';
-  const fileID = 'E6E8NBA94K72';
-  
-  // Date format yyyyMMdd in UTC
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(now.getUTCDate()).padStart(2, '0');
-  const dateUtc = `${year}${month}${day}`;
-
-  // Derive daily secret: AES-256-GCM
-  const keyBytes = crypto.createHash('sha256').update(HMAC_SECRET).digest();
-  const ivSource = crypto.createHash('sha256').update('iv:' + HMAC_SECRET).digest();
-  const nonce = ivSource.subarray(0, 12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', keyBytes, nonce);
-  const plaintext = `${HMAC_SECRET}:${dateUtc}`;
-  let ciphertext = cipher.update(plaintext, 'utf8');
-  ciphertext = Buffer.concat([ciphertext, cipher.final()]);
-  const tag = cipher.getAuthTag();
-  const signingSecret = `${HMAC_SECRET}:${Buffer.concat([ciphertext, tag]).toString('hex')}`;
-
-  assert(signingSecret.startsWith(HMAC_SECRET + ':'), 'Daily AES-GCM signing secret derived');
-
-  // Timestamp OTP mask
-  const nowSec = Math.floor(Date.now() / 1000);
-  const mask = crypto.createHmac('sha256', signingSecret).update('otp-ts-mask').digest().subarray(0, 4);
-  const tsBuf = Buffer.alloc(4);
-  tsBuf.writeUInt32BE(nowSec, 0);
-  const xored = Buffer.alloc(4);
-  for (let i = 0; i < 4; i++) xored[i] = tsBuf[i] ^ mask[i];
-  const tsHex = xored.toString('hex');
-
-  // Token HMAC
-  const token = crypto.createHmac('sha256', signingSecret).update(`${fileID}:${nowSec}`).digest('hex');
-  const gatewayURL = `https://svatv.cryboiz.workers.dev/${fileID}?token=${token}&ts=${tsHex}`;
-  assert(gatewayURL.includes(fileID) && gatewayURL.includes('token='), 'Gateway URL generated with valid signature');
-
-  // -------------------------------------------------------------
-  // TEST 4: NON-REGRESSION ON MOVIE SOURCES 1 & 3
-  // -------------------------------------------------------------
-  console.log('\n--- Test Group 4: Movie Source 1 & 3 Protection ---');
-
-  const sourceRows = { items: [{ slug: 'same-title', name: 'Same title', language: 'Vietsub' }] };
-  const nguoncHost = 'phim.nguonc.com';
-  const kkphimHost = 'phimapi.com';
-
-  assert(nguoncHost === 'phim.nguonc.com', 'Source 1 host remains unchanged (phim.nguonc.com)');
-  assert(kkphimHost === 'phimapi.com', 'Source 3 host remains unchanged (phimapi.com)');
-
-  console.log('\n=== ALL 4 TEST SUITES PASSED VERIFICATION ===');
+  // This script only checks sample fixture shapes. The Swift parser/provider
+  // suites exercise production code; no signing token or live result is implied.
+  console.log('\nFixture shape checks passed. Run Swift tests for actual parser and provider behavior.');
 }
 
 run().catch(err => {

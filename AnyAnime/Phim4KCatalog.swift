@@ -106,7 +106,7 @@ enum Phim4KCatalog {
         for video in detail["videos"] as? [Object] ?? [] {
             let id = MovieCatalog.text(video["video_file_id"])
             let label = MovieCatalog.text(video["label"])
-            guard !id.isEmpty, MovieCatalog.url(video["file_url"], base: detailURL) != nil else { continue }
+            guard !id.isEmpty else { continue }
             result.append(Episode(title: "Xem phim", url: detailURL, number: 1,
                                   season: "VIP/Premium · " + (label.isEmpty ? "Máy chủ " + id : label),
                                   qualityBadge: MovieCatalog.detectQualityBadge(from: label), source: .phim4k,
@@ -119,7 +119,7 @@ enum Phim4KCatalog {
             for (index, row) in (season["episodes"] as? [Object] ?? []).enumerated() {
                 let episodeID = MovieCatalog.text(row["episodes_id"])
                 let title = MovieCatalog.text(row["episodes_name"])
-                guard !episodeID.isEmpty, MovieCatalog.url(row["file_url"], base: detailURL) != nil else { continue }
+                guard !episodeID.isEmpty else { continue }
                 result.append(Episode(title: title.isEmpty ? "Tập \(index + 1)" : title, url: detailURL, number: index + 1,
                                       season: "VIP/Premium · " + name, qualityBadge: MovieCatalog.detectQualityBadge(from: name + " " + title),
                                       source: .phim4k, playback: .phim4kCore(detailURL: detailURL, seasonID: id, episodeID: episodeID)))
@@ -142,6 +142,30 @@ enum Phim4KCatalog {
         let url = MovieCatalog.url(raw, base: base) ?? URL(string: raw)
         guard let url else { return nil }
         return (url, MovieCatalog.text(row["file_type"]).lowercased().contains("embed"))
+    }
+
+    enum MediaKind: Equatable {
+        case hls, dash, mp4, mkv, otherVideo, embed, authenticationRequired, intermediate, invalid, unknown
+    }
+
+    /// Uses response status and MIME before falling back to the URL extension.
+    static func mediaKind(status: Int, contentType: String, url: URL, isWeb: Bool = false) -> MediaKind {
+        if status == 401 || status == 403 { return .authenticationRequired }
+        guard (200..<300).contains(status) else { return .invalid }
+        if isWeb { return .embed }
+        let type = contentType.lowercased().split(separator: ";").first.map(String.init) ?? ""
+        if type.contains("json") || type == "text/html" { return .intermediate }
+        if type.contains("mpegurl") { return .hls }
+        if type.contains("dash+xml") { return .dash }
+        if type.contains("matroska") { return .mkv }
+        if type == "video/mp4" { return .mp4 }
+        switch url.pathExtension.lowercased() {
+        case "m3u8": return .hls
+        case "mpd": return .dash
+        case "mp4", "m4v": return .mp4
+        case "mkv": return .mkv
+        default: return type.hasPrefix("video/") ? .otherVideo : .unknown
+        }
     }
 
     private static func plain(_ value: Any?) -> String {

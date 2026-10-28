@@ -70,7 +70,7 @@ enum HTMLParser {
         return result
     }
 
-    static func detail(from html: String, anime: Anime, baseURL: URL) -> AnimeDetail {
+    static func detail(from html: String, anime: Anime, baseURL: URL, includeEpisodes: Bool = true) -> AnimeDetail {
         let title = first(#"(?is)<h1[^>]*>(.*?)</h1>"#, in: html).map(cleanText) ?? anime.title
         let bannerValue = first(#"(?is)<meta\s+(?:property=[\"']og:image[\"']|itemprop=[\"']image[\"'])\s+content=[\"']([^\"']*banner[^\"']*)[\"']"#, in: html)
         let posterValue = first(#"(?is)<meta\s+(?:property=[\"']og:image[\"']|itemprop=[\"']image[\"'])\s+content=[\"']([^\"']+)[\"']"#, in: html)
@@ -79,6 +79,11 @@ enum HTMLParser {
         let info = first(#"(?is)<div[^>]*class=[\"'][^\"']*(?:Info|film-info)[^\"']*[\"'][^>]*>(.*?)</div>"#, in: html)
             .map(cleanText) ?? ""
 
+        if !includeEpisodes {
+            return AnimeDetail(title: title, posterURL: posterValue.flatMap { absoluteURL($0, relativeTo: baseURL) } ?? anime.imageURL,
+                               bannerURL: bannerValue.flatMap { absoluteURL($0, relativeTo: baseURL) },
+                               summary: description, info: info, episodes: [])
+        }
         var episodes: [Episode] = []
         var seen = Set<String>()
         var candidateCount = 0
@@ -97,23 +102,34 @@ enum HTMLParser {
             let hash = !(link.attributes["data-hash"] ?? "").isEmpty && !(link.attributes["data-hash"]?.lowercased().contains("user") ?? false)
 
             // A watch URL in a login redirect or a comment permalink is not an episode.
-            guard episodeLabel, button || episodeContainer || hash else {
+            // The observed Next.js site uses /xem-phim/<show>/tap-N links in
+            // its episode grid without legacy btn-episode class names.
+            let modernRoute = url.path.hasPrefix("/xem-phim/") && url.pathComponents.count >= 4
+            let identifiedEpisode = button || episodeContainer
+            guard (episodeLabel || (identifiedEpisode && !rawTitle.isEmpty)), identifiedEpisode || hash || modernRoute else {
                 rejectedCount += 1
                 continue
             }
 
             let numberText = first(#"(?i)^(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?([0-9]+)"#, in: rawTitle)
             let number = numberText.flatMap(Int.init)
-            let season = link.attributes["data-server"] ?? link.attributes["data-server-name"]
-                ?? link.attributes["data-season"] ?? link.attributes["data-season-id"]
-                ?? link.ancestors.reversed().compactMap {
-                    $0.attributes["data-server"] ?? $0.attributes["data-server-name"] ?? $0.attributes["data-season"] ?? $0.attributes["data-season-id"]
-                }.first ?? "Vietsub"
+            let names = ["data-server", "data-server-name", "data-season", "data-season-id"]
+            let ownServer = names.compactMap { link.attributes[$0] }.first
+            let parentServer = link.ancestors.reversed().compactMap { ancestor in
+                names.compactMap { ancestor.attributes[$0] }.first
+            }.first
+            let season = ownServer ?? parentServer ?? "Vietsub"
             let key = url.absoluteString + "|" + season
             if seen.insert(key).inserted {
                 episodes.append(Episode(title: rawTitle, url: url, number: number, season: season))
             }
         }
+
+        // Decode the site's streamed episode array only when the DOM itself
+        // demonstrates the same show slug and the /xem-phim/<slug>/tap-N route.
+        let existingURLs = Set(episodes.map { $0.url.absoluteString })
+        let modern = streamedEpisodes(from: html, animeURL: anime.url, baseURL: baseURL, known: existingURLs)
+        episodes.append(contentsOf: modern)
 
         #if DEBUG
         print("[Anime] episode_candidates=\(candidateCount) accepted=\(episodes.count) rejected=\(rejectedCount)")
@@ -137,12 +153,18 @@ enum HTMLParser {
         )
     }
 
+    static func hasCompleteStreamedEpisodes(_ html: String, episodes: [Episode]) -> Bool {
+        guard html.contains("animeSlugOrId"),
+              let declared = first(#"(?i)\"numberOfEpisodes\"\s*:\s*([0-9]+)"#, in: html).flatMap(Int.init), declared > 0 else { return false }
+        return Set(episodes.compactMap(\.number)).count >= declared
+    }
+
     static func watchURL(from html: String, baseURL: URL, animeURL: URL? = nil) -> URL? {
         for link in HTMLDocument.links(html) where !link.excluded {
             guard let href = link.attributes["href"], !href.hasPrefix("#"), !href.hasPrefix("?") else { continue }
             let hrefClean = href.split(separator: "#").first.map(String.init) ?? href
             guard let url = absoluteURL(hrefClean, relativeTo: baseURL), url.host == baseURL.host,
-                  url.path.range(of: #"(?i)/(?:xem-phim|tap-1|ep-1)(?:-[0-9a-zA-Z_]+)?(?:\.html)?/?$"#, options: .regularExpression) != nil else { continue }
+                  url.path.range(of: #"(?i)/(?:xem-phim|tap-0*1|ep-0*1)(?:-[0-9a-zA-Z_]+)?(?:\.html)?/?$"#, options: .regularExpression) != nil else { continue }
             if let animeURL, episodeURL(hrefClean, animeURL: animeURL, baseURL: baseURL) == nil { continue }
             let label = link.text.lowercased()
             let button = link.marker.split(whereSeparator: \.isWhitespace).contains("btn-episode") || link.marker.contains("watch-now")
@@ -162,7 +184,11 @@ enum HTMLParser {
         guard url.host == baseURL.host else { return nil }
 
         let showComponents = animeURL.pathComponents.filter { $0 != "/" }
-        guard let rawShowSlug = showComponents.last else { return nil }
+        let rawShowSlug: String
+        if showComponents.count >= 2 && ["phim", "xem-phim"].contains(showComponents[0].lowercased()) {
+            rawShowSlug = showComponents[1]
+        } else if let last = showComponents.last { rawShowSlug = last }
+        else { return nil }
         let showSlug = rawShowSlug.replacingOccurrences(of: #"(?i)\.html$"#, with: "", options: .regularExpression)
         guard !showSlug.isEmpty else { return nil }
 
@@ -176,13 +202,13 @@ enum HTMLParser {
         }
 
         let matchesShow: Bool
-        if normalizedPath.count >= 2 && normalizedShow.count >= 2 && Array(normalizedShow.prefix(2)) == Array(normalizedPath.prefix(2)) {
+        if normalizedPath.count >= 3 && normalizedPath[0].lowercased() == "xem-phim" && normalizedPath[1] == showSlug {
+            matchesShow = true
+        } else if normalizedPath.count >= 2 && normalizedShow.count >= 2 && Array(normalizedShow.prefix(2)) == Array(normalizedPath.prefix(2)) {
             matchesShow = true
         } else if normalizedPath.contains(showSlug) {
             matchesShow = true
         } else if url.path.contains("/" + showSlug + "/") || url.path.contains("/" + showSlug + "-") || url.path.contains("/" + showSlug + ".html") {
-            matchesShow = true
-        } else if pathComponents.count == 1 {
             matchesShow = true
         } else {
             matchesShow = false
@@ -197,50 +223,83 @@ enum HTMLParser {
         return url
     }
 
+    /// Read React's serialized episode list; links are generated only from rows
+    /// for a slug whose link pattern is already present in the HTML DOM.
+    private static func streamedEpisodes(from html: String, animeURL: URL, baseURL: URL, known: Set<String>) -> [Episode] {
+        let paths = animeURL.pathComponents.filter { $0 != "/" }
+        guard paths.count >= 2, ["phim", "xem-phim"].contains(paths[0].lowercased()) else { return [] }
+        let slug = paths[1].replacingOccurrences(of: #"(?i)\.html$"#, with: "", options: .regularExpression)
+        let prefix = "/xem-phim/" + slug + "/tap-"
+        guard HTMLDocument.links(html).contains(where: { !$0.excluded && ($0.attributes["href"] ?? "").hasPrefix(prefix) }) else { return [] }
+        let text = streamedPayload(from: html)
+        guard let marker = text.range(of: "\"animeSlugOrId\":\"" + slug + "\",\"episodes\":[") else { return [] }
+        let arrayStart = text.index(before: marker.upperBound)
+        // Scan bytes to find the matching bracket without treating brackets in
+        // strings as structure. JSONSerialization handles escapes and Unicode.
+        let bytes = Array(text[arrayStart...].utf8)
+        var depth = 0, inString = false, escaped = false, end: Int?
+        for (index, byte) in bytes.enumerated() {
+            if inString {
+                if escaped { escaped = false }
+                else if byte == 92 { escaped = true }
+                else if byte == 34 { inString = false }
+            } else if byte == 34 { inString = true }
+            else if byte == 91 { depth += 1 }
+            else if byte == 93 { depth -= 1; if depth == 0 { end = index; break } }
+        }
+        guard let end, let rows = try? JSONSerialization.jsonObject(with: Data(bytes[0...end])) as? [[String: Any]] else { return [] }
+        var seen = known
+        return rows.compactMap { row in
+            guard let number = row["number"] as? Int, number > 0, number <= 100_000,
+                  let id = row["episodeId"] as? String, !id.isEmpty,
+                  let url = URL(string: prefix + String(number), relativeTo: baseURL)?.absoluteURL,
+                  seen.insert(url.absoluteString).inserted else { return nil }
+            return Episode(title: "Tập " + String(number), url: url, number: number, season: "Vietsub")
+        }
+    }
+
+    private static func streamedPayload(from html: String) -> String {
+        let pattern = #"self\.__next_f\.push\(\s*\[1\s*,\s*("(?:\\.|[^"\\])*")\s*\]\s*\)"#
+        var chunks: [String] = []
+        for match in matches(pattern, in: html) where match.numberOfRanges > 1 {
+            let json = "[" + substring(html, range: match.range(at: 1)) + "]"
+            if let data = json.data(using: .utf8), let values = try? JSONSerialization.jsonObject(with: data) as? [String], let chunk = values.first {
+                chunks.append(chunk)
+            }
+        }
+        return chunks.joined()
+    }
+
     static func schedule(from html: String, baseURL: URL) -> [DayOfWeek: [AnimeScheduleItem]] {
         var result: [DayOfWeek: [AnimeScheduleItem]] = [:]
         for day in DayOfWeek.allCases { result[day] = [] }
         var seenIDs = Set<String>()
 
-        let itemPattern = #"(?is)\{\\?["']id\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']slug\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']title\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']coverUrl\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']airTime\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']pubTimeFormat\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']latestEpisode\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']status\\?["']:\s*\\?["']([^"']+?)\\?["']"#
-
-        for match in matches(itemPattern, in: html) {
-            guard match.numberOfRanges >= 9 else { continue }
-            let id = substring(html, range: match.range(at: 1))
-            let slug = substring(html, range: match.range(at: 2))
-            let title = cleanText(substring(html, range: match.range(at: 3)))
-            let coverRaw = substring(html, range: match.range(at: 4)).replacingOccurrences(of: "\\/", with: "/")
-            let airTime = cleanText(substring(html, range: match.range(at: 5)))
-            let pubTime = cleanText(substring(html, range: match.range(at: 6)))
-            let latest = cleanText(substring(html, range: match.range(at: 7)))
-            let status = cleanText(substring(html, range: match.range(at: 8)))
-
-            guard !id.isEmpty, !title.isEmpty, seenIDs.insert(id + "|" + pubTime).inserted else { continue }
-            let day = parseDayOfWeek(from: pubTime)
-
+        let payload = streamedPayload(from: html)
+        // Each item is a JSON object, including in the streamed React payload.
+        // Missing optional values stay empty; unknown weekdays are not guessed.
+        let pattern = #"(?s)\{[^{}]*"pubTimeFormat"[^{}]*\}"#
+        for match in matches(pattern, in: payload) {
+            let raw = substring(payload, range: match.range)
+            guard let data = raw.data(using: .utf8),
+                  let row = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { continue }
+            func field(_ key: String) -> String {
+                if let value = row[key] as? String { return value }
+                if let number = row[key] as? NSNumber { return number.stringValue }
+                return ""
+            }
+            let id = field("id"), slug = field("slug"), title = field("title")
+            let pubTime = field("pubTimeFormat"), airTime = field("airTime")
+            let latest = field("latestEpisode"), status = field("status")
+            guard !id.isEmpty, !slug.isEmpty, !title.isEmpty,
+                  let day = parseDayOfWeek(from: pubTime), seenIDs.insert(id + "|" + pubTime).inserted else { continue }
             let animePath = slug.hasPrefix("/") ? slug : "/phim/" + slug
-            let pageURL = URL(string: animePath, relativeTo: baseURL)?.absoluteURL ?? baseURL.appendingPathComponent(slug)
-            let coverURL = URL(string: coverRaw, relativeTo: baseURL)?.absoluteURL
-
-            let anime = Anime(
-                title: title,
-                url: pageURL,
-                imageURL: coverURL,
-                episodeText: latest,
-                quality: "Full HD",
-                score: ""
-            )
-
-            let item = AnimeScheduleItem(
-                id: id,
-                anime: anime,
-                airTime: airTime,
-                pubTimeFormat: pubTime,
-                expectedEpisode: latest,
-                statusText: status,
-                dayOfWeek: day
-            )
-            result[day, default: []].append(item)
+            guard let pageURL = absoluteURL(animePath, relativeTo: baseURL), pageURL.host == baseURL.host else { continue }
+            let cover = field("coverUrl")
+            let anime = Anime(title: title, url: pageURL, imageURL: cover.isEmpty ? nil : absoluteURL(cover, relativeTo: baseURL),
+                              episodeText: latest, quality: "", score: "")
+            result[day, default: []].append(AnimeScheduleItem(id: id, anime: anime, airTime: airTime, pubTimeFormat: pubTime,
+                                                               expectedEpisode: latest, statusText: status, dayOfWeek: day))
         }
 
         if result.values.allSatisfy({ $0.isEmpty }) {
@@ -248,7 +307,7 @@ enum HTMLParser {
             for cardMatch in matches(cardPattern, in: html) {
                 let card = substring(html, range: cardMatch.range)
                 let time = first(#"(?is)(?:Thứ\s+[2-7]|Thứ\s+[a-zA-Z]+|Chủ\s+Nhật|CN)\s+[0-9]{1,2}:[0-9]{2}"#, in: card) ?? ""
-                let status = first(#"(?is)<span[^>]*>(Đã chiếu|Sắp chiếu|Chưa chiếu)</span>"#, in: card) ?? "Sắp chiếu"
+                let status = first(#"(?is)<span[^>]*>(Đã chiếu|Sắp chiếu|Chưa chiếu)</span>"#, in: card) ?? ""
                 let href = first(#"(?is)href=[\"']([^\"']+)[\"']"#, in: card) ?? ""
                 let title = first(#"(?is)title=[\"']([^\"']+)[\"']"#, in: card).map(cleanText)
                     ?? first(#"(?is)<h[2-4][^>]*>(.*?)</h[2-4]>"#, in: card).map(cleanText) ?? ""
@@ -256,12 +315,12 @@ enum HTMLParser {
                 let ep = first(#"(?is)<span[^>]*>([Tt]ập\s*[0-9]+)</span>"#, in: card) ?? ""
 
                 guard !title.isEmpty, let pageURL = absoluteURL(href, relativeTo: baseURL) else { continue }
-                let day = parseDayOfWeek(from: time)
+                guard let day = parseDayOfWeek(from: time) else { continue }
                 let itemID = pageURL.path + "|" + time
                 guard seenIDs.insert(itemID).inserted else { continue }
 
                 let anime = Anime(title: title, url: pageURL, imageURL: cover.flatMap { absoluteURL($0, relativeTo: baseURL) },
-                                  episodeText: ep, quality: "Full HD", score: "")
+                                  episodeText: ep, quality: "", score: "")
                 let item = AnimeScheduleItem(id: itemID, anime: anime, airTime: time, pubTimeFormat: time, expectedEpisode: ep, statusText: status, dayOfWeek: day)
                 result[day, default: []].append(item)
             }
@@ -270,7 +329,7 @@ enum HTMLParser {
         return result
     }
 
-    private static func parseDayOfWeek(from text: String) -> DayOfWeek {
+    private static func parseDayOfWeek(from text: String) -> DayOfWeek? {
         let t = text.lowercased()
         if t.contains("hai") || t.contains("thứ 2") || t.contains("t2") { return .monday }
         if t.contains("ba") || t.contains("thứ 3") || t.contains("t3") { return .tuesday }
@@ -279,7 +338,7 @@ enum HTMLParser {
         if t.contains("sáu") || t.contains("sau") || t.contains("thứ 6") || t.contains("t6") { return .friday }
         if t.contains("bảy") || t.contains("bay") || t.contains("thứ 7") || t.contains("t7") { return .saturday }
         if t.contains("chủ nhật") || t.contains("chu nhat") || t.contains("cn") { return .sunday }
-        return .monday
+        return nil
     }
 
     static func mergedEpisodes(_ preview: [Episode], _ full: [Episode]) -> [Episode] {

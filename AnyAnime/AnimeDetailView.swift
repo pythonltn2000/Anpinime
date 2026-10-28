@@ -442,6 +442,7 @@ struct AnimeDetailView: View {
                 episodeStatus = .available
             }
 
+            await Task.yield() // Let SwiftUI present metadata before parsing a large episode list.
             let fullEpisodes = try await service.loadEpisodes(for: anime, initialDetail: meta, forceRefresh: forceRefresh)
             try Task.checkCancellation()
 
@@ -454,7 +455,7 @@ struct AnimeDetailView: View {
                 }
                 episodeStatus = .available
             } else {
-                episodeStatus = .unavailable("Anime này hiện chưa có tập nào trên hệ thống.")
+                episodeStatus = .unavailable("Chưa đọc được danh sách tập từ website. Hãy thử tải lại hoặc xác minh kết nối.")
             }
         } catch is CancellationError {
             // Screen dismissed

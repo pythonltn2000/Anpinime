@@ -7,6 +7,7 @@ struct AnimeScheduleView: View {
     @State private var loading = true
     @State private var errorMessage: String? = nil
     @State private var selectedAnime: Anime? = nil
+    @State private var lastUpdated: Date?
 
     private let days: [DayOfWeek] = [
         .monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday
@@ -20,6 +21,11 @@ struct AnimeScheduleView: View {
                 .background(Color(white: 0.08))
 
             Divider()
+            Text("Giờ theo website nguồn").font(.caption2).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14)
+            if let error = errorMessage, !scheduleData.isEmpty {
+                Text("Không cập nhật được lịch: " + error + (lastUpdated.map { " · Lần cuối: " + $0.formatted(date: .abbreviated, time: .shortened) } ?? ""))
+                    .font(.caption).foregroundColor(.secondary).padding(8)
+            }
 
             ZStack {
                 if loading && scheduleData.isEmpty {
@@ -156,7 +162,10 @@ struct AnimeScheduleView: View {
                 ],
                 spacing: 14
             ) {
-                ForEach(items) { item in
+                ForEach(items.sorted {
+                    if $0.airTime.isEmpty != $1.airTime.isEmpty { return !$0.airTime.isEmpty }
+                    return $0.airTime.localizedStandardCompare($1.airTime) == .orderedAscending
+                }) { item in
                     scheduleCard(item)
                 }
             }
@@ -207,7 +216,8 @@ struct AnimeScheduleView: View {
 
                             // Status Badge: "Đã chiếu" vs "Sắp chiếu"
                             let isAired = item.statusText.contains("Đã chiếu")
-                            Text(item.statusText.isEmpty ? (isAired ? "Đã chiếu" : "Sắp chiếu") : item.statusText)
+                            if !item.statusText.isEmpty {
+                            Text(item.statusText)
                                 .font(.system(size: 9, weight: .heavy))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 3)
@@ -216,6 +226,7 @@ struct AnimeScheduleView: View {
                                     in: Capsule()
                                 )
                                 .foregroundColor(.white)
+                            }
                         }
                         .padding(6)
 
@@ -256,11 +267,10 @@ struct AnimeScheduleView: View {
         do {
             let data = try await service.schedule(forceRefresh: forceRefresh)
             scheduleData = data
+            lastUpdated = service.scheduleUpdatedAt
             loading = false
         } catch {
-            if scheduleData.isEmpty {
-                errorMessage = error.localizedDescription
-            }
+            errorMessage = error.localizedDescription
             loading = false
             service.register(error)
         }
