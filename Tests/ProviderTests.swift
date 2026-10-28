@@ -143,7 +143,7 @@ struct ProviderTests {
         ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 403; ProviderProtocol.mediaGetStatus = 403; ProviderProtocol.lock.unlock()
         do { _ = try await app.resolve(detail.episodes[0]); fatalError("Expected auth error") }
         catch { require(error.localizedDescription.contains("AUTH_REQUIRED"), "VIP 403 surfaces AUTH_REQUIRED without fallback") }
-        ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 200; ProviderProtocol.mediaType = "application/json"; ProviderProtocol.mediaGetType = "application/json"; ProviderProtocol.lock.unlock()
+        ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 200; ProviderProtocol.mediaType = "application/json"; ProviderProtocol.mediaGetStatus = 200; ProviderProtocol.mediaGetType = "application/json"; ProviderProtocol.lock.unlock()
         do { _ = try await app.resolve(detail.episodes[0]); fatalError("Expected invalid media response") }
         catch { require(error.localizedDescription.contains("JSON"), "JSON response is not handed to the video decoder") }
         ProviderProtocol.reset()
