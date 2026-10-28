@@ -19,6 +19,21 @@ xcrun simctl install "$ANPINIME_SIMULATOR_ID" build-simulator/Build/Products/Deb
 python3 Tests/serve_player.py > "$RUNNER_TEMP/anpinime-media-server.log" 2>&1 &
 ANPINIME_SERVER_PID=$!
 trap 'kill "$ANPINIME_SERVER_PID" || true' EXIT
+# Wait for the fixture before launching mpv; otherwise a fast simulator may
+# open the URL before the Python server has bound its socket.
+ANPINIME_SERVER_READY=0
+for attempt in $(seq 1 20); do
+  if python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",8765),timeout=1); s.close()' 2>/dev/null; then
+    ANPINIME_SERVER_READY=1
+    break
+  fi
+  kill -0 "$ANPINIME_SERVER_PID"
+  sleep 1
+done
+if [ "$ANPINIME_SERVER_READY" != 1 ]; then
+  cat "$RUNNER_TEMP/anpinime-media-server.log"
+  exit 1
+fi
 xcrun simctl launch "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime --mpv-playback-smoke
 ANPINIME_APP_DATA=$(xcrun simctl get_app_container "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime data)
 mkdir -p previews
