@@ -126,3 +126,64 @@ enum AnimeServiceError: LocalizedError {
         }
     }
 }
+
+enum DayOfWeek: Int, CaseIterable, Identifiable, Comparable, Hashable {
+    case monday = 2
+    case tuesday = 3
+    case wednesday = 4
+    case thursday = 5
+    case friday = 6
+    case saturday = 7
+    case sunday = 1
+
+    var id: Int { rawValue }
+
+    var shortTitle: String {
+        switch self {
+        case .monday: return "T2"
+        case .tuesday: return "T3"
+        case .wednesday: return "T4"
+        case .thursday: return "T5"
+        case .friday: return "T6"
+        case .saturday: return "T7"
+        case .sunday: return "CN"
+        }
+    }
+
+    var fullTitle: String {
+        switch self {
+        case .monday: return "Thứ Hai"
+        case .tuesday: return "Thứ Ba"
+        case .wednesday: return "Thứ Tư"
+        case .thursday: return "Thứ Năm"
+        case .friday: return "Thứ Sáu"
+        case .saturday: return "Thứ Bảy"
+        case .sunday: return "Chủ Nhật"
+        }
+    }
+
+    static func < (lhs: DayOfWeek, rhs: DayOfWeek) -> Bool {
+        let l = lhs == .sunday ? 8 : lhs.rawValue
+        let r = rhs == .sunday ? 8 : rhs.rawValue
+        return l < r
+    }
+
+    static var current: DayOfWeek {
+        var calendar = Calendar(identifier: .gregorian)
+        if let tz = TimeZone(identifier: "Asia/Ho_Chi_Minh") {
+            calendar.timeZone = tz
+        }
+        let weekday = calendar.component(.weekday, from: Date())
+        return DayOfWeek(rawValue: weekday) ?? .monday
+    }
+}
+
+struct AnimeScheduleItem: Identifiable, Hashable {
+    let id: String
+    let anime: Anime
+    let airTime: String
+    let pubTimeFormat: String
+    let expectedEpisode: String
+    let statusText: String
+    let dayOfWeek: DayOfWeek
+}

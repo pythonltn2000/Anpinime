@@ -81,27 +81,44 @@ enum HTMLParser {
 
         var episodes: [Episode] = []
         var seen = Set<String>()
+        var candidateCount = 0
+        var rejectedCount = 0
+
         for link in HTMLDocument.links(html) {
             guard !link.excluded, let href = link.attributes["href"],
                   let url = episodeURL(href, animeURL: anime.url, baseURL: baseURL) else { continue }
+            candidateCount += 1
             let rawTitle = link.text
             let episodeLabel = rawTitle.range(of: #"(?i)^(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?[0-9]+(?:[.,][0-9]+)?(?:[ ._-]*(?:end|cuối|final))?$|^(?:ova|ona|sp|special|movie|full|trọn bộ|trailer)(?:[ .:_-]*[0-9]+)?$"#, options: .regularExpression) != nil
             let button = link.marker.split(whereSeparator: \.isWhitespace).contains("btn-episode")
             let episodeContainer = link.ancestors.contains {
-                $0.marker.range(of: #"(?:list-episode|episode-list|episodes|server-list|list-server|episodios)"#, options: .regularExpression) != nil
+                $0.marker.range(of: #"(?:list-episode|episode-list|episodes|server-list|list-server|episodios|halim-list-eps)"#, options: .regularExpression) != nil
             }
             let hash = !(link.attributes["data-hash"] ?? "").isEmpty
-            // A watch URL in a login redirect or a comment permalink is not an episode.
-            guard episodeLabel, button || episodeContainer || hash else { continue }
-            let numberText = first(#"(?i)^(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?([0-9]+)"#, in: rawTitle)
+            let hasNumber = rawTitle.range(of: #"[0-9]+"#, options: .regularExpression) != nil
+
+            // Accept if marked as episode button/container/hash, or if the label clearly designates an episode
+            guard (button || episodeContainer || hash) || (episodeLabel && hasNumber) else {
+                rejectedCount += 1
+                continue
+            }
+
+            let numberText = first(#"(?i)(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?([0-9]+)"#, in: rawTitle)
             let number = numberText.flatMap(Int.init)
-            let season = link.attributes["data-season"] ?? link.attributes["data-season-id"]
-                ?? link.ancestors.reversed().compactMap { $0.attributes["data-season"] ?? $0.attributes["data-season-id"] ?? $0.attributes["data-server"] }.first ?? "Phần 1"
+            let season = link.attributes["data-server"] ?? link.attributes["data-server-name"]
+                ?? link.attributes["data-season"] ?? link.attributes["data-season-id"]
+                ?? link.ancestors.reversed().compactMap {
+                    $0.attributes["data-server"] ?? $0.attributes["data-server-name"] ?? $0.attributes["data-season"] ?? $0.attributes["data-season-id"]
+                }.first ?? "Vietsub"
             let key = url.absoluteString + "|" + season
             if seen.insert(key).inserted {
                 episodes.append(Episode(title: rawTitle, url: url, number: number, season: season))
             }
         }
+
+        #if DEBUG
+        print("[Anime] episode_candidates=\(candidateCount) accepted=\(episodes.count) rejected=\(rejectedCount)")
+        #endif
 
         if episodes.contains(where: { $0.number != nil }) {
             episodes.removeAll { $0.number == nil && ["xem phim", "xem ngay", "watch now"].contains($0.title.lowercased()) }
@@ -123,28 +140,147 @@ enum HTMLParser {
 
     static func watchURL(from html: String, baseURL: URL, animeURL: URL? = nil) -> URL? {
         for link in HTMLDocument.links(html) where !link.excluded {
-            guard let href = link.attributes["href"], !href.hasPrefix("#"), !href.hasPrefix("?"),
-                  let url = absoluteURL(href, relativeTo: baseURL), url.host == baseURL.host,
-                  url.fragment == nil, url.query == nil,
-                  url.path.range(of: #"/xem-phim(?:-[0-9]+)?\.html/?$"#, options: .regularExpression) != nil else { continue }
-            if let animeURL, episodeURL(href, animeURL: animeURL, baseURL: baseURL) == nil { continue }
+            guard let href = link.attributes["href"], !href.hasPrefix("#"), !href.hasPrefix("?") else { continue }
+            let hrefClean = href.split(separator: "#").first.map(String.init) ?? href
+            guard let url = absoluteURL(hrefClean, relativeTo: baseURL), url.host == baseURL.host,
+                  url.path.range(of: #"(?i)/(?:xem-phim|tap-1|ep-1)(?:-[0-9a-zA-Z_]+)?(?:\.html)?/?$"#, options: .regularExpression) != nil else { continue }
+            if let animeURL, episodeURL(hrefClean, animeURL: animeURL, baseURL: baseURL) == nil { continue }
             let label = link.text.lowercased()
-            if ["xem phim", "xem ngay", "watch now"].contains(label) || link.marker.contains("btn-episode") { return url }
+            let button = link.marker.split(whereSeparator: \.isWhitespace).contains("btn-episode") || link.marker.contains("watch-now")
+            if ["xem phim", "xem ngay", "watch now"].contains(label) || button { return url }
         }
         return nil
     }
 
-    private static func episodeURL(_ href: String, animeURL: URL, baseURL: URL) -> URL? {
-        guard !href.isEmpty, !href.hasPrefix("#"), !href.hasPrefix("?"),
-              let candidate = absoluteURL(href, relativeTo: baseURL),
-              ["http", "https"].contains(candidate.scheme ?? ""), candidate.query == nil, candidate.fragment == nil else { return nil }
+    static func episodeURL(_ href: String, animeURL: URL, baseURL: URL) -> URL? {
+        let cleanHref = href.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanHref.isEmpty, !cleanHref.hasPrefix("#"), !cleanHref.hasPrefix("?"),
+              !cleanHref.hasPrefix("javascript:"), !cleanHref.hasPrefix("data:") else { return nil }
+        let hrefWithoutFragment = cleanHref.split(separator: "#").first.map(String.init) ?? cleanHref
+        guard let candidate = absoluteURL(hrefWithoutFragment, relativeTo: baseURL),
+              ["http", "https"].contains(candidate.scheme?.lowercased() ?? "") else { return nil }
         let url = rebasedAnimeURL(candidate, baseURL: baseURL)
         guard url.host == baseURL.host else { return nil }
-        let show = animeURL.pathComponents.filter { $0 != "/" }
-        let path = url.pathComponents.filter { $0 != "/" }
-        guard show.count >= 2, path.count >= 3, Array(show.prefix(2)) == Array(path.prefix(2)),
-              url.lastPathComponent.range(of: #"(?i)^(?:xem-phim(?:-[0-9]+)?|(?:tap|ep)-?[0-9]+(?:[.-][0-9]+){0,2}|(?:ova|ona|special|movie|full)(?:-[0-9]+)?)\.html$"#, options: .regularExpression) != nil else { return nil }
+
+        let showComponents = animeURL.pathComponents.filter { $0 != "/" }
+        guard let rawShowSlug = showComponents.last else { return nil }
+        let showSlug = rawShowSlug.replacingOccurrences(of: #"(?i)\.html$"#, with: "", options: .regularExpression)
+        guard !showSlug.isEmpty else { return nil }
+
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+        guard !pathComponents.isEmpty else { return nil }
+        let normalizedPath = pathComponents.map {
+            $0.replacingOccurrences(of: #"(?i)\.html$"#, with: "", options: .regularExpression)
+        }
+        let normalizedShow = showComponents.map {
+            $0.replacingOccurrences(of: #"(?i)\.html$"#, with: "", options: .regularExpression)
+        }
+
+        let matchesShow: Bool
+        if normalizedPath.count >= 2 && normalizedShow.count >= 2 && Array(normalizedShow.prefix(2)) == Array(normalizedPath.prefix(2)) {
+            matchesShow = true
+        } else if normalizedPath.contains(showSlug) {
+            matchesShow = true
+        } else if url.path.contains("/" + showSlug + "/") || url.path.contains("/" + showSlug + "-") || url.path.contains("/" + showSlug + ".html") {
+            matchesShow = true
+        } else if pathComponents.count == 1 {
+            matchesShow = true
+        } else {
+            matchesShow = false
+        }
+        guard matchesShow else { return nil }
+
+        let last = url.lastPathComponent.lowercased()
+        let isEpisodePath = last.range(of: #"(?i)^(?:xem-phim(?:-[0-9a-zA-Z_]+)?|(?:tap|ep)-?[0-9]+(?:[.-][0-9a-zA-Z_]+)*|(?:ova|ona|sp|special|movie|full|trailer)(?:-[0-9a-zA-Z_]+)?)(?:\.html)?$"#, options: .regularExpression) != nil
+            || url.path.lowercased().contains("/xem-phim")
+            || last.contains("tap-") || last.contains("ep-")
+        guard isEpisodePath else { return nil }
         return url
+    }
+
+    static func schedule(from html: String, baseURL: URL) -> [DayOfWeek: [AnimeScheduleItem]] {
+        var result: [DayOfWeek: [AnimeScheduleItem]] = [:]
+        for day in DayOfWeek.allCases { result[day] = [] }
+        var seenIDs = Set<String>()
+
+        let itemPattern = #"(?is)\{\\?["']id\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']slug\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']title\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']coverUrl\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']airTime\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']pubTimeFormat\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']latestEpisode\\?["']:\s*\\?["']([^"']+?)\\?["'],.*?\\?["']status\\?["']:\s*\\?["']([^"']+?)\\?["']"#
+
+        for match in matches(itemPattern, in: html) {
+            guard match.numberOfRanges >= 9 else { continue }
+            let id = substring(html, range: match.range(at: 1))
+            let slug = substring(html, range: match.range(at: 2))
+            let title = cleanText(substring(html, range: match.range(at: 3)))
+            let coverRaw = substring(html, range: match.range(at: 4)).replacingOccurrences(of: "\\/", with: "/")
+            let airTime = cleanText(substring(html, range: match.range(at: 5)))
+            let pubTime = cleanText(substring(html, range: match.range(at: 6)))
+            let latest = cleanText(substring(html, range: match.range(at: 7)))
+            let status = cleanText(substring(html, range: match.range(at: 8)))
+
+            guard !id.isEmpty, !title.isEmpty, seenIDs.insert(id + "|" + pubTime).inserted else { continue }
+            let day = parseDayOfWeek(from: pubTime)
+
+            let animePath = slug.hasPrefix("/") ? slug : "/phim/" + slug
+            let pageURL = URL(string: animePath, relativeTo: baseURL)?.absoluteURL ?? baseURL.appendingPathComponent(slug)
+            let coverURL = URL(string: coverRaw, relativeTo: baseURL)?.absoluteURL
+
+            let anime = Anime(
+                title: title,
+                url: pageURL,
+                imageURL: coverURL,
+                episodeText: latest,
+                quality: "Full HD",
+                score: ""
+            )
+
+            let item = AnimeScheduleItem(
+                id: id,
+                anime: anime,
+                airTime: airTime,
+                pubTimeFormat: pubTime,
+                expectedEpisode: latest,
+                statusText: status,
+                dayOfWeek: day
+            )
+            result[day, default: []].append(item)
+        }
+
+        if result.values.allSatisfy({ $0.isEmpty }) {
+            let cardPattern = #"(?is)<div[^>]*class=[\"'][^\"']*(?:group relative flex flex-col|schedule-item|item-schedule)[^\"']*[\"'][^>]*>(.*?)</div>\s*</div>"#
+            for cardMatch in matches(cardPattern, in: html) {
+                let card = substring(html, range: cardMatch.range)
+                let time = first(#"(?is)(?:Thứ\s+[2-7]|Thứ\s+[a-zA-Z]+|Chủ\s+Nhật|CN)\s+[0-9]{1,2}:[0-9]{2}"#, in: card) ?? ""
+                let status = first(#"(?is)<span[^>]*>(Đã chiếu|Sắp chiếu|Chưa chiếu)</span>"#, in: card) ?? "Sắp chiếu"
+                let href = first(#"(?is)href=[\"']([^\"']+)[\"']"#, in: card) ?? ""
+                let title = first(#"(?is)title=[\"']([^\"']+)[\"']"#, in: card).map(cleanText)
+                    ?? first(#"(?is)<h[2-4][^>]*>(.*?)</h[2-4]>"#, in: card).map(cleanText) ?? ""
+                let cover = imageSource(in: card)
+                let ep = first(#"(?is)<span[^>]*>([Tt]ập\s*[0-9]+)</span>"#, in: card) ?? ""
+
+                guard !title.isEmpty, let pageURL = absoluteURL(href, relativeTo: baseURL) else { continue }
+                let day = parseDayOfWeek(from: time)
+                let itemID = pageURL.path + "|" + time
+                guard seenIDs.insert(itemID).inserted else { continue }
+
+                let anime = Anime(title: title, url: pageURL, imageURL: cover.flatMap { absoluteURL($0, relativeTo: baseURL) },
+                                  episodeText: ep, quality: "Full HD", score: "")
+                let item = AnimeScheduleItem(id: itemID, anime: anime, airTime: time, pubTimeFormat: time, expectedEpisode: ep, statusText: status, dayOfWeek: day)
+                result[day, default: []].append(item)
+            }
+        }
+
+        return result
+    }
+
+    private static func parseDayOfWeek(from text: String) -> DayOfWeek {
+        let t = text.lowercased()
+        if t.contains("hai") || t.contains("thứ 2") || t.contains("t2") { return .monday }
+        if t.contains("ba") || t.contains("thứ 3") || t.contains("t3") { return .tuesday }
+        if t.contains("tư") || t.contains("tu") || t.contains("thứ 4") || t.contains("t4") { return .wednesday }
+        if t.contains("năm") || t.contains("nam") || t.contains("thứ 5") || t.contains("t5") { return .thursday }
+        if t.contains("sáu") || t.contains("sau") || t.contains("thứ 6") || t.contains("t6") { return .friday }
+        if t.contains("bảy") || t.contains("bay") || t.contains("thứ 7") || t.contains("t7") { return .saturday }
+        if t.contains("chủ nhật") || t.contains("chu nhat") || t.contains("cn") { return .sunday }
+        return .monday
     }
 
     static func mergedEpisodes(_ preview: [Episode], _ full: [Episode]) -> [Episode] {

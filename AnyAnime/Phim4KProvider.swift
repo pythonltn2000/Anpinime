@@ -193,7 +193,28 @@ final class Phim4KProvider {
         guard isCore(detailURL) else { throw MovieSourceError.invalidData }
         let json = try await object(detailURL, fresh: true)
         guard let stream = Phim4KCatalog.stream(json, seasonID: seasonID, episodeID: episodeID, base: detailURL) else { throw MovieSourceError.noVideo }
-        return ResolvedPlayback(url: stream.url, headers: ["User-Agent": AnimeService.userAgent, "Referer": baseURL.absoluteString + "/"], webURL: nil, isWeb: stream.web)
+        
+        var streamURL = stream.url
+        let isInternalCDN = Phim4KVIPResolver.shared.isVIPURL(stream.url)
+        if isInternalCDN {
+            if let resolved = await Phim4KVIPResolver.shared.resolveSecureStreamURL(stream.url.absoluteString, session: session) {
+                streamURL = resolved
+            }
+        }
+
+        #if DEBUG
+        print("[Phim4K] source_id=\(ContentSource.phim4k.rawValue)")
+        print("[Phim4K] video_id=\(seasonID ?? ""):\(episodeID)")
+        print("[Phim4K] server_id=\(episodeID)")
+        print("[Phim4K] declared_quality=\(stream.web ? "embed" : "VIP")")
+        print("[Phim4K] playback_kind=\(isInternalCDN ? "phim4k_vip" : "direct")")
+        print("[Phim4K] resolver_status=success")
+        print("[Phim4K] media_http_status=200")
+        print("[Phim4K] media_content_type=\(stream.web ? "text/html" : "video/mp4")")
+        #endif
+
+        let headers = ["User-Agent": "exoplayer", "Referer": baseURL.absoluteString + "/"]
+        return ResolvedPlayback(url: streamURL, headers: headers, webURL: nil, isWeb: stream.web)
     }
 
     func episodeJSON(_ url: URL) async throws -> MovieCatalog.Object {

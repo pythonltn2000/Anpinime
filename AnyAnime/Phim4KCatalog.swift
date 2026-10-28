@@ -136,7 +136,11 @@ enum Phim4KCatalog {
         } else {
             row = (json["videos"] as? [Object] ?? []).first { MovieCatalog.text($0["video_file_id"]) == episodeID }
         }
-        guard let row, let url = MovieCatalog.url(row["file_url"], base: base) else { return nil }
+        guard let row else { return nil }
+        let raw = MovieCatalog.text(row["file_url"]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return nil }
+        let url = MovieCatalog.url(raw, base: base) ?? URL(string: raw)
+        guard let url else { return nil }
         return (url, MovieCatalog.text(row["file_type"]).lowercased().contains("embed"))
     }
 

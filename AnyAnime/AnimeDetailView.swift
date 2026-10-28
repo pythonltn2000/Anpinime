@@ -1,15 +1,25 @@
 import SwiftUI
 
+enum EpisodeLoadStatus: Equatable {
+    case loading
+    case available
+    case unavailable(String)
+    case verificationRequired
+    case networkError(String)
+}
+
 struct AnimeDetailView: View {
     @EnvironmentObject private var service: AnimeService
     let anime: Anime
     @State private var detail: AnimeDetail?
     @State private var loading = true
+    @State private var episodeStatus: EpisodeLoadStatus = .loading
     @State private var message = ""
     @State private var selectedSeason = ""
     @State private var selectedEpisode: Episode?
     @State private var showingServerSheet = false
     @State private var pendingEpisodeNumber: Int? = nil
+    @State private var loadTask: Task<Void, Never>? = nil
 
     private func orderedSeasons(_ episodes: [Episode]) -> [String] {
         episodes.reduce(into: [String]()) { result, ep in
@@ -19,18 +29,22 @@ struct AnimeDetailView: View {
 
     var body: some View {
         ZStack {
-            if loading { LoadingView(text: "Đang tải thông tin phim…") }
-            else if let detail { detailContent(detail) }
-            else {
+            if loading && detail == nil {
+                LoadingView(text: "Đang tải thông tin phim…")
+            } else if let currentDetail = detail {
+                detailContent(currentDetail)
+            } else {
                 EmptyStateView(icon: "exclamationmark.triangle", title: "Không tải được chi tiết", message: message, actionTitle: "Thử lại") {
-                    Task { await load() }
+                    startLoading(forceRefresh: true)
                 }
             }
         }
         .navigationTitle(detail?.title ?? anime.title)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
-        .onChange(of: service.verificationGeneration) { _ in Task { await load() } }
+        .onAppear { startLoading(forceRefresh: false) }
+        .onDisappear { loadTask?.cancel() }
+        .refreshable { await loadAsync(forceRefresh: true) }
+        .onChange(of: service.verificationGeneration) { _ in startLoading(forceRefresh: true) }
         .sheet(isPresented: $showingServerSheet) {
             if let detail {
                 ServerPickerSheet(
@@ -115,62 +129,204 @@ struct AnimeDetailView: View {
                 .frame(height: 235)
                 .clipped()
 
-                if let first = activeEpisodes.first ?? detail.episodes.first {
-                    HStack(spacing: 10) {
-                        Button {
-                            if seasons.count > 1 {
-                                pendingEpisodeNumber = first.number
-                                showingServerSheet = true
-                            } else {
-                                selectedEpisode = first
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "play.fill")
-                                Text(seasons.count > 1 ? "Xem phim · Chọn Server" : "Xem phim")
-                                    .fontWeight(.bold)
-                                    .lineLimit(1)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
+                // Primary Action Button Area
+                playbackActionButton(activeEpisodes: activeEpisodes, detail: detail, seasons: seasons)
 
-                        if seasons.count > 1 {
-                            Button {
-                                pendingEpisodeNumber = first.number
-                                showingServerSheet = true
-                            } label: {
-                                Label("\(seasons.count) SV", systemImage: "server.rack")
-                                    .font(.subheadline.weight(.semibold))
-                                    .padding(.vertical, 4)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.anpinimeAccent)
-                        }
+                if !detail.summary.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Nội dung").font(.headline)
+                        Text(detail.summary)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
-                } else {
-                    Text("Nguồn này chưa có tập phát được.").font(.subheadline).foregroundStyle(.secondary).padding(.horizontal, 16)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Nội dung").font(.headline)
-                    Text(detail.summary)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-
-                if !detail.episodes.isEmpty {
-                    episodeSection(detail.episodes, seasons: seasons, active: activeSeason, visible: activeEpisodes)
-                }
+                // Episodes Section
+                episodesSectionView(detail: detail, seasons: seasons, activeSeason: activeSeason, activeEpisodes: activeEpisodes)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 24)
+        }
+    }
+
+    @ViewBuilder
+    private func playbackActionButton(activeEpisodes: [Episode], detail: AnimeDetail, seasons: [String]) -> some View {
+        HStack(spacing: 10) {
+            if let first = activeEpisodes.first ?? detail.episodes.first {
+                Button {
+                    if seasons.count > 1 {
+                        pendingEpisodeNumber = first.number
+                        showingServerSheet = true
+                    } else {
+                        selectedEpisode = first
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                        Text(seasons.count > 1 ? "Xem phim · Chọn Server" : "Xem phim")
+                            .fontWeight(.bold)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+
+                if seasons.count > 1 {
+                    Button {
+                        pendingEpisodeNumber = first.number
+                        showingServerSheet = true
+                    } label: {
+                        Label("\(seasons.count) SV", systemImage: "server.rack")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.anpinimeAccent)
+                }
+            } else {
+                switch episodeStatus {
+                case .loading:
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.85)
+                        Text("Đang tải danh sách tập…")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+
+                case .verificationRequired:
+                    Button {
+                        startLoading(forceRefresh: true)
+                    } label: {
+                        Label("Yêu cầu xác minh · Thử lại", systemImage: "shield.lefthalf.filled")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+
+                case .networkError:
+                    Button {
+                        startLoading(forceRefresh: true)
+                    } label: {
+                        Label("Lỗi tải tập · Chạm để thử lại", systemImage: "arrow.clockwise")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+
+                case .unavailable(let text):
+                    Text(text)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                case .available:
+                    EmptyView()
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    private func episodesSectionView(detail: AnimeDetail, seasons: [String], activeSeason: String, activeEpisodes: [Episode]) -> some View {
+        switch episodeStatus {
+        case .available:
+            if !detail.episodes.isEmpty {
+                episodeSection(detail.episodes, seasons: seasons, active: activeSeason, visible: activeEpisodes)
+            } else {
+                Text("Nguồn này chưa có tập phát được.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+            }
+
+        case .loading:
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Danh sách tập").font(.headline)
+                HStack(spacing: 10) {
+                    ProgressView().scaleEffect(0.85)
+                    Text("Đang đồng bộ danh sách tập từ máy chủ…")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 12)
+            }
+            .padding(.horizontal, 16)
+
+        case .verificationRequired:
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Danh sách tập").font(.headline)
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.shield")
+                        .font(.title3)
+                        .foregroundColor(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Cần xác thực bảo vệ website")
+                            .font(.caption.weight(.bold))
+                        Text("Vui lòng tải lại hoặc mở lại trang để hoàn tất xác minh.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button("Thử lại") {
+                        startLoading(forceRefresh: true)
+                    }
+                    .buttonStyle(.bordered)
+                    .font(.caption.weight(.semibold))
+                }
+                .padding(12)
+                .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            }
+            .padding(.horizontal, 16)
+
+        case .networkError(let errText):
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Danh sách tập").font(.headline)
+                HStack(spacing: 10) {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.title3)
+                        .foregroundColor(.red)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Không thể tải danh sách tập")
+                            .font(.caption.weight(.bold))
+                        Text(errText)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    Button("Tải lại") {
+                        startLoading(forceRefresh: true)
+                    }
+                    .buttonStyle(.bordered)
+                    .font(.caption.weight(.semibold))
+                }
+                .padding(12)
+                .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            }
+            .padding(.horizontal, 16)
+
+        case .unavailable(let reason):
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Danh sách tập").font(.headline)
+                Text(reason)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
         }
     }
 
@@ -240,20 +396,89 @@ struct AnimeDetailView: View {
         .padding(.horizontal)
     }
 
-    private func load() async {
-        loading = true
-        defer { loading = false }
-        do {
-            let value = try await service.detail(for: anime)
-            detail = value
-            selectedSeason = value.episodes.first?.season ?? ""
-            message = ""
-        } catch {
-            detail = nil
-            message = error.localizedDescription
-            service.register(error)
+    private func startLoading(forceRefresh: Bool) {
+        loadTask?.cancel()
+        loadTask = Task {
+            await loadAsync(forceRefresh: forceRefresh)
         }
     }
+
+    private func loadAsync(forceRefresh: Bool) async {
+        message = ""
+        do {
+            if anime.source.isMovie {
+                loading = detail == nil
+                let full = try await service.detail(for: anime)
+                try Task.checkCancellation()
+                detail = full
+                selectedSeason = full.episodes.first?.season ?? ""
+                episodeStatus = full.episodes.isEmpty ? .unavailable("Nguồn này chưa có tập phát được.") : .available
+                loading = false
+                return
+            }
+
+            // Check existing cache first
+            if !forceRefresh, let cached = service.cachedDetail(for: anime.id) {
+                detail = cached
+                selectedSeason = cached.episodes.first?.season ?? ""
+                episodeStatus = cached.episodes.isEmpty ? .loading : .available
+                loading = false
+                if !cached.episodes.isEmpty { return }
+            } else if detail == nil {
+                // Instantly provide metadata view from anime model so screen is not blank
+                detail = AnimeDetail(title: anime.title, posterURL: anime.imageURL, bannerURL: nil,
+                                     summary: "", info: "", episodes: [])
+                loading = false
+            }
+
+            episodeStatus = .loading
+            let meta = try await service.detailMetadata(for: anime, forceRefresh: forceRefresh)
+            try Task.checkCancellation()
+            detail = meta
+            loading = false
+
+            if !meta.episodes.isEmpty {
+                selectedSeason = meta.episodes.first?.season ?? ""
+                episodeStatus = .available
+            }
+
+            let fullEpisodes = try await service.loadEpisodes(for: anime, initialDetail: meta, forceRefresh: forceRefresh)
+            try Task.checkCancellation()
+
+            if !fullEpisodes.isEmpty {
+                let complete = AnimeDetail(title: meta.title, posterURL: meta.posterURL, bannerURL: meta.bannerURL,
+                                           summary: meta.summary, info: meta.info, episodes: fullEpisodes)
+                detail = complete
+                if selectedSeason.isEmpty || !fullEpisodes.contains(where: { $0.season == selectedSeason }) {
+                    selectedSeason = fullEpisodes.first?.season ?? ""
+                }
+                episodeStatus = .available
+            } else {
+                episodeStatus = .unavailable("Anime này hiện chưa có tập nào trên hệ thống.")
+            }
+        } catch is CancellationError {
+            // Screen dismissed
+        } catch let err as AnimeServiceError {
+            switch err {
+            case .verificationRequired:
+                episodeStatus = .verificationRequired
+            default:
+                if detail == nil || detail?.summary.isEmpty == true {
+                    message = err.localizedDescription
+                }
+                episodeStatus = .networkError(err.localizedDescription)
+            }
+            service.register(err)
+        } catch {
+            if detail == nil || detail?.summary.isEmpty == true {
+                message = error.localizedDescription
+            }
+            episodeStatus = .networkError(error.localizedDescription)
+            service.register(error)
+        }
+        loading = false
+    }
+}
 }
 
 struct ServerPickerSheet: View {

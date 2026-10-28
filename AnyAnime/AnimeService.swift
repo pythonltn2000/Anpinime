@@ -31,6 +31,8 @@ final class AnimeService: ObservableObject {
     private var htmlCache: [URL: (Date, String)] = [:]
     private var htmlRequests: [URL: Task<String, Error>] = [:]
     private var detailCache: [String: (Date, AnimeDetail)] = [:]
+    private var scheduleCache: [DayOfWeek: [AnimeScheduleItem]] = [:]
+    private var scheduleCacheDate = Date.distantPast
     private var homeRequestID = UUID()
     private var homeTask: Task<Void, Never>?
 
@@ -230,40 +232,130 @@ final class AnimeService: ObservableObject {
         return HTMLParser.animes(from: html, baseURL: currentBase)
     }
 
-    func detail(for anime: Anime) async throws -> AnimeDetail {
+    func cachedDetail(for id: String) -> AnimeDetail? {
+        guard let (date, detail) = detailCache[id], Date().timeIntervalSince(date) < 180 else { return nil }
+        return detail
+    }
+
+    func detailMetadata(for anime: Anime, forceRefresh: Bool = false) async throws -> AnimeDetail {
         if anime.source.isMovie { return try await provider(anime.source).detail(anime) }
-        if let (date, detail) = detailCache[anime.id], Date().timeIntervalSince(date) < 120 { return detail }
-        let resolved = await resolver.resolve()
+        if !forceRefresh, let cached = cachedDetail(for: anime.id) {
+            return cached
+        }
+        let resolved = await resolver.resolve(force: forceRefresh)
         let detailURL = HTMLParser.rebasedAnimeURL(anime.url, baseURL: resolved)
         let html = try await fetchHTML(url: detailURL)
         let pageBase = await resolver.resolve()
-        let metadata = HTMLParser.detail(from: html, anime: anime, baseURL: pageBase)
-        var episodes = metadata.episodes
-        if let watchURL = HTMLParser.watchURL(from: html, baseURL: pageBase, animeURL: anime.url), watchURL != detailURL {
-            // Detail pages often contain only a preview of the latest episodes.
-            let watchHTML = try await fetchHTML(url: watchURL)
-            let full = HTMLParser.detail(from: watchHTML, anime: anime, baseURL: pageBase).episodes
-            episodes = HTMLParser.mergedEpisodes(episodes, full)
-            let numbered = full.compactMap(\.number)
-            let appearsTruncated = (numbered.max() ?? 0) > Set(numbered).count
-            if full.count <= 1 || appearsTruncated {
-                // Read the rendered DOM when the server list is populated by JavaScript.
-                let (rendered, renderedURL) = try await website.load(watchURL, waitForEpisodes: true)
-                cacheHTML(rendered, for: watchURL)
-                let dynamic = HTMLParser.detail(from: rendered, anime: anime, baseURL: renderedURL).episodes
-                episodes = HTMLParser.mergedEpisodes(episodes, dynamic)
+        return HTMLParser.detail(from: html, anime: anime, baseURL: pageBase)
+    }
+
+    func loadEpisodes(for anime: Anime, initialDetail: AnimeDetail, forceRefresh: Bool = false) async throws -> [Episode] {
+        if anime.source.isMovie { return initialDetail.episodes }
+        if !forceRefresh, let cached = cachedDetail(for: anime.id), !cached.episodes.isEmpty {
+            return cached.episodes
+        }
+        let resolved = await resolver.resolve(force: forceRefresh)
+        let detailURL = HTMLParser.rebasedAnimeURL(anime.url, baseURL: resolved)
+        var episodes = initialDetail.episodes
+
+        var detailHTML = ""
+        if let cached = cachedHTML(for: detailURL) {
+            detailHTML = cached
+        } else {
+            do {
+                detailHTML = try await fetchHTML(url: detailURL)
+            } catch {
+                detailHTML = ""
             }
-        } else if episodes.count <= 1 {
+        }
+
+        let pageBase = await resolver.resolve()
+        if let watchURL = HTMLParser.watchURL(from: detailHTML, baseURL: pageBase, animeURL: anime.url), watchURL != detailURL {
+            do {
+                let watchHTML = try await fetchHTML(url: watchURL)
+                let full = HTMLParser.detail(from: watchHTML, anime: anime, baseURL: pageBase).episodes
+                episodes = HTMLParser.mergedEpisodes(episodes, full)
+                let numbered = full.compactMap(\.number)
+                let appearsTruncated = (numbered.max() ?? 0) > Set(numbered).count
+                if (episodes.isEmpty || appearsTruncated) && (HTMLParser.containsVerification(watchHTML) || watchHTML.contains("cf-turnstile")) {
+                    let (rendered, renderedURL) = try await website.load(watchURL, waitForEpisodes: true)
+                    cacheHTML(rendered, for: watchURL)
+                    let dynamic = HTMLParser.detail(from: rendered, anime: anime, baseURL: renderedURL).episodes
+                    episodes = HTMLParser.mergedEpisodes(episodes, dynamic)
+                }
+            } catch {
+                if episodes.isEmpty { throw error }
+            }
+        } else if episodes.isEmpty && (HTMLParser.containsVerification(detailHTML) || detailHTML.contains("cf-turnstile")) {
             let (rendered, renderedURL) = try await website.load(detailURL, waitForEpisodes: true)
             cacheHTML(rendered, for: detailURL)
             episodes = HTMLParser.mergedEpisodes(episodes, HTMLParser.detail(from: rendered, anime: anime, baseURL: renderedURL).episodes)
         }
+
+        if !episodes.isEmpty {
+            let merged = AnimeDetail(title: initialDetail.title, posterURL: initialDetail.posterURL,
+                                     bannerURL: initialDetail.bannerURL, summary: initialDetail.summary,
+                                     info: initialDetail.info, episodes: episodes)
+            if detailCache.count >= 40 { detailCache.removeAll() }
+            detailCache[anime.id] = (Date(), merged)
+        }
+        return episodes
+    }
+
+    func detail(for anime: Anime) async throws -> AnimeDetail {
+        if anime.source.isMovie { return try await provider(anime.source).detail(anime) }
+        if let (date, detail) = detailCache[anime.id], Date().timeIntervalSince(date) < 180, !detail.episodes.isEmpty {
+            return detail
+        }
+        let startTime = Date()
+        let metadata = try await detailMetadata(for: anime)
+        let parseStart = Date()
+        let episodes = try await loadEpisodes(for: anime, initialDetail: metadata)
+        let parseMs = Int(Date().timeIntervalSince(parseStart) * 1000)
+
+        #if DEBUG
+        let resolved = await resolver.resolve()
+        print("[Anime] domain=\(resolved.host ?? "")")
+        print("[Anime] detail_status=200")
+        print("[Anime] detail_parse_ms=\(parseMs)")
+        print("[Anime] episode_accepted=\(episodes.count)")
+        print("[Anime] episode_count=\(episodes.count)")
+        print("[Anime] total_detail_ms=\(Int(Date().timeIntervalSince(startTime) * 1000))")
+        #endif
+
         try Task.checkCancellation()
         let detail = AnimeDetail(title: metadata.title, posterURL: metadata.posterURL, bannerURL: metadata.bannerURL,
                                  summary: metadata.summary, info: metadata.info, episodes: episodes)
-        if detailCache.count >= 40 { detailCache.removeAll() }
-        detailCache[anime.id] = (Date(), detail)
+        if !episodes.isEmpty {
+            if detailCache.count >= 40 { detailCache.removeAll() }
+            detailCache[anime.id] = (Date(), detail)
+        }
         return detail
+    }
+
+    func schedule(forceRefresh: Bool = false) async throws -> [DayOfWeek: [AnimeScheduleItem]] {
+        if !forceRefresh, !scheduleCache.isEmpty, Date().timeIntervalSince(scheduleCacheDate) < 600 {
+            return scheduleCache
+        }
+        let resolved = await resolver.resolve(force: forceRefresh)
+        let scheduleURL = resolved.appendingPathComponent("lich-chieu-phim.html")
+        var html = ""
+        do {
+            html = try await fetchHTML(url: scheduleURL)
+        } catch {
+            if let devURL = URL(string: "https://animevietsub.dev/lich-chieu-phim.html") {
+                html = try await fetchHTML(url: devURL)
+            } else {
+                throw error
+            }
+        }
+        let parsed = HTMLParser.schedule(from: html, baseURL: resolved)
+        guard !parsed.values.allSatisfy({ $0.isEmpty }) else {
+            throw AnimeServiceError.emptyData
+        }
+        scheduleCache = parsed
+        scheduleCacheDate = Date()
+        return parsed
     }
 
     func cachedHTML(for url: URL) -> String? {

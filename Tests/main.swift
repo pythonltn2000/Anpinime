@@ -183,3 +183,26 @@ check(bleachEpisodes.count == 1 && bleachEpisodes[0].url.lastPathComponent == "t
 let nguoncMenuHTML = "<nav><a href='/the-loai/phim-hai'>Hài</a><a href='/quoc-gia/my'>Mỹ</a><a href='/nam-phat-hanh/2026'>2026</a><a href='https://phimapi.com/the-loai/foreign'>Foreign</a></nav>"
 let parsedNguoncMenu = MovieBrowseCatalog.nguoncMenu(nguoncMenuHTML)
 check(parsedNguoncMenu.map(\.path) == ["api/films/the-loai/phim-hai", "api/films/quoc-gia/my", "api/films/nam-phat-hanh/2026"], "NguonC website menus convert to its own API routes and discard foreign links")
+
+// Additional regressions for Task 1: AnimeVietsub episode parsing with .html in animeURL and complex titles
+let animeWithHTML = Anime(title: "Bleach", url: animeBase.appendingPathComponent("phim/bleach-sennen-kessen-hen-kashin-tan-a5985.html"), imageURL: nil, episodeText: "", quality: "", score: "")
+let parsedHTMLURL = HTMLParser.detail(from: bleachHTML, anime: animeWithHTML, baseURL: animeBase).episodes
+check(parsedHTMLURL.count == 1 && parsedHTMLURL[0].number == 1, "Anime with .html in animeURL correctly resolves episodes")
+
+let complexEpHTML = "<div class='list-episode'><a class='btn-episode' href='/phim/bleach-sennen-kessen-hen-kashin-tan-a5985/tap-01.html'>Tập 1 - Vietsub Full HD</a><a class='btn-episode' href='/phim/bleach-sennen-kessen-hen-kashin-tan-a5985/tap-02.html'>Tập 2 - Thuyết Minh</a></div>"
+let complexEps = HTMLParser.detail(from: complexEpHTML, anime: animeWithHTML, baseURL: animeBase).episodes
+check(complexEps.count == 2 && complexEps[0].number == 1 && complexEps[1].number == 2, "Complex episode titles like 'Tập 1 - Vietsub Full HD' are properly extracted")
+
+// Additional regressions for Task 2: Native Schedule timetable parsing
+let scheduleNextJSHTML = "<html><script>self.__next_f.push([1,\"{\\\"t2\\\":[{\\\"id\\\":\\\"1\\\",\\\"title\\\":\\\"Anime Thứ 2\\\",\\\"time\\\":\\\"23:00\\\",\\\"episode\\\":\\\"12\\\",\\\"slug\\\":\\\"anime-thu-2\\\",\\\"thumb\\\":\\\"https://img.example/t2.jpg\\\",\\\"status\\\":\\\"Đã chiếu\\\"}],\\\"cn\\\":[{\\\"id\\\":\\\"2\\\",\\\"title\\\":\\\"Anime Chủ Nhật\\\",\\\"time\\\":\\\"18:00\\\",\\\"episode\\\":\\\"05\\\",\\\"slug\\\":\\\"anime-chu-nhat\\\",\\\"thumb\\\":\\\"https://img.example/cn.jpg\\\",\\\"status\\\":\\\"Sắp chiếu\\\"}]}\"])</script></html>"
+let scheduleParsed = HTMLParser.schedule(from: scheduleNextJSHTML, baseURL: animeBase)
+check(scheduleParsed[.monday]?.count == 1 && scheduleParsed[.monday]?[0].anime.title == "Anime Thứ 2", "Schedule parses Monday Next.js streaming hydration payload")
+check(scheduleParsed[.sunday]?.count == 1 && scheduleParsed[.sunday]?[0].statusText == "Sắp chiếu", "Schedule parses Sunday Next.js streaming hydration payload")
+
+// Additional regressions for Task 3: Phim4K VIP Resolver file ID and Gateway URL signing
+check(Phim4KVIPResolver.extractFileID(from: URL(string: "https://cdn.phim4k.lol/E6E8NBA94K72")!) == "E6E8NBA94K72", "Phim4KVIPResolver extracts file ID from CDN URL")
+check(Phim4KVIPResolver.extractFileID(from: URL(string: "https://sv.p4kzz.workers.dev/api/v2/stream/E6E8NBA94K72")!) == "E6E8NBA94K72", "Phim4KVIPResolver extracts file ID from worker path")
+check(Phim4KVIPResolver.extractFileID(from: URL(string: "https://cdn.phim4k.lol/original-a")!) == "original-a", "Phim4KVIPResolver extracts slug file ID")
+let signedVIP = Phim4KVIPResolver.buildGatewayURL(fileID: "E6E8NBA94K72", timestamp: 1774320000)
+check(signedVIP.host == "svatv.cryboiz.workers.dev" && signedVIP.query?.contains("auth=") == true, "VIP signed gateway URL contains auth token and valid worker host")
+print("All extended repair regressions passed successfully!")

@@ -523,10 +523,24 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 return PlaybackChoice(id: id, title: option.displayName)
             }
         }
+        #if DEBUG
+        if episode.source == .phim4k {
+            print("[Phim4K] audio_track_count=\(playback.audioTracks.count)")
+            print("[Phim4K] subtitle_track_count=\(playback.subtitleTracks.count)")
+            print("[Phim4K] audio_selected=\(playback.audioTrack)")
+            print("[Phim4K] subtitle_selected=\(playback.subtitleTrack)")
+        }
+        #endif
     }
 
     private func chooseOption(_ kind: String, id: String) {
         guard active else { return }
+        #if DEBUG
+        if episode.source == .phim4k {
+            if kind == "audio" { print("[Phim4K] audio_selected=\(id)") }
+            if kind == "subtitles" { print("[Phim4K] subtitle_selected=\(id)") }
+        }
+        #endif
         if let mpvController { mpvController.choose(kind, id: id); return }
         guard let item = playerController?.player?.currentItem else {
             let payload = ["type": "AnPinimeCommand", "name": "track", "kind": kind, "id": id]
