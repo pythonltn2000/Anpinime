@@ -156,6 +156,7 @@ check(MovieCatalog.episodeRow(reordered, serverName: "Missing", key: "tap-1") ==
 
 let commentFixture = try String(contentsOfFile: "Tests/Fixtures/anime-episodes-comments.html", encoding: .utf8)
 let commentDetail = HTMLParser.detail(from: commentFixture, anime: animeFixture, baseURL: animeBase)
+print("DEBUG commentDetail titles: \(commentDetail.episodes.map(\.title))")
 check(commentDetail.episodes.map(\.title) == ["1", "Tập 2", "OVA 1"], "Anime excludes login redirects, usernames, comment permalinks, quoted episodes and script strings")
 check(commentDetail.episodes.allSatisfy { $0.season == "Vietsub" }, "Anime preserves server identity from the actual episode container")
 check(HTMLParser.watchURL(from: commentFixture, baseURL: animeBase, animeURL: animeFixture.url)?.path == "/phim/series-a1/xem-phim.html", "Watch-page discovery skips login redirects and comment links")
