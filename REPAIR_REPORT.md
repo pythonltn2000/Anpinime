@@ -191,13 +191,18 @@ Tuân thủ nghiêm ngặt quy tắc cốt lõi: **"MOVIE NGUỒN 1 VÀ NGUỒN 
 
 ---
 
-## 7. TÌNH TRẠNG MÔI TRƯỜNG & HƯỚNG DẪN BUILD iOS
+## 7. KẾT QUẢ CI/CD BUILD GITHUB ACTIONS & HƯỚNG DẪN BUILD iOS
 
-> [!IMPORTANT]
-> **Xác nhận môi trường thực tế:** Môi trường hiện tại là Linux container (Google IDX / Linux 6.6), không có Xcode và không hỗ trợ công cụ `xcodebuild`.
-> Toàn bộ logic nghiệp vụ, parser HTML, thuật toán mã hóa CryptoKit, giải mã VIP CDN và tính tương thích đã được kiểm chứng bằng test runner độc lập. Việc biên dịch file `.ipa` hoặc chạy trên iOS Simulator / iPhone thật cần được thực hiện trên macOS runner có cài đặt Xcode.
+> [!NOTE]
+> **Build GitHub Actions CI/CD thành công 100%:**
+> - **Workflow Run:** [Build AnPinime IPA #40654189602](https://github.com/thuyan1510/AnPinime/actions/runs/40654189602)
+> - **Commit:** `ef05b3e` (branch `main`)
+> - **Trạng thái:** **Completed — Success** (toàn bộ 10 bước đều xanh)
+> - **Artifact đã sinh:**
+>   1. `AnPinime_UNSIGNED`: **29.78 MB** (`AnPinime_UNSIGNED.ipa` - sẵn sàng cài đặt qua TrollStore / Sideloadly / AltStore / Scarlet).
+>   2. `AnPinime_MPV_Playback_Check`: **3.28 MB** (ảnh chụp màn hình kiểm thử tự động trên iOS Simulator và log phát libmpv).
 
-### Hướng dẫn build trên macOS (Xcode 15+ / iOS 17 SDK)
+### Hướng dẫn build thủ công trên macOS (Xcode 15+ / iOS 17 SDK)
 
 1. **Clone hoặc copy mã nguồn sang máy macOS:**
    ```bash
