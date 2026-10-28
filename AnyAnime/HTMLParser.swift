@@ -102,7 +102,7 @@ enum HTMLParser {
                 continue
             }
 
-            let numberText = first(#"(?i)(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?([0-9]+)"#, in: rawTitle)
+            let numberText = first(#"(?i)^(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?([0-9]+)"#, in: rawTitle)
             let number = numberText.flatMap(Int.init)
             let season = link.attributes["data-server"] ?? link.attributes["data-server-name"]
                 ?? link.attributes["data-season"] ?? link.attributes["data-season-id"]
