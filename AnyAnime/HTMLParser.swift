@@ -89,16 +89,15 @@ enum HTMLParser {
                   let url = episodeURL(href, animeURL: anime.url, baseURL: baseURL) else { continue }
             candidateCount += 1
             let rawTitle = link.text
-            let episodeLabel = rawTitle.range(of: #"(?i)^(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?[0-9]+(?:[.,][0-9]+)?(?:[ ._-]*(?:end|cuối|final))?$|^(?:ova|ona|sp|special|movie|full|trọn bộ|trailer)(?:[ .:_-]*[0-9]+)?$"#, options: .regularExpression) != nil
+            let episodeLabel = rawTitle.range(of: #"(?i)^(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?[0-9]+(?:[.,][0-9]+)?(?:[ ._-]*(?:end|cuối|final|vietsub|thuyết minh|thuyet minh|raw|lồng tiếng|long tieng|full|hd|[a-zA-Z0-9 -]+))?$|^(?:ova|ona|sp|special|tập đặc biệt|tap dac biet|movie|full|trọn bộ|trailer)(?:[ .:_-]*[0-9]+)?$"#, options: .regularExpression) != nil
             let button = link.marker.split(whereSeparator: \.isWhitespace).contains("btn-episode")
             let episodeContainer = link.ancestors.contains {
                 $0.marker.range(of: #"(?:list-episode|episode-list|episodes|server-list|list-server|episodios|halim-list-eps)"#, options: .regularExpression) != nil
             }
-            let hash = !(link.attributes["data-hash"] ?? "").isEmpty
-            let hasNumber = rawTitle.range(of: #"[0-9]+"#, options: .regularExpression) != nil
+            let hash = !(link.attributes["data-hash"] ?? "").isEmpty && !(link.attributes["data-hash"]?.lowercased().contains("user") ?? false)
 
-            // Accept if marked as episode button/container/hash, or if the label clearly designates an episode
-            guard (button || episodeContainer || hash) || (episodeLabel && hasNumber) else {
+            // A watch URL in a login redirect or a comment permalink is not an episode.
+            guard episodeLabel, button || episodeContainer || hash else {
                 rejectedCount += 1
                 continue
             }
