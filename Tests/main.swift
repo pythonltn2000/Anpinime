@@ -256,3 +256,25 @@ let escapedNested = String(data: encodedNested, encoding: .utf8)!.dropFirst().dr
 let nestedPage = "<script>self.__next_f.push([1," + escapedNested + "])</script>"
 let nestedItems = HTMLParser.schedule(from: nestedPage, baseURL: animeBase)
 check(nestedItems[.wednesday]?.first?.anime.title == "Anime {đặc biệt}", "Schedule JSON preserves nested objects and braces inside strings")
+
+let animeSettings = UserDefaults(suiteName: "AnPinime.AnimeSiteTests")!
+animeSettings.removePersistentDomain(forName: "AnPinime.AnimeSiteTests")
+check(AnimeSiteConfiguration.normalizedBase("https://animevitsub..news") == nil, "Invalid anime host with empty labels is rejected")
+animeSettings.set("https://animevietsub.news", forKey: "AnPinime.phim4kURL")
+check(AnimeSiteConfiguration.migrateMisplacedURL(defaults: animeSettings), "Misplaced anime URL is moved to the anime setting")
+check(AnimeSiteConfiguration.selectedURL(defaults: animeSettings)?.host == "animevietsub.news" && animeSettings.string(forKey: "AnPinime.phim4kURL") == nil, "Anime URL cannot remain a Phim4K Free override")
+animeSettings.set("https://free.example", forKey: "AnPinime.phim4kURL")
+check(!AnimeSiteConfiguration.migrateMisplacedURL(defaults: animeSettings) && animeSettings.string(forKey: "AnPinime.phim4kURL") == "https://free.example", "A real Free override remains independent")
+let latestWatchHTML = "<a class='watch-now' href='/phim/series-a1/tap-10-10010.html'>Xem phim</a>"
+check(HTMLParser.watchURL(from: latestWatchHTML, baseURL: animeBase, animeURL: animeFixture.url)?.lastPathComponent == "tap-10-10010.html", "Watch discovery accepts the real latest-episode link")
+let canonicalHTML = "<link rel='canonical' href='/phim/renamed-series-a1/'><div class='list-episode'><a href='/phim/renamed-series-a1/tap-1.html'>1</a></div>"
+check(HTMLParser.detail(from: canonicalHTML, anime: animeFixture, baseURL: animeBase).episodes.count == 1, "Canonical alias with the same anime ID retains episodes")
+let differentCanonical = canonicalHTML.replacingOccurrences(of: "renamed-series-a1", with: "another-series-a2")
+check(HTMLParser.detail(from: differentCanonical, anime: animeFixture, baseURL: animeBase).episodes.isEmpty, "Canonical links cannot select another anime ID")
+check(!HTMLParser.containsVerification("<title>Anime</title><meta property='og:image' content='poster.jpg'><h1>Anime</h1><a>Xem phim</a><section id='comments'><div class='cf-turnstile'></div></section>"), "A comment captcha does not hide a real anime detail page")
+
+let reorderedPayload: [String: Any] = ["episodes": [["number": 1, "episodeId": "real-1"], ["number": 2, "episodeId": "real-2"]], "animeSlugOrId": "luc-do-toi-da-chuyen-sinh-thanh-slime-s4-2342192"]
+let payloadText = String(data: try JSONSerialization.data(withJSONObject: reorderedPayload, options: [.prettyPrinted, .sortedKeys]), encoding: .utf8)!
+let payloadLiteral = String(data: try JSONSerialization.data(withJSONObject: [payloadText]), encoding: .utf8)!.dropFirst().dropLast()
+let reorderedHTML = "<div class='episode-list'><a href='/xem-phim/luc-do-toi-da-chuyen-sinh-thanh-slime-s4-2342192/tap-1'>Tập 1</a></div><script>self.__next_f.push([1," + payloadLiteral + "])</script>"
+check(HTMLParser.detail(from: reorderedHTML, anime: nextShow, baseURL: animeBase).episodes.count == 2, "Streamed episodes decode JSON regardless of property order and whitespace")

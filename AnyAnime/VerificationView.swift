@@ -142,7 +142,7 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard navigationAction.targetFrame?.isMainFrame == true else { decisionHandler(.allow); return }
         let host = navigationAction.request.url?.host?.lowercased() ?? ""
-        let allowed = host == targetURL?.host || host.hasPrefix("animevietsub.") || host.hasPrefix("www.animevietsub.")
+        let allowed = host == targetURL?.host || AnimeSiteConfiguration.isAutomaticHost(host)
         decisionHandler(allowed ? .allow : .cancel)
     }
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,

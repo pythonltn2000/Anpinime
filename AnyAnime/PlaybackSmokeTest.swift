@@ -5,7 +5,7 @@ enum PlaybackSmokeTest {
     static var enabled: Bool {
         mpvFixture || ProcessInfo.processInfo.arguments.contains("--playback-smoke") || webOnly || movieSource != nil
     }
-    static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") }
+    static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") && !liveSource2 }
     static var webOnly: Bool { ProcessInfo.processInfo.arguments.contains("--web-playback-smoke") }
     static var providerFixture: Bool { ProcessInfo.processInfo.arguments.contains("--movie-provider-smoke") || ProcessInfo.processInfo.arguments.contains("--phim4k-provider-smoke") }
     static var movieSource: ContentSource? {
@@ -31,6 +31,11 @@ enum PlaybackSmokeTest {
                       playback.secondarySubtitleTrack == subtitles[1].id else { return }
                 result["mkvAudioAndDualSubtitlesVerified"] = true
                 result["autoplayVerified"] = true
+            }
+            if liveSource2 {
+                guard playback.playing else { return }
+                result["sample"] = "Phim4K Free1 / thuong-nguyen-do"
+                result["mediaInfo"] = playback.mediaInfo
             }
             result["audioChoices"] = playback.audioTracks.count
             result["subtitleChoices"] = playback.subtitleTracks.count
@@ -83,11 +88,17 @@ private struct MovieSmokeView: View {
                     .task {
                         do {
                             service.selectSource(source)
-                            await service.loadHome()
-                            let items = service.homeSections.flatMap(\.items)
-                            // An explicit repeatable live sample, not a silent fallback in production.
-                            let sample = PlaybackSmokeTest.liveSource2 ? items.first(where: { $0.url.lastPathComponent == "thuong-nguyen-do" }) : items.first
-                            guard let item = sample else { throw MovieSourceError.unavailable(service.status) }
+                            let items: [Anime]
+                            if PlaybackSmokeTest.liveSource2 {
+                                // Fixed public Free1 sample. This is never used as a production fallback for VIP.
+                                items = try await service.search("Thương Nguyên Đồ", source: .phim4k).filter {
+                                    $0.catalogLabel == "Phim4K · Free1" && $0.url.lastPathComponent == "thuong-nguyen-do"
+                                }
+                            } else {
+                                await service.loadHome()
+                                items = service.homeSections.flatMap(\.items)
+                            }
+                            guard let item = items.first else { throw MovieSourceError.unavailable(service.status) }
                             detail = try await service.detail(for: item)
                         } catch { self.error = error.localizedDescription }
                     }

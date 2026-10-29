@@ -115,3 +115,41 @@ The new intro is the user's original MP4, copied without transcoding. Anime
 schedule uses the source's actual /lich-chieu-phim.html page, including its day
 selectors, rather than an invented timetable. Duplicate HTML loads share one
 request and cached episode pages can be reused by the player.
+
+## Free catalog/configuration repair — 2026-10-29
+
+The app's manual Free URL previously replaced the entire source-2 configuration
+with `core:nil` and one catalog. This made Core and the other Free catalog vanish
+when the user saved any manual URL. `applyingCatalogOverride` now replaces only
+the selected Free ID. Clearing it restores the app directory configuration;
+AnimeVietsub hosts are rejected in this setting. Partial bootstrap updates merge
+with known configuration so omitted Free2 values do not erase the last address.
+
+Bounded public checks on 2026-10-29 (read-only, two details and one media sample):
+`free.cryboiz.workers.dev/danh-sach/phim-moi-cap-nhat-v3` returned 200.
+`/phim/thuong-nguyen-do` returned 100 Vietsub episodes, and `/phim/xom-nho`
+returned six. Each selected row used its original `link` at
+`sf.phim4k.space/api/content/stream/hls`; query values and media URLs are not
+included here. The Thương Nguyên Đồ sample returned a 28,277-byte HLS playlist;
+its first media request returned 200, `video/mp2t`, and an MPEG-TS sync byte 0x47.
+Prefix requests with `oxoo`, `exoplayer`, and the existing Safari user agent all
+returned HLS; this does not establish a need to change the Free user agent.
+These are network/media-format observations, not proof of iPhone playback.
+
+The stored Free2 hostname failed DNS in this environment. The Core detail sample
+returned HTTP 403 with HTML/Cloudflare using both stored and default public client
+configuration; this does not prove an account authorization failure. No origin
+credentials, signing material or fake token were recovered or installed.
+
+Existing static evidence identifies `/link_play` at image-relative 0x72ab30 as a
+separate flow built on the fixed `khanggtivi.xyz/api/` live-TV service with a
+`play_urls` model. It is not evidence of the Core movie VIP resolver and has not
+been grafted onto it. The previously documented VIP resolver at 0x6d3a28 remains
+unverified without a legitimate active URL/session. Full original-app parity and
+live VIP video/audio/subtitle playback therefore remain unproven.
+
+REA 6.8.0 archive inventory was run using the existing Node 22.21.1 binary
+(Node 20's zlib lacked the required zstd export). Evidence ID
+`ev_bbe18dcb4952bd6b65047d4096c62c51bd40ce67abd55696ff5b8bd0f4825aa3`
+confirms the supplied IPA SHA-256 above via `rea-artifact-graph`. This inventory
+is static package evidence only; it does not establish runtime VIP behavior.

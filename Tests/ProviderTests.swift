@@ -59,6 +59,9 @@ final class ProviderProtocol: URLProtocol {
                     ["video_file_id": "b", "label": "1080P", "file_type": "mp4", "file_url": "https://vip.example/original.mp4"]]]
             default: body = [movie]
             }
+        } else if host == "free1.example", path.hasPrefix("/phim/") {
+            body = ["movie": ["name": "Free1 original"], "episodes": [["server_name": "Vietsub", "server_data": [
+                ["name": "Tập 01", "slug": "tap-01", "link": "https://stream.example/api/content/stream/hls?movie=shared-slug&server=Vietsub&slug=tap-01"]]]]]
         } else if path.hasPrefix("/phim/") || path.hasPrefix("/api/film/") {
             let rows: [[String: Any]] = [["name": "01", "slug": "tap-1", "link_m3u8": "https://" + host + "/movie.m3u8", "link_embed": "https://" + host + "/advertising-player"]]
             body = ["movie": ["name": host], "episodes": [["server_name": "Vietsub", "server_data": rows]]]
@@ -93,6 +96,13 @@ struct ProviderTests {
             .init(id: "free1", url: URL(string: "https://free1.example")!, format: .free1),
             .init(id: "free2", url: URL(string: "https://free2.example")!, format: .free2)
         ])
+        let overridden = try Phim4KProvider.applyingCatalogOverride("https://custom-free.example", format: .free1, to: source2)
+        require(overridden.core?.baseURL == source2.core?.baseURL && overridden.catalogs.map(\.id) == ["free1", "free2"], "Manual Free override preserves Core and both original catalog identities")
+        require(overridden.catalogs[0].url.host == "custom-free.example" && overridden.catalogs[1].url.host == "free2.example", "Manual Free override replaces only its selected catalog")
+        let restoredAutomatic = try Phim4KProvider.applyingCatalogOverride("", format: .free1, to: source2)
+        require(restoredAutomatic.catalogs[0].url.host == "free1.example", "Clearing the manual URL restores the original-app Free configuration")
+        do { _ = try Phim4KProvider.applyingCatalogOverride("https://custom-free.example/?token=x", format: .free1, to: source2); fatalError("Expected signed override rejection") } catch {}
+        do { _ = try Phim4KProvider.applyingCatalogOverride("https://animevietsub.news", format: .free1, to: source2); fatalError("Expected anime host rejection") } catch {}
         for (source, host, category) in [(ContentSource.film4k, "phim.nguonc.com", "api/films/the-loai/hanh-dong"),
                                          (.kkphim, "phimapi.com", "v1/api/the-loai/hanh-dong")] {
             ProviderProtocol.reset()
@@ -140,6 +150,11 @@ struct ProviderTests {
         require(Set(captured.compactMap { $0.url?.host }) == ["core.example", "free1.example", "free2.example", "vip.example"], "Source 2 never directly queries NguonC or KKPhim")
         require(captured.filter { $0.url?.host != "core.example" }.allSatisfy { $0.value(forHTTPHeaderField: "API-KEY") == nil }, "Core API credentials stay on the Core host")
         require(captured.filter { $0.url?.host == "core.example" }.allSatisfy { $0.value(forHTTPHeaderField: "API-KEY") == "fixture-key" }, "Core app requests retain the required API header")
+        let freeDetail = try await app.detail(search[1])
+        let freePlayback = try await app.resolve(freeDetail.episodes[0])
+        require(!freePlayback.isWeb && freePlayback.url.host == "stream.example" && freePlayback.url.path == "/api/content/stream/hls", "Free1 uses its actual app HLS endpoint rather than an embed")
+        require(URLComponents(url: freePlayback.url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "slug" })?.value == "tap-01", "Free1 preserves the selected server and episode query")
+        require(freePlayback.headers["Origin"] == "https://free1.example" && freePlayback.headers["API-KEY"] == nil, "Free playback keeps its catalog origin without leaking Core credentials")
         ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 403; ProviderProtocol.mediaGetStatus = 403; ProviderProtocol.lock.unlock()
         do { _ = try await app.resolve(detail.episodes[0]); fatalError("Expected auth error") }
         catch { require(error.localizedDescription.contains("AUTH_REQUIRED"), "VIP 403 surfaces AUTH_REQUIRED without fallback") }

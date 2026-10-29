@@ -41,24 +41,39 @@ final class Phim4KProvider {
                 return fixture
             }
             #endif
+            await MovieSourceDirectory.refresh(session: session)
+            try Task.checkCancellation()
+            let original = Configuration(core: MovieSourceDirectory.coreAPI(), catalogs: MovieSourceDirectory.catalogs().map {
+                Catalog(id: $0.id, url: $0.url, format: $0.format)
+            })
             let custom = UserDefaults.standard.string(forKey: "AnPinime.phim4kURL")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if !custom.isEmpty {
-                guard let url = URL(string: custom), url.scheme == "https", url.host != nil,
-                      url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else {
-                    throw MovieSourceError.unavailable("Địa chỉ Phim4K phải là URL HTTPS hợp lệ.")
-                }
-                let format = Phim4KFormat(rawValue: UserDefaults.standard.string(forKey: "AnPinime.phim4kFormat") ?? "") ?? .free1
-                result = Configuration(core: nil, catalogs: [Catalog(id: format.rawValue, url: url, format: format)])
-            } else {
-                await MovieSourceDirectory.refresh(session: session)
-                try Task.checkCancellation()
-                result = Configuration(core: MovieSourceDirectory.coreAPI(), catalogs: MovieSourceDirectory.catalogs().map {
-                    Catalog(id: $0.id, url: $0.url, format: $0.format)
-                })
-            }
+            let format = Phim4KFormat(rawValue: UserDefaults.standard.string(forKey: "AnPinime.phim4kFormat") ?? "") ?? .free1
+            result = try Self.applyingCatalogOverride(custom, format: format, to: original)
         }
         configuration = result
         return result
+    }
+
+    /// A manual Free catalog URL replaces only that catalog. Core and the
+    /// other original-app Free catalog remain available and retain their IDs.
+    static func applyingCatalogOverride(_ raw: String, format: Phim4KFormat, to original: Configuration) throws -> Configuration {
+        let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return original }
+        guard let url = URL(string: clean), url.scheme == "https", let host = url.host, host.contains("."),
+              url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else {
+            throw MovieSourceError.unavailable("Địa chỉ kho Free của Phim4K phải là URL HTTPS hợp lệ.")
+        }
+        let labels = host.lowercased().split(separator: ".")
+        let isAnimeHost = (labels.count == 2 && labels[0] == "animevietsub") ||
+            (labels.count == 3 && labels[0] == "www" && labels[1] == "animevietsub")
+        guard !isAnimeHost else {
+            throw MovieSourceError.unavailable("Đây là địa chỉ AnimeVietsub. Hãy cập nhật trong cài đặt Anime, không dùng làm kho Free Phim4K.")
+        }
+        let replacement = Catalog(id: format.rawValue, url: url, format: format)
+        var catalogs = original.catalogs
+        if let index = catalogs.firstIndex(where: { $0.id == format.rawValue }) { catalogs[index] = replacement }
+        else { catalogs.append(replacement) }
+        return Configuration(core: original.core, catalogs: catalogs)
     }
 
     func home(onInitial: ([AnimeSection]) -> Void) async throws -> [AnimeSection] {

@@ -4,7 +4,7 @@ import Foundation
 final class AnimeService: ObservableObject {
     static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
-    @Published private(set) var baseURL = URL(string: "https://animevietsub.vip/")!
+    @Published private(set) var baseURL = AnimeSiteConfiguration.selectedURL() ?? URL(string: "https://animevietsub.vip/")!
     @Published private(set) var homeSections: [AnimeSection] = []
     @Published private(set) var homeLoading = false
     @Published private(set) var status = "Đang xác định máy chủ AnimeVietsub…"
@@ -29,7 +29,7 @@ final class AnimeService: ObservableObject {
     }
     private var homeCache: [ContentSource: HomeSnapshot] = [:]
     private var htmlCache: [URL: (Date, String)] = [:]
-    private var htmlRequests: [URL: Task<String, Error>] = [:]
+    private var htmlRequests: [URL: (UUID, Task<String, Error>)] = [:]
     private var detailCache: [String: (Date, AnimeDetail)] = [:]
     private var scheduleCache: [DayOfWeek: [AnimeScheduleItem]] = [:]
     private var scheduleCacheDate = Date.distantPast
@@ -79,7 +79,7 @@ final class AnimeService: ObservableObject {
         homeLoading = cached == nil
         status = "Đang kết nối \(value.subtitle)…"
         if value.isMovie { baseURL = provider(value).baseURL }
-        else { baseURL = URL(string: "https://animevietsub.vip")! }
+        else { baseURL = AnimeSiteConfiguration.selectedURL() ?? URL(string: "https://animevietsub.vip")! }
         if let cached {
             baseURL = cached.baseURL
             status = cached.notice
@@ -90,6 +90,21 @@ final class AnimeService: ObservableObject {
             guard let self else { return }
             await self.performLoadHome(generation: generation, selectedSource: value, forceDomainRefresh: false)
         }
+    }
+
+    func reloadAnimeSource() async {
+        guard source == .anime else { return }
+        homeTask?.cancel(); homeTask = nil
+        await resolver.invalidate()
+        guard source == .anime else { return }
+        homeRequestID = UUID()
+        homeCache[.anime] = nil
+        homeSections = []
+        for (_, task) in htmlRequests.values { task.cancel() }
+        htmlRequests.removeAll(); htmlCache.removeAll(); detailCache.removeAll()
+        scheduleCache.removeAll(); scheduleCacheDate = .distantPast
+        imageGeneration += 1
+        await loadHome(forceDomainRefresh: true)
     }
 
     private func provider(_ source: ContentSource) -> MovieProvider {
@@ -109,6 +124,8 @@ final class AnimeService: ObservableObject {
     }
 
     init() {
+        AnimeSiteConfiguration.migrateMisplacedURL()
+        if let custom = AnimeSiteConfiguration.selectedURL() { baseURL = custom }
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 45
@@ -410,14 +427,15 @@ final class AnimeService: ObservableObject {
     private func fetchHTML(url: URL) async throws -> String {
         try Task.checkCancellation()
         if let html = cachedHTML(for: url) { return html }
-        if let pending = htmlRequests[url] {
+        if let (_, pending) = htmlRequests[url] {
             let html = try await pending.value
             try Task.checkCancellation()
             return html
         }
         let task = Task { try await fetchHTMLWithRetry(url: url) }
-        htmlRequests[url] = task
-        defer { htmlRequests[url] = nil }
+        let requestID = UUID()
+        htmlRequests[url] = (requestID, task)
+        defer { if htmlRequests[url]?.0 == requestID { htmlRequests[url] = nil } }
         let html = try await task.value
         try Task.checkCancellation()
         return html
@@ -447,7 +465,9 @@ final class AnimeService: ObservableObject {
         if let (date, html) = htmlCache[url], Date().timeIntervalSince(date) < 120 { return html }
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 15)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue(baseURL.absoluteString, forHTTPHeaderField: "Referer")
+        var origin = URLComponents(url: url, resolvingAgainstBaseURL: true)
+        origin?.path = "/"; origin?.query = nil; origin?.fragment = nil
+        request.setValue(origin?.url?.absoluteString ?? url.absoluteString, forHTTPHeaderField: "Referer")
         let requestStart = Date()
         let (data, response) = try await session.data(for: request)
         try Task.checkCancellation()

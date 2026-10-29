@@ -34,7 +34,9 @@ enum MovieSourceDirectory {
             let box = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: iv), ciphertext: sealed.dropLast(16), tag: sealed.suffix(16))
             let decoded = try MovieCatalog.object(AES.GCM.open(box, using: key))
             guard let config = decoded["data"] as? MovieCatalog.Object else { throw MovieSourceError.invalidData }
-            var updated: [String: String] = [:]
+            // A partial bootstrap response must not erase an already-known
+            // Free2 catalog or a valid Core configuration.
+            var updated = UserDefaults.standard.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
             for name in ["free1", "free2", "api"] {
                 if let value = config[name] as? String, let url = address(value) { updated[name] = url.absoluteString }
             }

@@ -658,6 +658,8 @@ struct AppSettingsView: View {
     @AppStorage("AnPinime.autoNext") private var autoNext = true
     @AppStorage("AnPinime.rememberSpeed") private var rememberSpeed = true
     @AppStorage("AnPinime.skipSeconds") private var skipSeconds = 10
+    @State private var animeURL = UserDefaults.standard.string(forKey: AnimeSiteConfiguration.customURLKey) ?? ""
+    @State private var animeSourceMessage = ""
     @State private var phim4kURL = UserDefaults.standard.string(forKey: "AnPinime.phim4kURL") ?? ""
     @State private var phim4kFormat = Phim4KFormat(rawValue: UserDefaults.standard.string(forKey: "AnPinime.phim4kFormat") ?? "") ?? .free1
     @State private var sourceMessage = ""
@@ -685,7 +687,25 @@ struct AppSettingsView: View {
                 Button("Làm mới danh sách và kết nối") { Task { await service.loadHome(forceDomainRefresh: true) } }
                     .disabled(service.homeLoading)
             }
-            if service.source.isMovie {
+            if service.source == .anime {
+                Section {
+                    TextField("https://…", text: $animeURL)
+                        .keyboardType(.URL).textInputAutocapitalization(.never).disableAutocorrection(true)
+                    Button("Lưu website anime") {
+                        let value = animeURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !value.isEmpty && AnimeSiteConfiguration.normalizedBase(value) == nil {
+                            animeSourceMessage = "Nhập địa chỉ gốc HTTPS của website, không kèm đường dẫn hoặc tham số."
+                            return
+                        }
+                        UserDefaults.standard.set(value, forKey: AnimeSiteConfiguration.customURLKey)
+                        animeSourceMessage = value.isEmpty ? "Đã chọn tìm tên miền tự động." : "Đã lưu website anime."
+                        Task { await service.reloadAnimeSource() }
+                    }.disabled(service.homeLoading)
+                    if !animeSourceMessage.isEmpty { Text(animeSourceMessage).font(.footnote).foregroundStyle(.secondary) }
+                } header: { Text("Website anime") }
+                  footer: { Text("Địa chỉ này dùng chung cho danh sách, tìm kiếm, thông tin, tập phim và lịch chiếu anime. Để trống để tìm tên miền tự động.") }
+            }
+            if service.source == .phim4k {
                 Section {
                     TextField("https://…", text: $phim4kURL)
                         .keyboardType(.URL).textInputAutocapitalization(.never).disableAutocorrection(true)
@@ -700,6 +720,10 @@ struct AppSettingsView: View {
                                 sourceMessage = "Hãy nhập URL HTTPS hợp lệ, không chứa mật khẩu hoặc tham số."
                                 return
                             }
+                            if AnimeSiteConfiguration.isAutomaticHost(url.host) {
+                                sourceMessage = "Đây là website anime. Hãy lưu trong phần Website anime."
+                                return
+                            }
                         }
                         UserDefaults.standard.set(value, forKey: "AnPinime.phim4kURL")
                         UserDefaults.standard.set(phim4kFormat.rawValue, forKey: "AnPinime.phim4kFormat")
@@ -708,7 +732,7 @@ struct AppSettingsView: View {
                     }.disabled(service.homeLoading)
                     if !sourceMessage.isEmpty { Text(sourceMessage).font(.footnote).foregroundStyle(.secondary) }
                 } header: { Text("Nguồn phim 2") }
-                  footer: { Text("Để trống để dùng đầy đủ kho Phim4K, Free1 và Free2. Địa chỉ thủ công chỉ dùng một kho Free1/Free2 tương thích.") }
+                  footer: { Text("URL này chỉ thay kho Free đã chọn; Core VIP/Premium và kho Free còn lại vẫn dùng cấu hình tự động. Để trống để khôi phục kho Free gốc.") }
             }
             Section("Giới thiệu") {
                 LabeledContentCompat(title: "Ứng dụng", value: "AnPinime")

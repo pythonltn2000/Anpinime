@@ -4,17 +4,33 @@ actor DomainResolver {
     static let shared = DomainResolver()
     private let shortLink = URL(string: "https://bit.ly/animevietsubtv")!
     // These hosts are advertised by the source or were its known shortlink destination.
-    private let fallbacks = ["https://animevietsub.xyz/", "https://animevietsub.fan/", "https://animevietsub.bio/", "https://animevietsub.vip/", "https://animevietsub.sale/"]
+    private let fallbacks = ["https://animevietsub.news/", "https://animevietsub.xyz/", "https://animevietsub.fan/", "https://animevietsub.bio/", "https://animevietsub.vip/", "https://animevietsub.sale/"]
     private let cacheKey = "AnyAnime.VerifiedBaseURL.v2"
     private let oldCacheKey = "AnyAnime.ResolvedBaseURL"
+    private let cacheDateKey = "AnyAnime.VerifiedBaseURL.updatedAt"
+    private var selectedConfiguration: String?
     private let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
     private var resolvedThisLaunch: URL?
 
+    func invalidate() { resolvedThisLaunch = nil }
+
     func resolve(force: Bool = false) async -> URL {
+        let configuration = UserDefaults.standard.string(forKey: AnimeSiteConfiguration.customURLKey) ?? ""
+        if selectedConfiguration != configuration { resolvedThisLaunch = nil; selectedConfiguration = configuration }
+        // An explicit user choice always wins over automatic/cache discovery.
+        // Do not probe a legacy Bleach URL on a site that may use another catalog.
+        if let custom = AnimeSiteConfiguration.selectedURL() {
+            resolvedThisLaunch = custom
+            return custom
+        }
         if !force, let resolvedThisLaunch { return resolvedThisLaunch }
         // A previously verified page remains useful; later actual fetches still
         // detect 403/verification and retain the interactive WebKit flow.
-        if !force, let cached = cachedURL(key: cacheKey) { resolvedThisLaunch = cached; return cached }
+        if !force, let cached = cachedURL(key: cacheKey),
+           let date = UserDefaults.standard.object(forKey: cacheDateKey) as? Date,
+           Date().timeIntervalSince(date) < 6 * 3600 {
+            resolvedThisLaunch = cached; return cached
+        }
         var request = URLRequest(url: shortLink, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 8)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("vi-VN,vi;q=0.9,en;q=0.8", forHTTPHeaderField: "Accept-Language")
@@ -55,6 +71,7 @@ actor DomainResolver {
         }
         if let verified {
             UserDefaults.standard.set(verified.absoluteString, forKey: cacheKey)
+            UserDefaults.standard.set(Date(), forKey: cacheDateKey)
             resolvedThisLaunch = verified
             #if DEBUG
             print("[AnimeDomain] selected_host=\(verified.host ?? "") verified_anime_page=true")
@@ -63,7 +80,7 @@ actor DomainResolver {
         }
         // Do not persist an unverified result. Its challenge may require the
         // existing visible verification sheet on the user's own connection.
-        let provisional = redirect ?? cachedURL(key: cacheKey) ?? cachedURL(key: oldCacheKey) ?? candidates[0]
+        let provisional = redirect ?? URL(string: fallbacks[0])!
         resolvedThisLaunch = provisional
         #if DEBUG
         print("[AnimeDomain] selected_host=\(provisional.host ?? "") verified_anime_page=false failure_reason=unavailable_or_verification")
@@ -73,7 +90,15 @@ actor DomainResolver {
 
     func acceptResolvedURL(_ url: URL, html: String) -> URL? {
         guard let base = normalizedBase(url), isExpectedHost(base), HTMLParser.isVerifiedAnimeDetail(html, url: url) else { return nil }
+        if let custom = AnimeSiteConfiguration.selectedURL() {
+            // The user selected this catalog; never let an old-domain response
+            // or redirect silently switch it back to automatic discovery.
+            guard custom.host == base.host else { return nil }
+            resolvedThisLaunch = custom
+            return custom
+        }
         UserDefaults.standard.set(base.absoluteString, forKey: cacheKey)
+        UserDefaults.standard.set(Date(), forKey: cacheDateKey)
         resolvedThisLaunch = base
         #if DEBUG
         print("[AnimeDomain] selected_host=\(base.host ?? "") verified_anime_page=true")
@@ -90,9 +115,7 @@ actor DomainResolver {
         return components.url
     }
     private func isExpectedHost(_ url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else { return false }
-        let labels = host.split(separator: ".")
-        return (labels.count == 2 && labels[0] == "animevietsub") ||
-            (labels.count == 3 && labels[0] == "www" && labels[1] == "animevietsub")
+        if let custom = AnimeSiteConfiguration.selectedURL(), url.host == custom.host { return true }
+        return AnimeSiteConfiguration.isAutomaticHost(url.host)
     }
 }
