@@ -9,6 +9,9 @@ check(!HTMLParser.containsVerification("<title>AnimeVietsub</title><article clas
 check(!HTMLParser.containsVerification("<title>Xem phim</title><script>filmInfo.filmID = 20;</script><footer>verify you are human</footer>"), "Player content and footer text do not cause verification popup")
 check(HTMLParser.containsVerification("<title>Just a moment...</title><form id='challenge-form'></form>"), "Managed challenge is recognized")
 check(HTMLParser.containsVerification("<title>Xác Minh An Toàn - AnimeVietsub</title>"), "Vietnamese security page is recognized")
+let newsChallenge = try String(contentsOfFile: "Tests/Fixtures/anime-news-verification.html", encoding: .utf8)
+check(HTMLParser.containsVerification(newsChallenge), "Current .news browser check is not accepted as anime content")
+check(!HTMLParser.isVerifiedAnimeDetail(newsChallenge, url: URL(string: "https://animevietsub.news/phim/bleach-a5985/")!), "Current .news check cannot validate a domain or populate episodes")
 check(HTMLParser.containsVerification("<title>Kiểm tra</title><div class='cf-turnstile'></div>"), "Interactive verification is recognized")
 let card = "<article class='TPost'><a href='/phim/example-a1/'><img src='/poster.jpg' alt='Test Anime'></a><h2 class='Title'>Test Anime</h2></article>"
 let html = "<section><h2>Mới cập nhật</h2>\(card)</section><section><h2>Anime mới cập nhật</h2>\(card)</section>"

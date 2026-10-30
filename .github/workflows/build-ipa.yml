@@ -62,6 +62,10 @@ jobs:
         continue-on-error: true
         run: bash Tests/phim4k-live-smoke.sh
 
+      - name: Record bounded Free1 and Core transport observations
+        if: always()
+        run: python3 Tests/source2_live_probe.py
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

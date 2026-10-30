@@ -459,6 +459,7 @@ enum HTMLParser {
         // A normal page can contain Cloudflare scripts without asking for verification.
         let title = first(#"(?is)<title[^>]*>(.*?)</title>"#, in: value) ?? ""
         let challengeTitle = ["just a moment", "xác minh an toàn", "xác minh bảo mật", "attention required", "verify you are human", "checking your browser"].contains { title.contains($0) }
+            || (title.contains("animevietsub") && ["đang kiểm tra", "đang xác minh"].contains { title.contains($0) })
         let hasContent = value.range(of: #"class=["'][^"']*(?:tpost|ml-item|film-item|movie-item|btn-episode)[^"']*["']"#, options: .regularExpression) != nil
             || value.contains("filminfo.filmid")
             || (value.range(of: #"(?is)<h1\b[^>]*>"#, options: .regularExpression) != nil && value.contains("og:image") && value.contains("xem phim"))
