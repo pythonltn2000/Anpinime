@@ -65,6 +65,7 @@ import json,sys
 r=json.load(open('previews/playback-'+sys.argv[1]+'.json'))
 assert r['advancingVideoVerified'] and r['videoWidth']>0 and r['videoHeight']>0 and r['time']>1 and r['landscape'], r
 assert r['episodeCount']>=2 and r['selectedEpisodeNumber']==1, r
+if sys.argv[1]=='anime-provider': assert r['cancelledEpisodeLoadVerified'], r
 print(r)
 PY
 echo "### $ANPINIME_RESULT: PASS — anime episodes and advancing decoded video verified" >> "$GITHUB_STEP_SUMMARY"

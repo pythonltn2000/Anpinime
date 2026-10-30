@@ -635,7 +635,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             if ended && !webEnded { playback.endCount += 1 }
             webEnded = ended
             #if DEBUG
-            PlaybackSmokeTest.record(time: playback.currentTime, backend: "web", size: view.bounds.size)
+            PlaybackSmokeTest.record(time: playback.currentTime, backend: "web", size: view.bounds.size, playback: playback,
+                                     videoSize: CGSize(width: (state["videoWidth"] as? Double) ?? 0,
+                                                       height: (state["videoHeight"] as? Double) ?? 0))
             #endif
         case "playerError":
             if let detail = message.body as? String { print("[AnPinime Player] \(detail)") }
@@ -901,7 +903,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             reportSource(v);
             var api=playerAPI(v),sources=contentSources(api),current=mediaURL(v);
             if(api&&/^https?:/i.test(current)&&sources.indexOf(current)<0)return;
-            send('mediaState',{time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3,ready:v.readyState>=2,ended:v.ended,tracks:trackState(v)});
+            send('mediaState',{time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3,ready:v.readyState>=2,ended:v.ended,videoWidth:v.videoWidth||0,videoHeight:v.videoHeight||0,tracks:trackState(v)});
           }
           window.addEventListener('message',function(event){
             var c=event.data;if(!c||c.type!=='AnPinimeCommand')return;

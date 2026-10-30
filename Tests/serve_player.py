@@ -73,7 +73,7 @@ class Handler(BaseHTTPRequestHandler):
                       episode.href='/phim/fixture-a1/tap-2-102.html';
                       episode.textContent='Tập 2';
                       document.querySelector('.server-item').appendChild(episode);
-                    },500);</script>
+                    },3500);</script>
                     <div class="comments"><a href="/phim/fixture-a1/tap-99-999.html">Tập 99</a></div>
                     <nav><a href="/phim/fixture-a1/tap-88-888.html">Tập 88</a></nav>
                     <a href="/phim/unrelated-a2/tap-1-201.html">Tập 1</a>

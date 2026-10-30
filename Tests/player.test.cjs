@@ -16,7 +16,8 @@ function fixture(html, setup = () => {}) {
   let paused = true, plays = 0;
   for (const video of w.document.querySelectorAll('video')) {
     Object.defineProperties(video, {
-      paused: {get: () => paused}, duration: {get: () => 180}, readyState: {get: () => 4}
+      paused: {get: () => paused}, duration: {get: () => 180}, readyState: {get: () => 4},
+      videoWidth: {get: () => 640}, videoHeight: {get: () => 360}
     });
     video.play = () => { paused = false; plays++; return Promise.resolve(); };
     video.pause = () => { paused = true; };
@@ -37,6 +38,7 @@ assert.equal(f.video.style.width, '100vw');
 assert.equal(f.w.document.querySelector('header').style.display, 'none');
 assert.equal(f.plays, 1);
 assert(f.messages.some(m => m.name === 'videoFound' && m.value.url === 'https://cdn.example/movie.mp4'), 'Restore web-to-native video handoff before waiting for frames');
+assert(f.messages.some(m => m.name === 'mediaState' && m.value.videoWidth === 640 && m.value.videoHeight === 360), 'Web playback reports actual decoded video dimensions');
 f.command('pause');
 f.w.__anyanimeFocusPlayer();
 assert.equal(f.video.paused, true, 'DOM updates must not override user pause');

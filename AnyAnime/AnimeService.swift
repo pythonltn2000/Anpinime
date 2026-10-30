@@ -288,6 +288,7 @@ final class AnimeService: ObservableObject {
         let resolved = await resolver.resolve()
         let detailURL = HTMLParser.rebasedAnimeURL(anime.url, baseURL: resolved)
         var episodes = initialDetail.episodes
+        var cacheCompleteResult = true
 
         var detailHTML = ""
         if let cached = cachedHTML(for: detailURL) {
@@ -296,7 +297,9 @@ final class AnimeService: ObservableObject {
             do {
                 detailHTML = try await fetchHTML(url: detailURL)
             } catch {
+                try Task.checkCancellation()
                 if episodes.isEmpty { throw error }
+                cacheCompleteResult = false
             }
         }
 
@@ -329,7 +332,9 @@ final class AnimeService: ObservableObject {
                     episodes = HTMLParser.mergedEpisodes(episodes, dynamic)
                 }
             } catch {
+                try Task.checkCancellation()
                 if episodes.isEmpty { throw error }
+                cacheCompleteResult = false
             }
         } else if episodes.isEmpty || (episodes.count == 1 && episodes.first?.number != nil) {
             let (rendered, renderedURL) = try await website.load(detailURL, waitForEpisodes: true)
@@ -338,7 +343,8 @@ final class AnimeService: ObservableObject {
             episodes = HTMLParser.mergedEpisodes(episodes, dynamic)
         }
 
-        if !episodes.isEmpty {
+        try Task.checkCancellation()
+        if !episodes.isEmpty && cacheCompleteResult {
             let merged = AnimeDetail(title: initialDetail.title, posterURL: initialDetail.posterURL,
                                      bannerURL: initialDetail.bannerURL, summary: initialDetail.summary,
                                      info: initialDetail.info, episodes: episodes)

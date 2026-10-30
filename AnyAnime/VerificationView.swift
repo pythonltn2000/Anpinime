@@ -90,11 +90,13 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
                 if self.waitForEpisodes {
                     if self.renderedSince == nil { self.renderedSince = Date() }
                     let identity = Anime(title: "", url: self.targetURL ?? url, imageURL: nil, episodeText: "", quality: "", score: "")
-                    let count = HTMLParser.detail(from: html, anime: identity, baseURL: url.deletingLastPathComponent()).episodes.count
+                    let episodes = HTMLParser.detail(from: html, anime: identity, baseURL: url.deletingLastPathComponent()).episodes
+                    let count = episodes.count
                     self.stableEpisodePolls = count == self.lastEpisodeCount ? self.stableEpisodePolls + 1 : 0
                     self.lastEpisodeCount = count
                     let elapsed = Date().timeIntervalSince(self.renderedSince ?? Date())
-                    if elapsed < 8 && (count == 0 || self.stableEpisodePolls < 3) { return }
+                    let preview = count <= 1 && !HTMLParser.hasCompleteStreamedEpisodes(html, episodes: episodes)
+                    if elapsed < 8 && (preview || self.stableEpisodePolls < 3) { return }
                 }
                 Task { @MainActor in
                     await self.copyCookies()

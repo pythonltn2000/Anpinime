@@ -24,6 +24,7 @@ enum PlaybackSmokeTest {
     static var resultName: String? { animeFixture ? "anime-provider" : liveAnime ? "anime-live" : liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : liveVIP ? "phim4k-vip" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
     @MainActor static var animeEpisodeCount = 0
     @MainActor static var selectedAnimeEpisodeNumber: Int?
+    @MainActor static var cancelledAnimeLoadVerified = false
     @MainActor private static var firstVideoTime: Double?
     @MainActor private static var events: [[String: Any]] = []
     @MainActor static func diagnostic(_ event: String, fields: [String: Any]) {
@@ -71,7 +72,7 @@ enum PlaybackSmokeTest {
                 result["autoplayVerified"] = true
             }
             if source2Diagnostic || animeSmoke {
-                guard backend == "mpv", playback.playing, videoSize.width > 0, videoSize.height > 0 else { return }
+                guard backend == "mpv" || (animeSmoke && backend == "web"), playback.playing, videoSize.width > 0, videoSize.height > 0 else { return }
                 if firstVideoTime == nil { firstVideoTime = time }
                 guard time - firstVideoTime! >= 1 else { return }
                 result["sample"] = liveSource2 ? "Phim4K Free1 / thuong-nguyen-do" : liveVIP ? "Core Wakanda / 10403 / 31937" : "Local source-2 HLS through relay"
@@ -83,6 +84,10 @@ enum PlaybackSmokeTest {
                     result["sample"] = liveAnime ? "AnimeVietsub .news / Bleach a5985" : "Local anime metadata → dynamic episodes → player"
                     result["episodeCount"] = animeEpisodeCount
                     result["selectedEpisodeNumber"] = selectedAnimeEpisodeNumber ?? 0
+                    if animeFixture {
+                        guard cancelledAnimeLoadVerified else { return }
+                        result["cancelledEpisodeLoadVerified"] = true
+                    }
                 }
             }
             result["audioChoices"] = playback.audioTracks.count
@@ -143,6 +148,18 @@ private struct AnimeSmokeView: View {
                                              imageURL: nil, episodeText: "", quality: "", score: "")
                             }
                             let meta = try await service.detailMetadata(for: item, forceRefresh: true)
+                            if PlaybackSmokeTest.animeFixture {
+                                let cancelledLoad = Task { try await service.loadEpisodes(for: item, initialDetail: meta, forceRefresh: true) }
+                                try await Task.sleep(nanoseconds: 500_000_000)
+                                cancelledLoad.cancel()
+                                do {
+                                    _ = try await cancelledLoad.value
+                                    throw AnimeServiceError.emptyData
+                                } catch is CancellationError { }
+                                guard service.cachedDetail(for: item.id) == nil else { throw AnimeServiceError.emptyData }
+                                PlaybackSmokeTest.cancelledAnimeLoadVerified = true
+                                PlaybackSmokeTest.diagnostic("cancelled-episode-load", fields: ["partialCacheAbsent": true])
+                            }
                             let episodes = try await service.loadEpisodes(for: item, initialDetail: meta, forceRefresh: true)
                             guard let selected = episodes.first(where: { $0.number == 1 }) else { throw AnimeServiceError.emptyData }
                             PlaybackSmokeTest.animeEpisodeCount = episodes.count
