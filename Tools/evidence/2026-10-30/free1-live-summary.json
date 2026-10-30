@@ -1,0 +1,27 @@
+{
+  "runID": 41001476273,
+  "codeCommit": "410aafb042bba997c552cda102de02bf50c2d28d",
+  "artifactID": 12953593501,
+  "playbackVerified": false,
+  "successArtifactPresent": false,
+  "note": "Derived from capped diagnostic tail; full JSON and screenshot are in the CI artifact.",
+  "lastState": {
+    "buffering": false,
+    "event": "mpv-state",
+    "loaded": false,
+    "playing": false,
+    "time": 0,
+    "videoHeight": 0,
+    "videoWidth": 0
+  },
+  "responseStatuses": [
+    404
+  ],
+  "responseHosts": [
+    "s6.kkphimplayer6.com"
+  ],
+  "failure": {
+    "event": "failure",
+    "message": "Máy chủ chưa trả dữ liệu video. Hãy thử lại hoặc chọn máy chủ khác."
+  }
+}

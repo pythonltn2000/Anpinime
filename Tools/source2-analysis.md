@@ -153,3 +153,35 @@ REA 6.8.0 archive inventory was run using the existing Node 22.21.1 binary
 `ev_bbe18dcb4952bd6b65047d4096c62c51bd40ce67abd55696ff5b8bd0f4825aa3`
 confirms the supplied IPA SHA-256 above via `rea-artifact-graph`. This inventory
 is static package evidence only; it does not establish runtime VIP behavior.
+
+
+## HLS relay and live evidence — 2026-10-30
+
+Continued from `8acf5c0`; see `REPAIR_REPORT_V4.md` for scope and evidence.
+The relay changed TS segment paths to `.bin`, rejected by FFmpeg's HLS extension
+checks. Source 2 now preserves known media suffixes under opaque loopback IDs;
+the default relay behavior for sources 1/3 is unchanged. The required simulator
+fixture traverses the real source-2 provider, extensionless HLS endpoint, relay
+and pinned libmpv. Run `41001476273` (`410aafb`) produced decoded 640x360 video,
+advancing to 3.44 seconds, and a visible test-pattern screenshot. MKV autoplay,
+two audio tracks and two subtitle lanes also passed again.
+
+Free1 live did **not** pass. Both the macOS network probe and actual simulator
+player received HTTP 404 HTML for the documented sample's TS segments; the
+manifest itself returned 200. The player stayed unloaded with time and video
+dimensions at zero. No live success JSON was produced. A bounded Linux check
+of Xom Nho also obtained a 200 manifest followed by a 404 segment; it was not
+used to replace the selected movie.
+
+Core Wakanda still returned all five original server IDs. The exact 31937
+simulator check failed during resolution because the original CDN hostname
+could not be found. No VIP success JSON was produced; the existing unused
+signing helper has not been enabled or changed. Anime `.news` currently serves
+a custom browser-check title missed by the old parser; that recognition is
+repaired, while live anime playback remains unverified behind the challenge.
+
+Playback artifact `12953593501` contains screenshots and redacted diagnostics;
+small permanent JSON evidence is in `Tools/evidence/2026-10-30/`. The workflow's
+live steps use continue-on-error: a green build still does not establish Free1
+or VIP playback. There are no signed URLs, cookies or account sessions in the
+new evidence files.

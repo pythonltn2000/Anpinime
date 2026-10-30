@@ -1,0 +1,58 @@
+{
+  "playbackVerified": false,
+  "scope": "network prefixes only",
+  "requests": [
+    {
+      "label": "Free1 sample detail",
+      "host": "free.cryboiz.workers.dev",
+      "status": 200,
+      "contentType": "application/json;charset=UTF-8",
+      "bytesRead": 25151,
+      "signature": "other"
+    },
+    {
+      "label": "Free1 original manifest",
+      "host": "sf.phim4k.space",
+      "status": 200,
+      "contentType": "application/vnd.apple.mpegurl; charset=utf-8",
+      "bytesRead": 28277,
+      "signature": "hls"
+    },
+    {
+      "label": "Free1 segment 0",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "contentType": "text/html; charset=utf-8",
+      "bytesRead": 910,
+      "signature": "other"
+    },
+    {
+      "label": "Free1 segment 1",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "contentType": "text/html; charset=utf-8",
+      "bytesRead": 910,
+      "signature": "other"
+    },
+    {
+      "label": "Core Wakanda detail",
+      "host": "api.phim4k.space",
+      "status": 200,
+      "contentType": "application/json; charset=UTF-8",
+      "bytesRead": 35206,
+      "signature": "other"
+    },
+    {
+      "label": "Core original server 31937",
+      "host": "cdn.phim4k.lol",
+      "errorType": "URLError"
+    }
+  ],
+  "coreServerIDs": [
+    "31937",
+    "33090",
+    "27463",
+    "31938",
+    "31939"
+  ]
+}
