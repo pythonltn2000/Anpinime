@@ -18,6 +18,7 @@ final class FilmMediaRelay {
     var onQualities: (([PlaybackQuality]) -> Void)?
     private let origin: URL
     private let headers: [String: String]
+    private let preserveMediaExtensions: Bool
     private let secret = UUID().uuidString
     private let queue = DispatchQueue(label: "AnPinime.FilmMediaRelay")
     private let session: URLSession
@@ -30,8 +31,9 @@ final class FilmMediaRelay {
     private var requests: [UUID: Task<Void, Never>] = [:]
     private let mediaCache = NSCache<NSURL, NSData>()
 
-    init(origin: URL, headers: [String: String]) {
+    init(origin: URL, headers: [String: String], preserveMediaExtensions: Bool = false) {
         self.origin = origin; self.headers = headers
+        self.preserveMediaExtensions = preserveMediaExtensions
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = .shared
         config.timeoutIntervalForRequest = 25
@@ -87,7 +89,8 @@ final class FilmMediaRelay {
 
     private func localURL(_ url: URL) -> URL {
         if let key = identifiers[url] { return endpoint!.appendingPathComponent(key) }
-        let suffix = url.pathExtension == "m3u8" || url.path.hasSuffix("/stream/hls") ? "m3u8" : "bin"
+        let suffix = preserveMediaExtensions ? Phim4KRelayNaming.suffix(for: url)
+            : (url.pathExtension == "m3u8" || url.path.hasSuffix("/stream/hls") ? "m3u8" : "bin")
         let key = "\(secret)/\(UUID().uuidString).\(suffix)"
         identifiers[url] = key; urls[key] = url
         return endpoint!.appendingPathComponent(key)
@@ -145,6 +148,13 @@ final class FilmMediaRelay {
                 }
             }
             try Task.checkCancellation()
+            #if DEBUG
+            if PlaybackSmokeTest.source2Diagnostic {
+                PlaybackSmokeTest.diagnostic("relay-response", fields: ["host": url.host ?? "", "extension": url.pathExtension,
+                    "status": (response as? HTTPURLResponse)?.statusCode ?? 0, "bytes": data.count,
+                    "type": response.mimeType ?? ""])
+            }
+            #endif
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 send(id, status: (response as? HTTPURLResponse)?.statusCode ?? 502, body: Data()); return
             }
@@ -166,7 +176,12 @@ final class FilmMediaRelay {
                 send(id, status: 206, body: body.subdata(in: range), type: type, head: parts[0] == "HEAD",
                      extra: "Content-Range: bytes \(range.lowerBound)-\(range.upperBound - 1)/\(body.count)\r\n")
             } else { send(id, status: 200, body: body, type: type, head: parts[0] == "HEAD") }
-        } catch { if connections[id] != nil { send(id, status: 502, body: Data()) } }
+        } catch {
+            #if DEBUG
+            if PlaybackSmokeTest.source2Diagnostic { PlaybackSmokeTest.diagnostic("relay-error", fields: ["code": (error as NSError).code]) }
+            #endif
+            if connections[id] != nil { send(id, status: 502, body: Data()) }
+        }
     }
 
     private func send(_ id: UUID, status: Int, body: Data, type: String = "text/plain", head: Bool = false, extra: String = "") {

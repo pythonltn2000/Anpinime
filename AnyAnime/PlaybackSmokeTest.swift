@@ -5,18 +5,46 @@ enum PlaybackSmokeTest {
     static var enabled: Bool {
         mpvFixture || ProcessInfo.processInfo.arguments.contains("--playback-smoke") || webOnly || movieSource != nil
     }
-    static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") && !liveSource2 }
+    static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") && !liveSource2 && !source2HLS }
+    static var source2HLS: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-hls-smoke") }
+    static var source2Diagnostic: Bool { liveSource2 || source2HLS }
     static var webOnly: Bool { ProcessInfo.processInfo.arguments.contains("--web-playback-smoke") }
-    static var providerFixture: Bool { ProcessInfo.processInfo.arguments.contains("--movie-provider-smoke") || ProcessInfo.processInfo.arguments.contains("--phim4k-provider-smoke") }
+    static var providerFixture: Bool { source2HLS || ProcessInfo.processInfo.arguments.contains("--movie-provider-smoke") || ProcessInfo.processInfo.arguments.contains("--phim4k-provider-smoke") }
     static var movieSource: ContentSource? {
-        if ProcessInfo.processInfo.arguments.contains("--phim4k-provider-smoke") || liveSource2 { return .phim4k }
+        if ProcessInfo.processInfo.arguments.contains("--phim4k-provider-smoke") || source2Diagnostic { return .phim4k }
         if ProcessInfo.processInfo.arguments.contains("--movie-provider-smoke") || liveMovie { return .film4k }
         return nil
     }
     static var liveMovie: Bool { ProcessInfo.processInfo.arguments.contains("--film4k-live-smoke") }
     static var liveSource2: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-live-smoke") }
-    static var resultName: String? { liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : movieSource?.rawValue }
-    @MainActor static func record(time: Double, backend: String, size: CGSize, playback: PlaybackState? = nil) {
+    static var resultName: String? { liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
+    @MainActor private static var firstVideoTime: Double?
+    @MainActor private static var events: [[String: Any]] = []
+    @MainActor static func diagnostic(_ event: String, fields: [String: Any]) {
+        guard source2Diagnostic else { return }
+        var entry = fields
+        // libmpv warnings may contain upstream or loopback URLs. Never retain
+        // signed queries, cookies, tickets or the relay's per-playback IDs.
+        for (key, value) in fields {
+            if let value = value as? String {
+                entry[key] = value.replacingOccurrences(of: #"https?://[^\s\"'<>]+"#, with: "[URL]", options: .regularExpression)
+                    .replacingOccurrences(of: #"(?i)(cookie|authorization|api-key|token|x-f4k-pt)\s*[:=][^\r\n]*"#,
+                                          with: "$1=[redacted]", options: .regularExpression)
+            }
+        }
+        entry["event"] = event
+        if event == "mpv-state", events.last?["event"] as? String == event { events.removeLast() }
+        events.append(entry)
+        if events.count > 120 { events.removeFirst(events.count - 120) }
+        write(["events": events], name: "\(resultName!)-diagnostics")
+    }
+    @MainActor private static func write(_ result: [String: Any], name: String) {
+        if let data = try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]),
+           let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            try? data.write(to: directory.appendingPathComponent("playback-\(name).json"), options: .atomic)
+        }
+    }
+    @MainActor static func record(time: Double, backend: String, size: CGSize, playback: PlaybackState? = nil, videoSize: CGSize = .zero) {
         guard enabled, time > 1, size.width > size.height else { return }
         var result: [String: Any] = ["time": time, "backend": backend, "landscape": true,
                                      "width": size.width, "height": size.height]
@@ -32,10 +60,15 @@ enum PlaybackSmokeTest {
                 result["mkvAudioAndDualSubtitlesVerified"] = true
                 result["autoplayVerified"] = true
             }
-            if liveSource2 {
-                guard playback.playing else { return }
-                result["sample"] = "Phim4K Free1 / thuong-nguyen-do"
+            if source2Diagnostic {
+                guard backend == "mpv", playback.playing, videoSize.width > 0, videoSize.height > 0 else { return }
+                if firstVideoTime == nil { firstVideoTime = time }
+                guard time - firstVideoTime! >= 1 else { return }
+                result["sample"] = liveSource2 ? "Phim4K Free1 / thuong-nguyen-do" : "Local source-2 HLS through relay"
                 result["mediaInfo"] = playback.mediaInfo
+                result["videoWidth"] = videoSize.width
+                result["videoHeight"] = videoSize.height
+                result["advancingVideoVerified"] = true
             }
             result["audioChoices"] = playback.audioTracks.count
             result["subtitleChoices"] = playback.subtitleTracks.count
@@ -54,10 +87,7 @@ enum PlaybackSmokeTest {
                 result["stableSelectionAndOffVerified"] = true
             }
         }
-        if let data = try? JSONSerialization.data(withJSONObject: result),
-           let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            try? data.write(to: directory.appendingPathComponent("playback-\(resultName ?? backend).json"), options: .atomic)
-        }
+        write(result, name: resultName ?? backend)
     }
 }
 

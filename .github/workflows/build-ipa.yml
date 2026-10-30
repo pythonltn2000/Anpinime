@@ -18,7 +18,7 @@ jobs:
 
       - name: Verify parsing and playback regressions
         run: |
-          swiftc AnyAnime/Models.swift AnyAnime/AnimeSiteConfiguration.swift AnyAnime/AnimeScheduleStore.swift AnyAnime/HTMLDocument.swift AnyAnime/HTMLParser.swift AnyAnime/MovieBrowseCatalog.swift AnyAnime/MovieCatalog.swift AnyAnime/Phim4KCatalog.swift AnyAnime/Phim4KVIPResolver.swift AnyAnime/SearchHistory.swift AnyAnime/FilmMediaTransform.swift Tests/main.swift -o "$RUNNER_TEMP/anpinime-parser-tests"
+          swiftc AnyAnime/Models.swift AnyAnime/AnimeSiteConfiguration.swift AnyAnime/AnimeScheduleStore.swift AnyAnime/HTMLDocument.swift AnyAnime/HTMLParser.swift AnyAnime/MovieBrowseCatalog.swift AnyAnime/MovieCatalog.swift AnyAnime/Phim4KCatalog.swift AnyAnime/Phim4KVIPResolver.swift AnyAnime/Phim4KRelayNaming.swift AnyAnime/SearchHistory.swift AnyAnime/FilmMediaTransform.swift Tests/main.swift -o "$RUNNER_TEMP/anpinime-parser-tests"
           "$RUNNER_TEMP/anpinime-parser-tests"
           swiftc AnyAnime/Models.swift AnyAnime/AnimeSiteConfiguration.swift AnyAnime/AnimeScheduleStore.swift AnyAnime/HTMLDocument.swift AnyAnime/HTMLParser.swift AnyAnime/MovieBrowseCatalog.swift AnyAnime/MovieCatalog.swift AnyAnime/Phim4KCatalog.swift AnyAnime/Phim4KVIPResolver.swift AnyAnime/Phim4KMediaProbe.swift AnyAnime/MovieSourceDirectory.swift AnyAnime/MovieProvider.swift AnyAnime/Phim4KProvider.swift Tests/ProviderTests.swift -o "$RUNNER_TEMP/anpinime-provider-tests"
           "$RUNNER_TEMP/anpinime-provider-tests"
@@ -54,6 +54,9 @@ jobs:
         run: |
           brew install ffmpeg
           bash Tests/mpv-smoke.sh
+
+      - name: Verify source-2 HLS through its real relay and mpv
+        run: bash Tests/phim4k-live-smoke.sh hls
 
       - name: Check public Phim4K Free1 playback
         continue-on-error: true

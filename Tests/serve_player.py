@@ -5,6 +5,9 @@ from urllib.parse import urlsplit
 import json
 import time
 import base64
+import sys
+
+SOURCE2_HLS = "--source2-hls" in sys.argv
 
 VIDEO = Path(__file__).with_name("sample.mp4").read_bytes()
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==")
@@ -46,7 +49,23 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"items": [{"slug": "legacy", "name": "Phim4K kiểm thử"}]})
             return
         if path == "/phim/legacy":
-            self.send_json({"movie": {"name": "Phim4K kiểm thử"}, "episodes": [{"server_name": "Vietsub", "server_data": [{"name": "01", "link_m3u8": "http://127.0.0.1:8765/legacy.mp4"}]}]})
+            row = {"name": "01", "link": "http://127.0.0.1:8765/api/content/stream/hls?fixture=1"} if SOURCE2_HLS else {"name": "01", "link_m3u8": "http://127.0.0.1:8765/legacy.mp4"}
+            self.send_json({"movie": {"name": "Phim4K kiểm thử"}, "episodes": [{"server_name": "Vietsub", "server_data": [row]}]})
+            return
+        if SOURCE2_HLS and (path == "/api/content/stream/hls" or path.startswith("/source2-hls/")):
+            if self.headers.get("Origin") != "http://127.0.0.1:8765" or self.headers.get("Referer") != "http://127.0.0.1:8765/":
+                self.send_error(403, "Source 2 requires its own catalog headers")
+                return
+            name = "index.m3u8" if path == "/api/content/stream/hls" else path.removeprefix("/source2-hls/")
+            if name != "index.m3u8" and ("/" in name or not name.endswith(".ts")):
+                self.send_error(404)
+                return
+            data = Path(__file__).with_name("source2-hls").joinpath(name).read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.apple.mpegurl" if name.endswith("m3u8") else "video/mp2t")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
             return
         if path == "/expired.mp4":
             self.send_error(410, "Fixture URL expired; resolver must refresh once")

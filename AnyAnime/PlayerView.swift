@@ -175,7 +175,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 if resolved.isWeb { self.startFallback(url: resolved.url) }
                 else if self.shouldUseMediaRelay(for: resolved.url) {
                     self.filmRelay?.stop()
-                    let relay = FilmMediaRelay(origin: self.baseURL, headers: resolved.headers)
+                    let relay = FilmMediaRelay(origin: self.baseURL, headers: resolved.headers,
+                                              preserveMediaExtensions: self.episode.source == .phim4k)
                     relay.onQualities = { [weak self] options in
                         guard let self, self.active else { return }
                         if self.playback.qualities != options { self.playback.qualities = options }

@@ -278,3 +278,11 @@ let payloadText = String(data: try JSONSerialization.data(withJSONObject: reorde
 let payloadLiteral = String(data: try JSONSerialization.data(withJSONObject: [payloadText]), encoding: .utf8)!.dropFirst().dropLast()
 let reorderedHTML = "<div class='episode-list'><a href='/xem-phim/luc-do-toi-da-chuyen-sinh-thanh-slime-s4-2342192/tap-1'>Tập 1</a></div><script>self.__next_f.push([1," + payloadLiteral + "])</script>"
 check(HTMLParser.detail(from: reorderedHTML, anime: nextShow, baseURL: animeBase).episodes.count == 2, "Streamed episodes decode JSON regardless of property order and whitespace")
+
+// Source 2 keeps the suffixes required by FFmpeg's HLS extension checks.
+for ext in ["ts", "m4s", "mp4", "aac", "vtt", "m3u8"] {
+    check(Phim4KRelayNaming.suffix(for: URL(string: "https://media.example/opaque.\(ext)?token=hidden")!) == ext,
+          "Source-2 relay preserves \(ext) without signed query values")
+}
+check(Phim4KRelayNaming.suffix(for: URL(string: "https://media.example/api/content/stream/hls?id=hidden")!) == "m3u8", "Extensionless source-2 HLS remains a playlist")
+check(Phim4KRelayNaming.suffix(for: URL(string: "https://media.example/unsafe.html")!) == "bin", "Unknown media suffixes remain opaque")

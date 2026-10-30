@@ -53,6 +53,9 @@ final class MPVPlaybackController: UIViewController {
         if !extra.isEmpty { mpv_set_option_string(context, "http-header-fields", extra) }
         let status = mpv_initialize(context)
         guard status >= 0 else { fail("Không khởi tạo được mpv: " + String(cString: mpv_error_string(status))); return }
+        #if DEBUG
+        if PlaybackSmokeTest.source2Diagnostic { mpv_request_log_messages(context, "warn") }
+        #endif
         mpv_observe_property(context, 1, "track-list", MPV_FORMAT_NONE)
         playback.engine = "mpv"
         playback.supportsAdvancedSubtitles = true
@@ -132,6 +135,13 @@ final class MPVPlaybackController: UIViewController {
         for _ in 0..<40 {
             guard let event = mpv_wait_event(context, 0), event.pointee.event_id != MPV_EVENT_NONE else { break }
             switch event.pointee.event_id {
+            #if DEBUG
+            case MPV_EVENT_LOG_MESSAGE:
+                if PlaybackSmokeTest.source2Diagnostic, let log = event.pointee.data?.assumingMemoryBound(to: mpv_event_log_message.self) {
+                    PlaybackSmokeTest.diagnostic("mpv-log", fields: ["component": String(cString: log.pointee.prefix),
+                        "message": String(cString: log.pointee.text)])
+                }
+            #endif
             case MPV_EVENT_FILE_LOADED:
                 loaded = true
                 let pending = pendingImports; pendingImports = []
@@ -158,7 +168,13 @@ final class MPVPlaybackController: UIViewController {
         if !loaded && Date().timeIntervalSince(startedAt) > 40 { fail("Máy chủ chưa trả dữ liệu video. Hãy thử lại hoặc chọn máy chủ khác.") }
         playback.mediaInfo = [string("file-format"), string("video-codec"), "\(Int(number("video-params/w"))) × \(Int(number("video-params/h")))", string("audio-codec")].filter { !$0.isEmpty }.joined(separator: " · ")
         #if DEBUG
-        PlaybackSmokeTest.record(time: playback.currentTime, backend: "mpv", size: view.bounds.size, playback: playback)
+        if PlaybackSmokeTest.source2Diagnostic {
+            PlaybackSmokeTest.diagnostic("mpv-state", fields: ["loaded": loaded, "time": playback.currentTime,
+                "videoWidth": number("video-params/w"), "videoHeight": number("video-params/h"),
+                "playing": playback.playing, "buffering": playback.buffering])
+        }
+        PlaybackSmokeTest.record(time: playback.currentTime, backend: "mpv", size: view.bounds.size, playback: playback,
+                                 videoSize: CGSize(width: number("video-params/w"), height: number("video-params/h")))
         #endif
     }
     private func refreshTracks() {
@@ -214,6 +230,9 @@ final class MPVPlaybackController: UIViewController {
         if result < 0 { fail(String(cString: mpv_error_string(result))) }
     }
     private func fail(_ message: String) {
+        #if DEBUG
+        if PlaybackSmokeTest.source2Diagnostic { PlaybackSmokeTest.diagnostic("failure", fields: ["message": message]) }
+        #endif
         playback.loading = false; playback.buffering = false; playback.playing = false; playback.error = message
         timer?.invalidate(); timer = nil
         onFailure?(message)

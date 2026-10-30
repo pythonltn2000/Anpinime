@@ -9,3 +9,5 @@ Tools/morphicons/node_modules/
 Tests/multitrack.mkv
 build-simulator/
 previews/
+
+Tests/source2-hls/
