@@ -8,12 +8,22 @@ import base64
 import sys
 
 SOURCE2_HLS = "--source2-hls" in sys.argv
+ANIME_PROVIDER = "--anime-provider" in sys.argv
 
 VIDEO = Path(__file__).with_name("sample.mp4").read_bytes()
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==")
 
 class Handler(BaseHTTPRequestHandler):
     watch_requests = 0
+
+    def send_html(self, body):
+        data = body.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Set-Cookie", "smoke_session=1; Path=/; SameSite=Lax")
+        self.end_headers()
+        self.wfile.write(data)
 
     def send_json(self, value, cookie=False):
         body = json.dumps(value).encode()
@@ -33,6 +43,48 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if ANIME_PROVIDER:
+            if path == "/":
+                self.send_html('''<!doctype html><html><head><title>Anime fixture</title></head><body>
+                    <section><h2>Anime mới cập nhật</h2><article class="TPost">
+                    <a href="/phim/fixture-a1/"><img src="/poster.png" alt="Anime kiểm thử"></a>
+                    <h2 class="Title">Anime kiểm thử</h2></article></section></body></html>''')
+                return
+            if path == "/poster.png":
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(PNG)))
+                self.end_headers()
+                self.wfile.write(PNG)
+                return
+            if path == "/phim/fixture-a1/":
+                self.send_html('''<!doctype html><html><head><title>Anime kiểm thử</title>
+                    <meta property="og:image" content="/poster.png"></head><body>
+                    <h1>Anime kiểm thử</h1><div class="Description">Metadata appears before the episode list.</div>
+                    <a class="watch-now" href="/phim/fixture-a1/xem-phim.html">Xem phim</a>
+                    </body></html>''')
+                return
+            if path == "/phim/fixture-a1/xem-phim.html":
+                self.send_html('''<!doctype html><html><head><title>Xem Anime kiểm thử</title></head><body>
+                    <h1>Anime kiểm thử</h1><div class="server-item" data-server="Vietsub">
+                    <a href="/phim/fixture-a1/tap-1-101.html">Tập 1</a></div>
+                    <script>setTimeout(function(){
+                      var episode=document.createElement('a');
+                      episode.href='/phim/fixture-a1/tap-2-102.html';
+                      episode.textContent='Tập 2';
+                      document.querySelector('.server-item').appendChild(episode);
+                    },500);</script>
+                    <div class="comments"><a href="/phim/fixture-a1/tap-99-999.html">Tập 99</a></div>
+                    <nav><a href="/phim/fixture-a1/tap-88-888.html">Tập 88</a></nav>
+                    <a href="/phim/unrelated-a2/tap-1-201.html">Tập 1</a>
+                    <a href="/dang-nhap?redirect=/phim/fixture-a1/tap-1-101.html">Đăng nhập</a>
+                    </body></html>''')
+                return
+            if path in ("/phim/fixture-a1/tap-1-101.html", "/phim/fixture-a1/tap-2-102.html"):
+                self.send_html('''<!doctype html><html><head><meta name="viewport" content="width=device-width"></head>
+                    <body><header>Anime fixture player</header><iframe src="/embed.html" width="640" height="360"
+                    allow="autoplay; fullscreen"></iframe></body></html>''')
+                return
         movie = {"slug": "fixture-movie", "title": {"vi": "Phim kiểm thử"}, "mediaType": "movie"}
         if path == "/api/home":
             self.send_json({"list": [movie], "genres": ["Hành động"]})

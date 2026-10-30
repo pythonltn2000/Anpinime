@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -13,6 +14,7 @@ final class ProviderProtocol: URLProtocol {
     static var mediaType = "video/x-matroska"
     static var mediaGetStatus = 206
     static var mediaGetType = "video/mp4"
+    static var directoryEnvelope = Data()
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func stopLoading() {}
@@ -24,11 +26,18 @@ final class ProviderProtocol: URLProtocol {
         let mediaType = Self.mediaType
         let mediaGetStatus = Self.mediaGetStatus
         let mediaGetType = Self.mediaGetType
+        let directoryEnvelope = Self.directoryEnvelope
         Self.lock.unlock()
         let url = request.url!, host = url.host!, path = url.path
         var status = 200
         var body: Any
         var html: String?
+        if host == "rip.cryboiz.workers.dev", path == "/api/add" {
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: directoryEnvelope)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
         if host == "vip.example", request.httpMethod == "GET" {
             let body = mediaGetType.contains("json") ? Data("{\"error\":true}".utf8) : Data([0,0,0,24,0x66,0x74,0x79,0x70,0x69,0x73,0x6f,0x6d])
             client?.urlProtocol(self, didReceive: HTTPURLResponse(url: url, statusCode: mediaGetStatus, httpVersion: nil, headerFields: ["Content-Type": mediaGetType, "Content-Range": "bytes 0-11/12285989889"])!, cacheStoragePolicy: .notAllowed)
@@ -81,6 +90,26 @@ final class ProviderProtocol: URLProtocol {
         lock.lock(); defer { lock.unlock() }
         return requests
     }
+
+    static func setDirectory(_ config: [String: Any], tampered: Bool = false) throws {
+        // Public client configuration envelope, independent of account or CDN
+        // signing credentials. Exercise production authenticated decoding.
+        let key = SymmetricKey(data: Data([206, 51, 195, 123, 77, 239, 26, 201, 30, 27, 136, 218, 57, 173, 133, 211,
+                                          137, 62, 112, 164, 243, 123, 157, 247, 17, 203, 108, 161, 208, 77, 197, 2]))
+        let nonceData = Data(repeating: 7, count: 12)
+        let plaintext = try JSONSerialization.data(withJSONObject: ["data": config])
+        let box = try AES.GCM.seal(plaintext, using: key, nonce: AES.GCM.Nonce(data: nonceData))
+        var encrypted = box.ciphertext + box.tag
+        if tampered { encrypted[encrypted.count - 1] ^= 1 }
+        func encoded(_ value: Data) -> String {
+            value.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        }
+        let data = try JSONSerialization.data(withJSONObject: ["alg": "AES-GCM-256", "encoding": "base64url",
+                                                               "iv": encoded(nonceData), "ciphertext": encoded(encrypted)])
+        lock.lock(); defer { lock.unlock() }
+        directoryEnvelope = data
+    }
 }
 
 @MainActor
@@ -92,6 +121,7 @@ struct ProviderTests {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [ProviderProtocol.self]
         let session = URLSession(configuration: config)
+        try await verifyDirectoryMetadata(session: session)
         let source2 = Phim4KProvider.Configuration(core: .init(baseURL: URL(string: "https://core.example")!, apiKey: "fixture-key"), catalogs: [
             .init(id: "free1", url: URL(string: "https://free1.example")!, format: .free1),
             .init(id: "free2", url: URL(string: "https://free2.example")!, format: .free2)
@@ -176,5 +206,38 @@ struct ProviderTests {
     static func require(_ condition: @autoclosure () -> Bool, _ message: String) {
         guard condition() else { fatalError(message) }
         print("PASS: " + message)
+    }
+
+    @MainActor static func verifyDirectoryMetadata(session: URLSession) async throws {
+        let suite = "AnPinime.DirectoryMetadataTests." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let key = "AnPinime.source2Directory"
+        let original = ["api": "https://core.example", "free1": "https://free1.example", "free2": "https://free2.example", "tokens": "fixture-key"]
+        defaults.set(original, forKey: key)
+        require(MovieSourceDirectory.cdnGateway(defaults: defaults) == nil, "A missing CDN announcement never invents a default gateway")
+        ProviderProtocol.reset()
+        try ProviderProtocol.setDirectory(["cdn": "announced-cdn.example"])
+        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        require(MovieSourceDirectory.cdnGateway(defaults: defaults)?.absoluteString == "https://announced-cdn.example", "Authenticated directory CDN metadata is normalized to HTTPS")
+        var saved = defaults.dictionary(forKey: key) as! [String: String]
+        require(original.allSatisfy { saved[$0.key] == $0.value }, "Adding a CDN announcement preserves Core, both Free catalogs and their existing API configuration")
+        require(ProviderProtocol.captured().count == 1 && ProviderProtocol.captured().allSatisfy {
+            $0.url?.host == "rip.cryboiz.workers.dev" && $0.value(forHTTPHeaderField: "API-KEY") == nil
+        }, "Reading announced CDN metadata never requests that CDN or forwards Core credentials")
+        try ProviderProtocol.setDirectory(["free1": "new-free.example"])
+        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        saved = defaults.dictionary(forKey: key) as! [String: String]
+        require(MovieSourceDirectory.cdnGateway(defaults: defaults)?.host == "announced-cdn.example" && saved["free1"] == "https://new-free.example"
+                && saved["api"] == original["api"] && saved["free2"] == original["free2"], "Partial bootstrap updates preserve the last announced CDN and unrelated catalogs")
+        for invalid in ["http://insecure.example", "https://cdn.example/?token=fixture", "https://user:password@cdn.example"] {
+            try ProviderProtocol.setDirectory(["cdn": invalid])
+            await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+            require(MovieSourceDirectory.cdnGateway(defaults: defaults)?.host == "announced-cdn.example", "Invalid CDN metadata cannot erase the last valid announcement")
+        }
+        try ProviderProtocol.setDirectory(["cdn": "unverified-cdn.example"], tampered: true)
+        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        require(MovieSourceDirectory.cdnGateway(defaults: defaults)?.host == "announced-cdn.example", "An unauthenticated directory envelope cannot replace CDN metadata")
+        ProviderProtocol.reset()
     }
 }

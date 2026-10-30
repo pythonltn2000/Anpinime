@@ -58,6 +58,13 @@ jobs:
       - name: Verify source-2 HLS through its real relay and mpv
         run: bash Tests/phim4k-live-smoke.sh hls
 
+      - name: Verify anime dynamic episode list and selected-episode playback
+        run: bash Tests/anime-smoke.sh fixture
+
+      - name: Check current AnimeVietsub episode list and playback
+        continue-on-error: true
+        run: bash Tests/anime-smoke.sh live
+
       - name: Check public Phim4K Free1 playback
         continue-on-error: true
         run: bash Tests/phim4k-live-smoke.sh

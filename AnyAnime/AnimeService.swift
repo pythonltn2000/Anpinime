@@ -319,7 +319,10 @@ final class AnimeService: ObservableObject {
                 episodes = HTMLParser.mergedEpisodes(episodes, full)
                 let numbered = full.compactMap(\.number)
                 let appearsTruncated = (numbered.max() ?? 0) > Set(numbered).count
-                if episodes.isEmpty || appearsTruncated {
+                // Legacy pages can initially expose just episode 1, then fill
+                // the rest with JavaScript. That preview is not a complete list.
+                let numberedPreview = full.count == 1 && full.first?.number != nil
+                if episodes.isEmpty || appearsTruncated || numberedPreview {
                     let (rendered, renderedURL) = try await website.load(watchURL, waitForEpisodes: true)
                     cacheHTML(rendered, for: watchURL)
                     let dynamic = try await parseAnimeEpisodes(rendered, anime: anime, baseURL: renderedURL)
@@ -328,7 +331,7 @@ final class AnimeService: ObservableObject {
             } catch {
                 if episodes.isEmpty { throw error }
             }
-        } else if episodes.isEmpty {
+        } else if episodes.isEmpty || (episodes.count == 1 && episodes.first?.number != nil) {
             let (rendered, renderedURL) = try await website.load(detailURL, waitForEpisodes: true)
             cacheHTML(rendered, for: detailURL)
             let dynamic = try await parseAnimeEpisodes(rendered, anime: anime, baseURL: renderedURL)

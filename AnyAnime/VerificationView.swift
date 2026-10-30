@@ -84,7 +84,7 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             self.inspecting = false
             guard self.generation == requestGeneration, self.pending != nil, let page = result as? [String: Any],
                   let html = page["html"] as? String, let url = self.webView.url,
-                  url.scheme == "https", !html.isEmpty else { return }
+                  self.acceptsPageURL(url), !html.isEmpty else { return }
             self.lastWasChallenge = HTMLParser.containsVerification(html)
             if !self.lastWasChallenge {
                 if self.waitForEpisodes {
@@ -113,6 +113,13 @@ final class WebsiteSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { continuation.resume(returning: $0) }
         }
         for cookie in cookies { HTTPCookieStorage.shared.setCookie(cookie) }
+    }
+
+    private func acceptsPageURL(_ url: URL) -> Bool {
+        #if DEBUG
+        if PlaybackSmokeTest.animeFixture, url.scheme == "http", url.host == "127.0.0.1", url.port == 8765 { return true }
+        #endif
+        return url.scheme == "https"
     }
 
     func cancel() { finish(.failure(CancellationError())) }

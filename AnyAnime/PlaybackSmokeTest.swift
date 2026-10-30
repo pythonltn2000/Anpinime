@@ -3,9 +3,12 @@ import SwiftUI
 
 enum PlaybackSmokeTest {
     static var enabled: Bool {
-        mpvFixture || ProcessInfo.processInfo.arguments.contains("--playback-smoke") || webOnly || movieSource != nil
+        animeSmoke || mpvFixture || ProcessInfo.processInfo.arguments.contains("--playback-smoke") || webOnly || movieSource != nil
     }
-    static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") && !source2Diagnostic }
+    static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") && !source2Diagnostic && !animeSmoke }
+    static var animeFixture: Bool { ProcessInfo.processInfo.arguments.contains("--anime-provider-smoke") }
+    static var liveAnime: Bool { ProcessInfo.processInfo.arguments.contains("--anime-live-smoke") }
+    static var animeSmoke: Bool { animeFixture || liveAnime }
     static var source2HLS: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-hls-smoke") }
     static var liveVIP: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-vip-smoke") }
     static var source2Diagnostic: Bool { liveSource2 || source2HLS || liveVIP }
@@ -18,11 +21,13 @@ enum PlaybackSmokeTest {
     }
     static var liveMovie: Bool { ProcessInfo.processInfo.arguments.contains("--film4k-live-smoke") }
     static var liveSource2: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-live-smoke") }
-    static var resultName: String? { liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : liveVIP ? "phim4k-vip" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
+    static var resultName: String? { animeFixture ? "anime-provider" : liveAnime ? "anime-live" : liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : liveVIP ? "phim4k-vip" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
+    @MainActor static var animeEpisodeCount = 0
+    @MainActor static var selectedAnimeEpisodeNumber: Int?
     @MainActor private static var firstVideoTime: Double?
     @MainActor private static var events: [[String: Any]] = []
     @MainActor static func diagnostic(_ event: String, fields: [String: Any]) {
-        guard source2Diagnostic else { return }
+        guard source2Diagnostic || animeSmoke else { return }
         var entry = fields
         // libmpv warnings may contain upstream or loopback URLs. Never retain
         // signed queries, cookies, tickets or the relay's per-playback IDs.
@@ -47,6 +52,10 @@ enum PlaybackSmokeTest {
     }
     @MainActor static func record(time: Double, backend: String, size: CGSize, playback: PlaybackState? = nil, videoSize: CGSize = .zero) {
         guard enabled, time > 1, size.width > size.height else { return }
+        if animeSmoke {
+            guard let playback, playback.playing, videoSize.width > 0, videoSize.height > 0,
+                  selectedAnimeEpisodeNumber == 1, animeEpisodeCount >= (animeFixture ? 2 : 1) else { return }
+        }
         var result: [String: Any] = ["time": time, "backend": backend, "landscape": true,
                                      "width": size.width, "height": size.height]
         if let playback {
@@ -61,7 +70,7 @@ enum PlaybackSmokeTest {
                 result["mkvAudioAndDualSubtitlesVerified"] = true
                 result["autoplayVerified"] = true
             }
-            if source2Diagnostic {
+            if source2Diagnostic || animeSmoke {
                 guard backend == "mpv", playback.playing, videoSize.width > 0, videoSize.height > 0 else { return }
                 if firstVideoTime == nil { firstVideoTime = time }
                 guard time - firstVideoTime! >= 1 else { return }
@@ -70,6 +79,11 @@ enum PlaybackSmokeTest {
                 result["videoWidth"] = videoSize.width
                 result["videoHeight"] = videoSize.height
                 result["advancingVideoVerified"] = true
+                if animeSmoke {
+                    result["sample"] = liveAnime ? "AnimeVietsub .news / Bleach a5985" : "Local anime metadata → dynamic episodes → player"
+                    result["episodeCount"] = animeEpisodeCount
+                    result["selectedEpisodeNumber"] = selectedAnimeEpisodeNumber ?? 0
+                }
             }
             result["audioChoices"] = playback.audioTracks.count
             result["subtitleChoices"] = playback.subtitleTracks.count
@@ -95,13 +109,56 @@ enum PlaybackSmokeTest {
 struct PlaybackSmokeView: View {
     private let episode = Episode(title: "Tập kiểm thử", url: URL(string: "http://127.0.0.1:8765/episode.html")!, number: 1, season: "Phần 1")
     var body: some View {
-        if PlaybackSmokeTest.mpvFixture {
+        if PlaybackSmokeTest.animeSmoke { AnimeSmokeView() }
+        else if PlaybackSmokeTest.mpvFixture {
             let media = URL(string: "http://127.0.0.1:8765/multitrack.mkv")!
             let item = Episode(title: "MKV · Hai âm thanh · Hai phụ đề", url: media, number: 1, season: "Kiểm thử", source: .kkphim,
                                playback: .directStream(url: media, webURL: nil, isWeb: false, referer: media))
             PlayerView(episode: item, title: "Kiểm thử mpv", artworkURL: nil, episodes: [item])
         } else if let source = PlaybackSmokeTest.movieSource { MovieSmokeView(source: source) }
         else { PlayerView(episode: episode, title: "Kiểm thử phát video", artworkURL: nil, episodes: [episode]) }
+    }
+}
+
+private struct AnimeSmokeView: View {
+    @EnvironmentObject private var service: AnimeService
+    @State private var detail: AnimeDetail?
+    @State private var error = ""
+    var body: some View {
+        ZStack {
+            if let detail, let episode = detail.episodes.first(where: { $0.number == 1 }) {
+                PlayerView(episode: episode, title: detail.title, artworkURL: detail.posterURL, episodes: detail.episodes)
+            } else {
+                Text(error.isEmpty ? "Kiểm thử Anime: thông tin → tập → video" : error)
+                    .task {
+                        do {
+                            service.selectSource(.anime)
+                            let item: Anime
+                            if PlaybackSmokeTest.animeFixture {
+                                await service.loadHome(forceDomainRefresh: true)
+                                guard let first = service.homeSections.flatMap(\.items).first else { throw AnimeServiceError.emptyData }
+                                item = first
+                            } else {
+                                item = Anime(title: "Bleach", url: URL(string: "https://animevietsub.news/phim/bleach-sennen-kessen-hen-kashin-tan-a5985/")!,
+                                             imageURL: nil, episodeText: "", quality: "", score: "")
+                            }
+                            let meta = try await service.detailMetadata(for: item, forceRefresh: true)
+                            let episodes = try await service.loadEpisodes(for: item, initialDetail: meta, forceRefresh: true)
+                            guard let selected = episodes.first(where: { $0.number == 1 }) else { throw AnimeServiceError.emptyData }
+                            PlaybackSmokeTest.animeEpisodeCount = episodes.count
+                            PlaybackSmokeTest.selectedAnimeEpisodeNumber = selected.number
+                            PlaybackSmokeTest.diagnostic("anime-episodes", fields: ["episodeCount": episodes.count,
+                                "selectedEpisodeNumber": selected.number ?? 0, "host": selected.url.host ?? "", "path": selected.url.path])
+                            detail = AnimeDetail(title: meta.title, posterURL: meta.posterURL, bannerURL: meta.bannerURL,
+                                                 summary: meta.summary, info: meta.info, episodes: episodes)
+                        } catch {
+                            self.error = error.localizedDescription
+                            PlaybackSmokeTest.diagnostic("failure", fields: ["stage": "anime-episodes", "message": self.error])
+                        }
+                    }
+            }
+            VerificationGate(browser: service.website)
+        }
     }
 }
 

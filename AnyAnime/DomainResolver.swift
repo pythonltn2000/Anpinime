@@ -15,6 +15,10 @@ actor DomainResolver {
     func invalidate() { resolvedThisLaunch = nil }
 
     func resolve(force: Bool = false) async -> URL {
+        #if DEBUG
+        if PlaybackSmokeTest.animeFixture { return URL(string: "http://127.0.0.1:8765/")! }
+        if PlaybackSmokeTest.liveAnime { return URL(string: "https://animevietsub.news/")! }
+        #endif
         let configuration = UserDefaults.standard.string(forKey: AnimeSiteConfiguration.customURLKey) ?? ""
         if selectedConfiguration != configuration { resolvedThisLaunch = nil; selectedConfiguration = configuration }
         // An explicit user choice always wins over automatic/cache discovery.

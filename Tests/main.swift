@@ -162,6 +162,14 @@ let commentDetail = HTMLParser.detail(from: commentFixture, anime: animeFixture,
 check(commentDetail.episodes.map(\.title) == ["1", "Tập 2", "OVA 1"], "Anime excludes login redirects, usernames, comment permalinks, quoted episodes and script strings")
 check(commentDetail.episodes.allSatisfy { $0.season == "Vietsub" }, "Anime preserves server identity from the actual episode container")
 check(HTMLParser.watchURL(from: commentFixture, baseURL: animeBase, animeURL: animeFixture.url)?.path == "/phim/series-a1/xem-phim.html", "Watch-page discovery skips login redirects and comment links")
+let unmarkedLegacyHTML = try String(contentsOfFile: "Tests/Fixtures/anime-legacy-unmarked-episodes.html", encoding: .utf8)
+let unmarkedLegacy = HTMLParser.detail(from: unmarkedLegacyHTML, anime: animeFixture, baseURL: animeBase).episodes
+check(unmarkedLegacy.map(\.number) == [1, 2] && unmarkedLegacy.allSatisfy { $0.season == "Vietsub" }, "Unmarked legacy anchors retain supplied episodes and server while excluding comments, menus, forms, usernames, mismatched numbers and other shows")
+check(unmarkedLegacy.last?.url.query == "server=original", "Legacy recovery preserves the source-supplied episode query")
+check(HTMLParser.watchURL(from: unmarkedLegacyHTML, baseURL: animeBase, animeURL: animeFixture.url)?.path == "/phim/series-a1/tap-01-10001.html", "Watch discovery follows the first actual unmarked legacy episode without inventing a URL")
+let legacyAlias = unmarkedLegacyHTML.replacingOccurrences(of: "series-a1", with: "renamed-series-a1")
+let canonicalLegacy = "<link rel='canonical' href='/phim/renamed-series-a1/'>" + legacyAlias
+check(HTMLParser.detail(from: canonicalLegacy, anime: animeFixture, baseURL: animeBase).episodes.map(\.number) == [1, 2], "Unmarked legacy anchors respect a canonical alias with the same stable anime ID")
 let kkMenu = MovieBrowseCatalog.defaults(for: .kkphim)
 check(kkMenu.filter { $0.group == "Danh sách phim" }.count == 12, "KKPhim exposes all twelve lists shown on its website")
 check(kkMenu.filter { $0.group == "Thể loại" }.count == 26 && kkMenu.filter { $0.group == "Quốc gia" }.count == 36, "KKPhim retains its complete genre and country menus")

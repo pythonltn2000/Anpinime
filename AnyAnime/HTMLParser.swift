@@ -107,7 +107,12 @@ enum HTMLParser {
             // its episode grid without legacy btn-episode class names.
             let modernRoute = url.path.hasPrefix("/xem-phim/") && url.pathComponents.count >= 4
             let identifiedEpisode = button || episodeContainer
-            guard (episodeLabel || (identifiedEpisode && !rawTitle.isEmpty)), identifiedEpisode || hash || modernRoute else {
+            // Older pages can use ordinary numbered anchors without any of
+            // these CSS markers. Restore that case only when both the show
+            // path and the episode number in the label/URL agree.
+            let legacyNumbered = !href.contains("#") && legacyNumberedEpisode(rawTitle, url: url, animeURL: identityURL) != nil
+            guard (episodeLabel || legacyNumbered || (identifiedEpisode && !rawTitle.isEmpty)),
+                  identifiedEpisode || hash || modernRoute || legacyNumbered else {
                 rejectedCount += 1
                 continue
             }
@@ -181,9 +186,31 @@ enum HTMLParser {
             if link.marker.split(whereSeparator: \.isWhitespace).contains("btn-episode") || link.ancestors.contains(where: { $0.marker.contains("list-episode") || $0.marker.contains("list-server") }) {
                 let number = first(#"(?i)^(?:(?:tập|tap|ep)[ .:_-]*)?([0-9]+)"#, in: link.text).flatMap(Int.init) ?? Int.max
                 episodeCandidates.append((number, url))
+            } else if !href.contains("#"), let identity, let number = legacyNumberedEpisode(link.text, url: url, animeURL: identity) {
+                episodeCandidates.append((number, url))
             }
         }
         return episodeCandidates.min { $0.0 < $1.0 }?.1
+    }
+
+    /// Accept a source-supplied legacy URL, never a guessed URL or a numbered
+    /// username. Comments/navigation were excluded by the caller already.
+    private static func legacyNumberedEpisode(_ title: String, url: URL, animeURL: URL) -> Int? {
+        func normalized(_ component: String) -> String {
+            component.replacingOccurrences(of: #"(?i)\.html$"#, with: "", options: .regularExpression)
+        }
+        let show = animeURL.pathComponents.filter { $0 != "/" }
+        let candidate = url.pathComponents.filter { $0 != "/" }
+        let commentQuery = URLComponents(url: url, resolvingAgainstBaseURL: true)?.queryItems?.contains {
+            ["comment", "comment_id", "reply", "replytocom"].contains($0.name.lowercased())
+        } ?? false
+        guard !commentQuery, show.count >= 2, ["phim", "xem-phim"].contains(show[0].lowercased()),
+              candidate.count == 3, candidate[0].lowercased() == "phim",
+              normalized(show[1]) == normalized(candidate[1]),
+              let label = first(#"(?i)^(?:(?:tập|tap|ep(?:isode)?)[ .:_-]*)?([0-9]+)(?:[ ._–—-]+(?:end|cuối|final|vietsub|thuyết minh|thuyet minh|raw|lồng tiếng|long tieng|full|hd))*$"#, in: title).flatMap(Int.init),
+              let path = first(#"(?i)^(?:tap|ep)-?([0-9]+)(?:[.-][0-9a-zA-Z_]+)*(?:\.html)?$"#, in: candidate[2]).flatMap(Int.init),
+              label == path else { return nil }
+        return label
     }
 
     /// Canonical aliases may rename a slug while retaining the source's stable

@@ -17,7 +17,15 @@ enum MovieSourceDirectory {
         return CoreAPI(baseURL: host, apiKey: key)
     }
 
-    static func refresh(session: URLSession) async {
+    /// Announced gateway metadata only. It is not a playable media URL and
+    /// must not be used to rewrite a film URL or invent a signing request.
+    /// No default is supplied when the original app directory omits it.
+    static func cdnGateway(defaults: UserDefaults = .standard) -> URL? {
+        let saved = defaults.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
+        return saved["cdn"].flatMap(address)
+    }
+
+    static func refresh(session: URLSession, defaults: UserDefaults = .standard) async {
         do {
             var request = URLRequest(url: URL(string: "https://rip.cryboiz.workers.dev/api/add")!)
             request.timeoutInterval = 3.5
@@ -36,15 +44,15 @@ enum MovieSourceDirectory {
             guard let config = decoded["data"] as? MovieCatalog.Object else { throw MovieSourceError.invalidData }
             // A partial bootstrap response must not erase an already-known
             // Free2 catalog or a valid Core configuration.
-            var updated = UserDefaults.standard.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
-            for name in ["free1", "free2", "api"] {
+            var updated = defaults.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
+            for name in ["free1", "free2", "api", "cdn"] {
                 if let value = config[name] as? String, let url = address(value) { updated[name] = url.absoluteString }
             }
             if let token = config["tokens"] as? String, !token.isEmpty {
                 updated["tokens"] = token
             }
             if !updated.isEmpty {
-                UserDefaults.standard.set(updated, forKey: "AnPinime.source2Directory")
+                defaults.set(updated, forKey: "AnPinime.source2Directory")
             }
         } catch { /* A last-known directory remains useful during a temporary bootstrap outage. */ }
     }
