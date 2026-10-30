@@ -66,6 +66,10 @@ jobs:
         if: always()
         run: python3 Tests/source2_live_probe.py
 
+      - name: Check original Core Wakanda server 31937 playback
+        continue-on-error: true
+        run: bash Tests/phim4k-live-smoke.sh vip
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -5,9 +5,10 @@ enum PlaybackSmokeTest {
     static var enabled: Bool {
         mpvFixture || ProcessInfo.processInfo.arguments.contains("--playback-smoke") || webOnly || movieSource != nil
     }
-    static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") && !liveSource2 && !source2HLS }
+    static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") && !source2Diagnostic }
     static var source2HLS: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-hls-smoke") }
-    static var source2Diagnostic: Bool { liveSource2 || source2HLS }
+    static var liveVIP: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-vip-smoke") }
+    static var source2Diagnostic: Bool { liveSource2 || source2HLS || liveVIP }
     static var webOnly: Bool { ProcessInfo.processInfo.arguments.contains("--web-playback-smoke") }
     static var providerFixture: Bool { source2HLS || ProcessInfo.processInfo.arguments.contains("--movie-provider-smoke") || ProcessInfo.processInfo.arguments.contains("--phim4k-provider-smoke") }
     static var movieSource: ContentSource? {
@@ -17,7 +18,7 @@ enum PlaybackSmokeTest {
     }
     static var liveMovie: Bool { ProcessInfo.processInfo.arguments.contains("--film4k-live-smoke") }
     static var liveSource2: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-live-smoke") }
-    static var resultName: String? { liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
+    static var resultName: String? { liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : liveVIP ? "phim4k-vip" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
     @MainActor private static var firstVideoTime: Double?
     @MainActor private static var events: [[String: Any]] = []
     @MainActor static func diagnostic(_ event: String, fields: [String: Any]) {
@@ -64,7 +65,7 @@ enum PlaybackSmokeTest {
                 guard backend == "mpv", playback.playing, videoSize.width > 0, videoSize.height > 0 else { return }
                 if firstVideoTime == nil { firstVideoTime = time }
                 guard time - firstVideoTime! >= 1 else { return }
-                result["sample"] = liveSource2 ? "Phim4K Free1 / thuong-nguyen-do" : "Local source-2 HLS through relay"
+                result["sample"] = liveSource2 ? "Phim4K Free1 / thuong-nguyen-do" : liveVIP ? "Core Wakanda / 10403 / 31937" : "Local source-2 HLS through relay"
                 result["mediaInfo"] = playback.mediaInfo
                 result["videoWidth"] = videoSize.width
                 result["videoHeight"] = videoSize.height
@@ -109,9 +110,18 @@ private struct MovieSmokeView: View {
     let source: ContentSource
     @State private var detail: AnimeDetail?
     @State private var error = ""
+    private var selectedEpisode: Episode? {
+        if PlaybackSmokeTest.liveVIP {
+            return detail?.episodes.first {
+                if case .phim4kCore(_, _, let id) = $0.playback { return id == "31937" }
+                return false
+            }
+        }
+        return detail?.episodes.first
+    }
     var body: some View {
         Group {
-            if let detail, let episode = detail.episodes.first {
+            if let detail, let episode = selectedEpisode {
                 PlayerView(episode: episode, title: detail.title, artworkURL: detail.posterURL, episodes: detail.episodes)
             } else {
                 Text(error.isEmpty ? "Kiểm thử danh sách → chi tiết → video" : error)
@@ -119,7 +129,10 @@ private struct MovieSmokeView: View {
                         do {
                             service.selectSource(source)
                             let items: [Anime]
-                            if PlaybackSmokeTest.liveSource2 {
+                            if PlaybackSmokeTest.liveVIP {
+                                items = [Anime(title: "Wakanda Forever", url: URL(string: "https://api.phim4k.space/rest-api/v130/single_details?type=movie&id=10403")!,
+                                               imageURL: nil, episodeText: "", quality: "", score: "", source: .phim4k)]
+                            } else if PlaybackSmokeTest.liveSource2 {
                                 // Fixed public Free1 sample. This is never used as a production fallback for VIP.
                                 items = try await service.search("Thương Nguyên Đồ", source: .phim4k).filter {
                                     $0.catalogLabel == "Phim4K · Free1" && $0.url.lastPathComponent == "thuong-nguyen-do"
@@ -130,7 +143,11 @@ private struct MovieSmokeView: View {
                             }
                             guard let item = items.first else { throw MovieSourceError.unavailable(service.status) }
                             detail = try await service.detail(for: item)
-                        } catch { self.error = error.localizedDescription }
+                            if selectedEpisode == nil { throw MovieSourceError.noVideo }
+                        } catch {
+                            self.error = error.localizedDescription
+                            PlaybackSmokeTest.diagnostic("failure", fields: ["stage": "catalog-detail", "message": self.error])
+                        }
                     }
             }
         }

@@ -188,6 +188,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 } else { self.showNativePlayer(url: resolved.url) }
             } catch {
                 guard self.active, !Task.isCancelled else { return }
+                #if DEBUG
+                if PlaybackSmokeTest.source2Diagnostic { PlaybackSmokeTest.diagnostic("failure", fields: ["stage": "resolve", "message": error.localizedDescription]) }
+                #endif
                 if refresh, let url = self.providerWebURL { self.startFallback(url: url) }
                 else { self.playback.error = error.localizedDescription }
             }

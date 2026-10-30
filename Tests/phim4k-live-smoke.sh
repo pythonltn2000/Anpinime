@@ -3,6 +3,10 @@ set -euo pipefail
 ANPINIME_MODE=${1:-live}
 ANPINIME_RESULT=phim4k-live
 ANPINIME_FLAG=--phim4k-live-smoke
+if [ "$ANPINIME_MODE" = vip ]; then
+  ANPINIME_RESULT=phim4k-vip
+  ANPINIME_FLAG=--phim4k-vip-smoke
+fi
 if [ "$ANPINIME_MODE" = hls ]; then
   ANPINIME_RESULT=phim4k-hls
   ANPINIME_FLAG=--phim4k-hls-smoke
