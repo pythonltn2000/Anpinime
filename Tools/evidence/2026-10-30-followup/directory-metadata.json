@@ -1,0 +1,25 @@
+{
+  "httpStatus": 200,
+  "envelopeSHA256": "f074886859c6eee7a476abaf968e1ff14b113e834a08af122ed436a12afae84f",
+  "fields": [
+    "api",
+    "cdn",
+    "dich",
+    "free1",
+    "free2",
+    "json",
+    "love",
+    "medata",
+    "meo",
+    "party",
+    "plugin",
+    "rq",
+    "tbao",
+    "tmdb",
+    "tokens"
+  ],
+  "api": "api.phim4k.space",
+  "cdn": "svpc.cryboiz.workers.dev",
+  "free1": "free.cryboiz.workers.dev",
+  "free2": "free2.p4k.dpdns.org"
+}

@@ -185,3 +185,21 @@ small permanent JSON evidence is in `Tools/evidence/2026-10-30/`. The workflow's
 live steps use continue-on-error: a green build still does not establish Free1
 or VIP playback. There are no signed URLs, cookies or account sessions in the
 new evidence files.
+
+
+## Follow-up on earlier anime builds and premium configuration — 2026-10-30
+
+`REPAIR_REPORT_V5.md` traces two episode-list regressions to the older code and
+records a complete simulator anime pipeline with late JS-added episodes and
+cancellation/cache checks. Final code `7b600ca`, run `41143287070`, passes that
+fixture with two episodes and decoded 320x180 video at 3.958 seconds. Live .news
+still requires browser verification in the runner; it has no live success JSON.
+
+`Tools/premium-transport-review.md` records new source-2 evidence: the authenticated
+public directory announces `svpc.cryboiz.workers.dev`, while the old unused
+helper hardcodes another gateway. The directory reader now retains this CDN
+metadata, without rewriting media URLs or enabling the unverified signer. The
+original IPA/disassembly is unavailable in this workspace; earlier signing
+claims and fixed success logs are not a substitute for that trace. Wakanda
+stream keys and file handles are distinct, stable fields, not literal aliases.
+Safe metadata and playback evidence live in `Tools/evidence/2026-10-30-followup/`.

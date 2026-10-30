@@ -1,0 +1,56 @@
+{
+  "source": "Read-only comparison of repository Wakanda fixture and saved live snapshot; no new network requests",
+  "servers": [
+    {
+      "serverID": "31937",
+      "streamKeyType": "string",
+      "streamKeyLength": 12,
+      "fileHandleLength": 12,
+      "sameHandleEvenIgnoringCase": false,
+      "keyMatchesAnyOfFiveHandlesIgnoringCase": false,
+      "sameFileURLAcrossSnapshots": true,
+      "sameStreamKeyAcrossSnapshots": true
+    },
+    {
+      "serverID": "33090",
+      "streamKeyType": "string",
+      "streamKeyLength": 12,
+      "fileHandleLength": 12,
+      "sameHandleEvenIgnoringCase": false,
+      "keyMatchesAnyOfFiveHandlesIgnoringCase": false,
+      "sameFileURLAcrossSnapshots": true,
+      "sameStreamKeyAcrossSnapshots": true
+    },
+    {
+      "serverID": "27463",
+      "streamKeyType": "null",
+      "streamKeyLength": null,
+      "fileHandleLength": 15,
+      "sameHandleEvenIgnoringCase": null,
+      "keyMatchesAnyOfFiveHandlesIgnoringCase": null,
+      "sameFileURLAcrossSnapshots": true,
+      "sameStreamKeyAcrossSnapshots": true
+    },
+    {
+      "serverID": "31938",
+      "streamKeyType": "string",
+      "streamKeyLength": 12,
+      "fileHandleLength": 12,
+      "sameHandleEvenIgnoringCase": false,
+      "keyMatchesAnyOfFiveHandlesIgnoringCase": false,
+      "sameFileURLAcrossSnapshots": true,
+      "sameStreamKeyAcrossSnapshots": true
+    },
+    {
+      "serverID": "31939",
+      "streamKeyType": "string",
+      "streamKeyLength": 12,
+      "fileHandleLength": 12,
+      "sameHandleEvenIgnoringCase": false,
+      "keyMatchesAnyOfFiveHandlesIgnoringCase": false,
+      "sameFileURLAcrossSnapshots": true,
+      "sameStreamKeyAcrossSnapshots": true
+    }
+  ],
+  "conclusion": "Four non-empty keys are distinct from all five URL file handles, including case-insensitive comparison. One key is null. Keys and URLs are unchanged between snapshots. No cryptographic or transport relationship is established by these shape comparisons."
+}

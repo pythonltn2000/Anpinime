@@ -1,0 +1,60 @@
+{
+  "baseline": "44cd48a",
+  "codeCommit": "7b600ca",
+  "files": [
+    {
+      "path": "AnyAnime/MovieCatalog.swift",
+      "unchanged": true,
+      "baselineSHA256": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da",
+      "currentSHA256": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da"
+    },
+    {
+      "path": "AnyAnime/MovieProvider.swift",
+      "unchanged": true,
+      "baselineSHA256": "811e079c2fa9d9d4529d9869b5ba0057b1db56b869681629ee3aab2fd15cef93",
+      "currentSHA256": "811e079c2fa9d9d4529d9869b5ba0057b1db56b869681629ee3aab2fd15cef93"
+    },
+    {
+      "path": "AnyAnime/MovieBrowseCatalog.swift",
+      "unchanged": true,
+      "baselineSHA256": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055",
+      "currentSHA256": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055"
+    },
+    {
+      "path": "AnyAnime/FilmMediaRelay.swift",
+      "unchanged": true,
+      "baselineSHA256": "9c570845e33bbb1f16db825b047a2d5b1f289bde9843f492924664f060a63072",
+      "currentSHA256": "9c570845e33bbb1f16db825b047a2d5b1f289bde9843f492924664f060a63072"
+    },
+    {
+      "path": "AnyAnime/FilmMediaTransform.swift",
+      "unchanged": true,
+      "baselineSHA256": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9",
+      "currentSHA256": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9"
+    },
+    {
+      "path": "AnyAnime/Models.swift",
+      "unchanged": true,
+      "baselineSHA256": "d2479a9cfd958f7ff3bf08c58468201c69607bec999566160184a70d448bcef9",
+      "currentSHA256": "d2479a9cfd958f7ff3bf08c58468201c69607bec999566160184a70d448bcef9"
+    },
+    {
+      "path": "AnyAnime/Phim4KProvider.swift",
+      "unchanged": true,
+      "baselineSHA256": "a2c88d51891c2c5e41bd3250def758fb3e2dcfa67ef5d2f1a480fec3a0801a2e",
+      "currentSHA256": "a2c88d51891c2c5e41bd3250def758fb3e2dcfa67ef5d2f1a480fec3a0801a2e"
+    },
+    {
+      "path": "AnyAnime/Phim4KCatalog.swift",
+      "unchanged": true,
+      "baselineSHA256": "8fa7b95cdcbbab2fe9b67d78494dacf0369977100af936fcc5321446128c0178",
+      "currentSHA256": "8fa7b95cdcbbab2fe9b67d78494dacf0369977100af936fcc5321446128c0178"
+    },
+    {
+      "path": "AnyAnime/Phim4KVIPResolver.swift",
+      "unchanged": true,
+      "baselineSHA256": "c8ec45d598cd25ee9e51c639d47355aa603b54064d339657230a8a1485fff8cd",
+      "currentSHA256": "c8ec45d598cd25ee9e51c639d47355aa603b54064d339657230a8a1485fff8cd"
+    }
+  ]
+}
