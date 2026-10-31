@@ -71,7 +71,16 @@ final class Phim4KRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked S
     private let allowRemoteHTTP: Bool
     private let maxRedirects: Int
     private let lock = NSLock()
-    private var redirectCounts: [ObjectIdentifier: Int] = [:]
+    private struct TaskKey: Hashable {
+        let session: ObjectIdentifier
+        let identifier: Int
+    }
+    private final class RedirectCount {
+        weak var task: URLSessionTask?
+        let count: Int
+        init(task: URLSessionTask, count: Int) { self.task = task; self.count = count }
+    }
+    private var redirectCounts: [TaskKey: RedirectCount] = [:]
 
     init(mode: Mode, allowLoopbackHTTP: Bool = false, allowRemoteHTTP: Bool = false, maxRedirects: Int = 5) {
         self.mode = mode
@@ -84,9 +93,13 @@ final class Phim4KRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked S
                     willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) {
         lock.lock()
-        let taskKey = ObjectIdentifier(task)
-        let count = (redirectCounts[taskKey] ?? 0) + 1
-        redirectCounts[taskKey] = count
+        // Object addresses can be reused after a completed data(for:) request.
+        // Session task identifiers remain unique; weak entries also clean up
+        // completion-handler tasks that do not call the completion delegate.
+        redirectCounts = redirectCounts.filter { $0.value.task != nil }
+        let taskKey = TaskKey(session: ObjectIdentifier(session), identifier: task.taskIdentifier)
+        let count = (redirectCounts[taskKey]?.count ?? 0) + 1
+        redirectCounts[taskKey] = RedirectCount(task: task, count: count)
         lock.unlock()
         guard count <= maxRedirects, let original = response.url, let destination = request.url,
               mode == .media || Phim4KTransportPolicy.sameOrigin(original, destination) else {
@@ -97,6 +110,7 @@ final class Phim4KRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked S
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        lock.lock(); redirectCounts.removeValue(forKey: ObjectIdentifier(task)); lock.unlock()
+        let taskKey = TaskKey(session: ObjectIdentifier(session), identifier: task.taskIdentifier)
+        lock.lock(); redirectCounts.removeValue(forKey: taskKey); lock.unlock()
     }
 }

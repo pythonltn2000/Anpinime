@@ -435,7 +435,9 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path.startswith('/loop/'):
             destination = '/loop/'+str(int(self.path.rsplit('/',1)[1])+1)
         else: destination = None
-        body = json.dumps({k:self.headers.get(k) for k in ['API-KEY','Authorization','Cookie','Range','User-Agent']}).encode()
+        values = {k:self.headers.get(k) for k in ['API-KEY','Authorization','Cookie','Range','User-Agent']}
+        values['fixturePath'] = self.path
+        body = json.dumps(values).encode()
         self.send_response(302 if destination else 200)
         if destination: self.send_header('Location',destination)
         self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
@@ -475,9 +477,14 @@ threading.Event().wait()
         let (sameBody, sameResponse) = try await coreSession.data(for: cross)
         let sameHeaders = try JSONSerialization.jsonObject(with: sameBody) as! [String: Any]
         require((sameResponse as? HTTPURLResponse)?.statusCode == 200 && sameHeaders["API-KEY"] as? String == "fixture-key", "Same-origin Core redirects retain the required client header")
-        for _ in 0..<2 {
-            let (_, bounded) = try await mediaSession.data(from: root.appendingPathComponent("loop/0"))
-            require((bounded as? HTTPURLResponse)?.statusCode == 302 && bounded.url?.path == "/loop/2", "Redirect count is bounded per task and resets for a new request")
+        for iteration in 0..<2 {
+            let (boundedBody, bounded) = try await mediaSession.data(from: root.appendingPathComponent("loop/0"))
+            let actual = try JSONSerialization.jsonObject(with: boundedBody) as! [String: Any]
+            let status = (bounded as? HTTPURLResponse)?.statusCode ?? 0
+            let path = bounded.url?.path ?? "missing"
+            let serverPath = actual["fixturePath"] as? String ?? "missing"
+            require(status == 302 && path == "/loop/2" && serverPath == "/loop/2",
+                    "Redirect count is bounded per task and resets for a new request; iteration=\(iteration), status=\(status), responsePath=\(path), serverPath=\(serverPath)")
         }
     }
 
