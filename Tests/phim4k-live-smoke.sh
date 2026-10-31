@@ -3,6 +3,13 @@ set -euo pipefail
 ANPINIME_MODE=${1:-live}
 ANPINIME_RESULT=phim4k-live
 ANPINIME_FLAG=--phim4k-live-smoke
+cleanup() {
+  if [ -n "${ANPINIME_SIMULATOR_ID:-}" ]; then
+    xcrun simctl terminate "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime >/dev/null 2>&1 || true
+  fi
+  if [ -n "${ANPINIME_SERVER_PID:-}" ]; then kill "$ANPINIME_SERVER_PID" || true; fi
+}
+trap cleanup EXIT
 if [ "$ANPINIME_MODE" = vip ]; then
   ANPINIME_RESULT=phim4k-vip
   ANPINIME_FLAG=--phim4k-vip-smoke
@@ -14,7 +21,6 @@ if [ "$ANPINIME_MODE" = hls ]; then
   ffmpeg -hide_banner -loglevel error -y -i Tests/multitrack.mkv -map 0:v:0 -map 0:a:0 -c copy -t 12 -f hls -hls_time 3 -hls_list_size 0 -hls_base_url /source2-hls/ Tests/source2-hls/index.m3u8
   python3 Tests/serve_player.py --source2-hls > "$RUNNER_TEMP/anpinime-source2-hls-server.log" 2>&1 &
   ANPINIME_SERVER_PID=$!
-  trap 'kill "$ANPINIME_SERVER_PID" || true' EXIT
   ANPINIME_READY=0
   for attempt in $(seq 1 20); do
     if python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",8765),timeout=1); s.close()' 2>/dev/null; then ANPINIME_READY=1; break; fi

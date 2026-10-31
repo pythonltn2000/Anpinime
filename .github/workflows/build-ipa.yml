@@ -18,13 +18,15 @@ jobs:
 
       - name: Verify parsing and playback regressions
         run: |
-          swiftc AnyAnime/Models.swift AnyAnime/AnimeSiteConfiguration.swift AnyAnime/AnimeScheduleStore.swift AnyAnime/HTMLDocument.swift AnyAnime/HTMLParser.swift AnyAnime/MovieBrowseCatalog.swift AnyAnime/MovieCatalog.swift AnyAnime/Phim4KCatalog.swift AnyAnime/Phim4KVIPResolver.swift AnyAnime/Phim4KRelayNaming.swift AnyAnime/SearchHistory.swift AnyAnime/FilmMediaTransform.swift Tests/main.swift -o "$RUNNER_TEMP/anpinime-parser-tests"
+          swiftc AnyAnime/Models.swift AnyAnime/AnimeSiteConfiguration.swift AnyAnime/AnimeScheduleStore.swift AnyAnime/HTMLDocument.swift AnyAnime/HTMLParser.swift AnyAnime/MovieBrowseCatalog.swift AnyAnime/MovieCatalog.swift AnyAnime/Phim4KCatalog.swift AnyAnime/Phim4KVIPResolver.swift AnyAnime/Phim4KTransportPolicy.swift AnyAnime/Phim4KMediaProbe.swift AnyAnime/Phim4KRelayNaming.swift AnyAnime/SearchHistory.swift AnyAnime/FilmMediaTransform.swift Tests/main.swift -o "$RUNNER_TEMP/anpinime-parser-tests"
           "$RUNNER_TEMP/anpinime-parser-tests"
-          swiftc AnyAnime/Models.swift AnyAnime/AnimeSiteConfiguration.swift AnyAnime/AnimeScheduleStore.swift AnyAnime/HTMLDocument.swift AnyAnime/HTMLParser.swift AnyAnime/MovieBrowseCatalog.swift AnyAnime/MovieCatalog.swift AnyAnime/Phim4KCatalog.swift AnyAnime/Phim4KVIPResolver.swift AnyAnime/Phim4KMediaProbe.swift AnyAnime/MovieSourceDirectory.swift AnyAnime/MovieProvider.swift AnyAnime/Phim4KProvider.swift Tests/ProviderTests.swift -o "$RUNNER_TEMP/anpinime-provider-tests"
+          swiftc AnyAnime/Phim4KTransportPolicy.swift AnyAnime/Phim4KMediaProbe.swift AnyAnime/Phim4KVIPResolver.swift Tests/Phim4KResolverTests.swift -o "$RUNNER_TEMP/anpinime-resolver-tests"
+          "$RUNNER_TEMP/anpinime-resolver-tests"
+          swiftc AnyAnime/Models.swift AnyAnime/AnimeSiteConfiguration.swift AnyAnime/AnimeScheduleStore.swift AnyAnime/HTMLDocument.swift AnyAnime/HTMLParser.swift AnyAnime/MovieBrowseCatalog.swift AnyAnime/MovieCatalog.swift AnyAnime/Phim4KCatalog.swift AnyAnime/Phim4KVIPResolver.swift AnyAnime/Phim4KTransportPolicy.swift AnyAnime/Phim4KMediaProbe.swift AnyAnime/MovieSourceDirectory.swift AnyAnime/MovieProvider.swift AnyAnime/Phim4KProvider.swift Tests/ProviderTests.swift -o "$RUNNER_TEMP/anpinime-provider-tests"
           "$RUNNER_TEMP/anpinime-provider-tests"
           npm install --prefix "$RUNNER_TEMP/anpinime-js-tests" jsdom@26.1.0 --no-audit --no-fund
           NODE_PATH="$RUNNER_TEMP/anpinime-js-tests/node_modules" node Tests/player.test.cjs
-          swiftc AnyAnime/Phim4KMediaProbe.swift Tests/RangeProbeTests.swift -o "$RUNNER_TEMP/anpinime-range-tests"
+          swiftc AnyAnime/Phim4KTransportPolicy.swift AnyAnime/Phim4KMediaProbe.swift Tests/RangeProbeTests.swift -o "$RUNNER_TEMP/anpinime-range-tests"
           python3 Tests/range_probe_server.py > "$RUNNER_TEMP/anpinime-range-server.log" 2>&1 &
           ANPINIME_RANGE_SERVER=$!
           trap 'kill "$ANPINIME_RANGE_SERVER" || true' EXIT

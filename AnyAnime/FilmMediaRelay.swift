@@ -31,11 +31,12 @@ final class FilmMediaRelay {
     private var requests: [UUID: Task<Void, Never>] = [:]
     private let mediaCache = NSCache<NSURL, NSData>()
 
-    init(origin: URL, headers: [String: String], preserveMediaExtensions: Bool = false) {
+    init(origin: URL, headers: [String: String], preserveMediaExtensions: Bool = false, useSharedCookies: Bool = true) {
         self.origin = origin; self.headers = headers
         self.preserveMediaExtensions = preserveMediaExtensions
         let config = URLSessionConfiguration.ephemeral
-        config.httpCookieStorage = .shared
+        config.httpCookieStorage = useSharedCookies ? .shared : nil
+        config.httpShouldSetCookies = useSharedCookies
         config.timeoutIntervalForRequest = 25
         config.timeoutIntervalForResource = 60
         config.httpMaximumConnectionsPerHost = 12

@@ -105,10 +105,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"movie": {"name": "Phim4K kiểm thử"}, "episodes": [{"server_name": "Vietsub", "server_data": [row]}]})
             return
         if SOURCE2_HLS and (path == "/api/content/stream/hls" or path.startswith("/source2-hls/")):
-            origin = urlsplit(self.headers.get("Origin", ""))
-            referer = urlsplit(self.headers.get("Referer", ""))
-            if origin.scheme != "http" or origin.hostname != "127.0.0.1" or referer.hostname != "127.0.0.1" or referer.path != "/":
-                self.send_error(403, "Source 2 requires its own catalog headers")
+            if self.headers.get("User-Agent") != "oxoo" or any(self.headers.get(key) for key in ("Origin", "Referer", "API-KEY", "Authorization", "Cookie")):
+                self.send_error(403, "Source 2 media requires its original header map")
                 return
             name = "index.m3u8" if path == "/api/content/stream/hls" else path.removeprefix("/source2-hls/")
             if name != "index.m3u8" and ("/" in name or not name.endswith(".ts")):

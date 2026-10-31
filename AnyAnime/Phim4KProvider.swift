@@ -11,9 +11,13 @@ final class Phim4KProvider {
     struct Configuration {
         let core: MovieSourceDirectory.CoreAPI?
         let catalogs: [Catalog]
+        var gateway: URL? = nil
     }
+    static let mediaHeaders = ["User-Agent": "oxoo"]
 
     private let session: URLSession
+    private let mediaSession: URLSession
+    private let allowLoopbackHTTP: Bool
     private let suppliedConfiguration: Configuration?
     private var configuration: Configuration?
     private var cache: [URL: (Date, Any)] = [:]
@@ -21,10 +25,30 @@ final class Phim4KProvider {
     private(set) var notice = ""
     var baseURL: URL { configuration?.core?.baseURL ?? configuration?.catalogs.first?.url ?? MovieSourceDirectory.coreAPI().baseURL }
 
-    init(session: URLSession, configuration: Configuration? = nil) {
-        self.session = session
+    init(session suppliedSession: URLSession, configuration: Configuration? = nil) {
+        var localFixture = configuration.map { config in
+            ([config.core?.baseURL].compactMap { $0 } + config.catalogs.map(\.url)).contains {
+                $0.scheme == "http" && ["127.0.0.1", "localhost", "::1", "[::1]"].contains($0.host ?? "")
+            }
+        } ?? false
+        #if DEBUG
+        localFixture = localFixture || PlaybackSmokeTest.providerFixture
+        #endif
+        allowLoopbackHTTP = localFixture
+        // Source 2 owns its transport delegates; the supplied source-1/3
+        // sessions and their cookie/redirect behavior are never mutated.
+        session = URLSession(configuration: suppliedSession.configuration,
+                             delegate: Phim4KRedirectPolicy(mode: .sameOriginOnly, allowLoopbackHTTP: localFixture), delegateQueue: nil)
+        let mediaConfig = suppliedSession.configuration
+        mediaConfig.httpAdditionalHeaders = nil
+        mediaConfig.httpCookieStorage = nil
+        mediaConfig.httpShouldSetCookies = false
+        mediaSession = URLSession(configuration: mediaConfig,
+                                  delegate: Phim4KRedirectPolicy(mode: .media, allowLoopbackHTTP: localFixture, allowRemoteHTTP: true), delegateQueue: nil)
         suppliedConfiguration = configuration
     }
+
+    deinit { session.invalidateAndCancel(); mediaSession.invalidateAndCancel() }
 
     func invalidate() { cache.removeAll(); configuration = nil; notice = "" }
 
@@ -45,7 +69,7 @@ final class Phim4KProvider {
             try Task.checkCancellation()
             let original = Configuration(core: MovieSourceDirectory.coreAPI(), catalogs: MovieSourceDirectory.catalogs().map {
                 Catalog(id: $0.id, url: $0.url, format: $0.format)
-            })
+            }, gateway: MovieSourceDirectory.cdnGateway())
             let custom = UserDefaults.standard.string(forKey: "AnPinime.phim4kURL")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let format = Phim4KFormat(rawValue: UserDefaults.standard.string(forKey: "AnPinime.phim4kFormat") ?? "") ?? .free1
             result = try Self.applyingCatalogOverride(custom, format: format, to: original)
@@ -73,7 +97,7 @@ final class Phim4KProvider {
         var catalogs = original.catalogs
         if let index = catalogs.firstIndex(where: { $0.id == format.rawValue }) { catalogs[index] = replacement }
         else { catalogs.append(replacement) }
-        return Configuration(core: original.core, catalogs: catalogs)
+        return Configuration(core: original.core, catalogs: catalogs, gateway: original.gateway)
     }
 
     func home(onInitial: ([AnimeSection]) -> Void) async throws -> [AnimeSection] {
@@ -204,54 +228,87 @@ final class Phim4KProvider {
     }
 
     func resolveCore(detailURL: URL, seasonID: String?, episodeID: String) async throws -> ResolvedPlayback {
-        _ = try await configure()
+        let config = try await configure()
         guard isCore(detailURL) else { throw MovieSourceError.invalidData }
         let json = try await object(detailURL, fresh: true)
         guard let stream = Phim4KCatalog.stream(json, seasonID: seasonID, episodeID: episodeID, base: detailURL) else {
             throw MovieSourceError.unavailable("Máy chủ đã chọn chưa cung cấp URL phát trực tiếp hoặc yêu cầu resolver hợp lệ.")
         }
-        // A capture observed "oxoo" on one host, but did not prove it was required.
-        let headers = ["User-Agent": "exoplayer", "Referer": baseURL.absoluteString + "/"]
-        guard ["https", "http"].contains(stream.url.scheme?.lowercased() ?? ""), stream.url.host != nil else {
+        let headers = Self.mediaHeaders
+        var mediaURL = stream.url
+        guard Phim4KTransportPolicy.permitsMediaEndpoint(mediaURL, allowLoopbackHTTP: allowLoopbackHTTP) else {
             throw MovieSourceError.unavailable("URL phát của máy chủ không hợp lệ.")
         }
+        if !stream.web, json["is_free_source"] as? Bool != true, Phim4KVIPResolver.requiresGateway(mediaURL) {
+            let gateway: URL?
+            if suppliedConfiguration != nil { gateway = config.gateway }
+            else {
+                // Refresh changing CDN metadata, retaining the last authenticated
+                // announcement if the public directory is temporarily offline.
+                await MovieSourceDirectory.refresh(session: session)
+                gateway = MovieSourceDirectory.cdnGateway()
+            }
+            guard let gateway else { throw Phim4KVIPResolver.Failure.missingGateway }
+            mediaURL = try await Phim4KVIPResolver.shared.resolve(mediaURL, gateway: gateway, session: session,
+                                                                allowLoopbackHTTP: allowLoopbackHTTP)
+        }
         if !stream.web {
-            var request = URLRequest(url: stream.url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
+            var request = URLRequest(url: mediaURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
             request.httpMethod = "HEAD"
             for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
             let http: HTTPURLResponse
             do {
-                let (_, response) = try await session.data(for: request)
+                let (_, response) = try await mediaSession.data(for: request)
                 guard let response = response as? HTTPURLResponse else { throw MovieSourceError.invalidData }
                 http = response
             } catch is CancellationError { throw CancellationError() }
             catch { throw MovieSourceError.unavailable("Không kết nối được máy chủ đã chọn: " + error.localizedDescription) }
             let type = http.value(forHTTPHeaderField: "Content-Type") ?? ""
             var status = http.statusCode
-            var kind = Phim4KCatalog.mediaKind(status: status, contentType: type, url: http.url ?? stream.url)
+            var kind = Phim4KCatalog.mediaKind(status: status, contentType: type, url: http.url ?? mediaURL)
             if [401, 403, 405, 501].contains(status) || kind == .unknown || kind == .intermediate {
                 // A HEAD response can be unsupported or describe an HTML endpoint
                 // while GET is media. Keep Range bounded even for 200 responses.
                 let result: Phim4KMediaProbe.Result
-                do { result = try await Phim4KMediaProbe().inspect(stream.url, headers: headers, configuration: session.configuration) }
+                do { result = try await Phim4KMediaProbe().inspect(mediaURL, headers: headers, configuration: mediaSession.configuration,
+                                                               allowLoopbackHTTP: allowLoopbackHTTP, allowRemoteHTTP: true) }
                 catch is CancellationError { throw CancellationError() }
                 catch { throw MovieSourceError.unavailable("Không kiểm tra được video: " + error.localizedDescription) }
                 status = result.response.statusCode
                 let contentType = result.response.value(forHTTPHeaderField: "Content-Type") ?? ""
-                kind = Phim4KCatalog.mediaKind(status: status, contentType: contentType, url: result.response.url ?? stream.url)
+                kind = Phim4KCatalog.mediaKind(status: status, contentType: contentType, url: result.response.url ?? mediaURL)
                 if (200..<300).contains(status), let signature = Phim4KCatalog.mediaKind(prefix: result.prefix) {
                     kind = signature
                 }
             }
             #if DEBUG
-            print("[Phim4K] server_id=\(episodeID) host=\(stream.url.host ?? "") media_http_status=\(status) playback_kind=\(kind)")
+            print("[Phim4K] server_id=\(episodeID) host=\(mediaURL.host ?? "") media_http_status=\(status) playback_kind=\(kind)")
             #endif
             if kind == .authenticationRequired { throw MovieSourceError.unavailable("AUTH_REQUIRED: Máy chủ yêu cầu quyền truy cập hoặc phiên đăng nhập hợp lệ.") }
             guard (200..<300).contains(status) else { throw MovieSourceError.unavailable("Máy chủ video trả HTTP \(status). Hãy thử lại hoặc chọn máy chủ khác.") }
             if kind == .intermediate { throw MovieSourceError.unavailable("Máy chủ trả về trang web hoặc JSON thay vì video; cần resolver hợp lệ.") }
             if kind == .unknown { throw MovieSourceError.unavailable("Không xác định được định dạng video từ phản hồi máy chủ.") }
         }
-        return ResolvedPlayback(url: stream.url, headers: headers, webURL: nil, isWeb: stream.web)
+        return ResolvedPlayback(url: mediaURL, headers: headers, webURL: nil, isWeb: stream.web)
+    }
+
+    /// The original app's is_free_source branch goes straight to media_kit.
+    /// Refresh the selected Free server/episode without entering the Core signer.
+    func resolveFree(detailURL: URL, serverName: String, episodeKey: String) async throws -> ResolvedPlayback {
+        let config = try await configure()
+        guard config.catalogs.contains(where: {
+            Phim4KTransportPolicy.permitsCoreRequest(detailURL, baseURL: $0.url, allowLoopbackHTTP: allowLoopbackHTTP)
+        }) else { throw MovieSourceError.invalidData }
+        let json = try await object(detailURL, fresh: true)
+        guard let row = MovieCatalog.episodeRow(json, serverName: serverName, key: episodeKey),
+              let stream = MovieCatalog.legacyStream(row, base: detailURL) else { throw MovieSourceError.noVideo }
+        if stream.web {
+            let origin = detailURL.scheme.flatMap { s in detailURL.host.map { "\(s)://\($0)" } } ?? baseURL.absoluteString
+            return ResolvedPlayback(url: stream.url, headers: ["User-Agent": AnimeService.userAgent, "Origin": origin, "Referer": origin + "/"],
+                                    webURL: MovieCatalog.url(row["link_embed"] ?? row["embed"], base: detailURL), isWeb: true)
+        }
+        guard Phim4KTransportPolicy.permitsMediaEndpoint(stream.url, allowLoopbackHTTP: allowLoopbackHTTP) else { throw MovieSourceError.noVideo }
+        return ResolvedPlayback(url: stream.url, headers: Self.mediaHeaders, webURL: nil, isWeb: false)
     }
 
     func episodeJSON(_ url: URL) async throws -> MovieCatalog.Object {
@@ -261,7 +318,8 @@ final class Phim4KProvider {
 
     private func isCore(_ url: URL) -> Bool {
         guard let core = configuration?.core else { return false }
-        return url.host == core.baseURL.host && url.path == "/" + Phim4KCatalog.prefix + "single_details"
+        return Phim4KTransportPolicy.permitsCoreRequest(url, baseURL: core.baseURL, allowLoopbackHTTP: allowLoopbackHTTP)
+            && url.path == "/" + Phim4KCatalog.prefix + "single_details"
     }
 
     private func object(_ url: URL, fresh: Bool = false) async throws -> MovieCatalog.Object {
@@ -271,8 +329,13 @@ final class Phim4KProvider {
 
     private func request(_ url: URL, fresh: Bool = false) async throws -> Any {
         guard let config = configuration else { throw MovieSourceError.invalidData }
-        let coreRequest = config.core.map { url.host == $0.baseURL.host && url.path.hasPrefix("/" + Phim4KCatalog.prefix) } ?? false
-        let freeRequest = config.catalogs.contains { url.host == $0.url.host && url.scheme == $0.url.scheme }
+        let coreRequest = config.core.map {
+            Phim4KTransportPolicy.permitsCoreRequest(url, baseURL: $0.baseURL, allowLoopbackHTTP: allowLoopbackHTTP)
+                && url.path.hasPrefix("/" + Phim4KCatalog.prefix)
+        } ?? false
+        let freeRequest = config.catalogs.contains {
+            Phim4KTransportPolicy.permitsCoreRequest(url, baseURL: $0.url, allowLoopbackHTTP: allowLoopbackHTTP)
+        }
         guard coreRequest || freeRequest else { throw MovieSourceError.unavailable("Đường dẫn không thuộc app Phim4K.") }
         if !fresh, let (date, json) = cache[url], Date().timeIntervalSince(date) < 120 { return json }
         var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)

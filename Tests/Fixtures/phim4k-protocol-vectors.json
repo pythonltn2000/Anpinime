@@ -1,0 +1,40 @@
+{
+  "note": "Non-secret Python cryptography reference vectors for algorithm traced from supplied IPA; not captured app requests.",
+  "vectors": [
+    {
+      "seed": "fixture-seed",
+      "timestamp": 1767355200,
+      "fileID": "fixture-file-id",
+      "gateway": "https://gateway.example/",
+      "expected": "https://gateway.example/fixture-file-id?token=3d0d01a2601096e202692e96b7c3323a728a039bb58b3d6944ee2d7b7ba45a31&ts=7a8dcfb5"
+    },
+    {
+      "seed": "fixture-seed",
+      "timestamp": 0,
+      "fileID": "zero",
+      "gateway": "https://gateway.example",
+      "expected": "https://gateway.example/zero?token=971a86671abd8aa701b438479f109ee78463b37b14c0e0065c552b4c7d823d6b&ts=eb969bcf"
+    },
+    {
+      "seed": "fixture-seed",
+      "timestamp": 16909060,
+      "fileID": "bytes.mkv",
+      "gateway": "https://gateway.example/v2/",
+      "expected": "https://gateway.example/v2/bytes.mkv?token=7461dab82fccc7ac47c1d8368105b6422463384ef3a9c15b862579d8633360ed&ts=a5dd06a8"
+    },
+    {
+      "seed": "fixture-seed",
+      "timestamp": 1793404799,
+      "fileID": "midnight",
+      "gateway": "https://gateway.example",
+      "expected": "https://gateway.example/midnight?token=33f427136c3840f7e142c1e126f4b946d538c5579607955042d4b1e3afc40037&ts=52740f99"
+    },
+    {
+      "seed": "fixture-seed",
+      "timestamp": 1793404800,
+      "fileID": "midnight",
+      "gateway": "https://gateway.example",
+      "expected": "https://gateway.example/midnight?token=ca43a3edc67aebda3112f28a2bc77f6d219de12ee8698311c781519a62f240f1&ts=6041e283"
+    }
+  ]
+}

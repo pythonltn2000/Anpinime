@@ -7,17 +7,17 @@ import FoundationNetworking
     static func main() async throws {
         let config = URLSessionConfiguration.ephemeral
         let root = URL(string: "http://127.0.0.1:8766")!
-        let first = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("range"), headers: [:], configuration: config)
+        let first = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("range"), headers: [:], configuration: config, allowLoopbackHTTP: true)
         assert(first.response.statusCode == 206)
         assert(first.response.value(forHTTPHeaderField: "Content-Range") == "bytes 0-2047/12285989889")
         assert(first.prefix.count == 2048 && first.prefix[4...7].elementsEqual(Data("ftyp".utf8)))
-        let ignored = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("ignore"), headers: [:], configuration: config)
+        let ignored = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("ignore"), headers: [:], configuration: config, allowLoopbackHTTP: true)
         assert(ignored.response.statusCode == 200 && ignored.prefix.count == 2048 && ignored.wasTruncated)
-        let redirected = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("redirect"), headers: [:], configuration: config)
+        let redirected = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("redirect"), headers: [:], configuration: config, allowLoopbackHTTP: true)
         assert(redirected.response.statusCode == 206 && redirected.prefix.count == 2048)
-        let denied = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("denied"), headers: [:], configuration: config)
+        let denied = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("denied"), headers: [:], configuration: config, allowLoopbackHTTP: true)
         assert(denied.response.statusCode == 403)
-        let json = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("json"), headers: [:], configuration: config)
+        let json = try await Phim4KMediaProbe().inspect(root.appendingPathComponent("json"), headers: [:], configuration: config, allowLoopbackHTTP: true)
         assert(json.response.statusCode == 200 && String(data: json.prefix, encoding: .utf8)?.hasPrefix("{") == true)
         print("PASS: bounded GET against virtual 12 GB resource, 206/200/redirect/403/JSON")
     }

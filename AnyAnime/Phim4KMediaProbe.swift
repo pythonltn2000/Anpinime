@@ -21,22 +21,31 @@ final class Phim4KMediaProbe: NSObject, URLSessionDataDelegate, @unchecked Senda
     private var cancelled = false
     private var task: URLSessionDataTask?
     private var session: URLSession?
+    private var allowLoopbackHTTP = false
+    private var sameOriginOnly = false
+    private var allowRemoteHTTP = false
+    private var redirectCount = 0
 
     init(limit: Int = 2048) { self.limit = max(1, min(limit, 65_536)) }
 
-    func inspect(_ url: URL, headers: [String: String], configuration: URLSessionConfiguration) async throws -> Result {
+    func inspect(_ url: URL, headers: [String: String], configuration: URLSessionConfiguration,
+                 allowLoopbackHTTP: Bool = false, sendRange: Bool = true, sameOriginOnly: Bool = false,
+                 allowRemoteHTTP: Bool = false) async throws -> Result {
         try await withTaskCancellationHandler(operation: {
             try Task.checkCancellation()
             return try await withCheckedThrowingContinuation { continuation in
                 lock.lock()
                 if cancelled { lock.unlock(); continuation.resume(throwing: CancellationError()); return }
                 self.continuation = continuation
+                self.allowLoopbackHTTP = allowLoopbackHTTP
+                self.sameOriginOnly = sameOriginOnly
+                self.allowRemoteHTTP = allowRemoteHTTP
                 let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
                 self.session = session
                 var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
                 request.httpMethod = "GET"
                 for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-                request.setValue("bytes=0-\(limit - 1)", forHTTPHeaderField: "Range")
+                if sendRange { request.setValue("bytes=0-\(limit - 1)", forHTTPHeaderField: "Range") }
                 request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
                 let task = session.dataTask(with: request)
                 self.task = task
@@ -49,15 +58,13 @@ final class Phim4KMediaProbe: NSObject, URLSessionDataDelegate, @unchecked Senda
     func urlSession(_ session: URLSession, task: URLSessionTask,
                     willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) {
-        var next = request
-        if response.url?.host?.lowercased() != request.url?.host?.lowercased() {
-            for name in (next.allHTTPHeaderFields ?? [:]).keys {
-                if !["range", "accept", "accept-encoding", "user-agent"].contains(name.lowercased()) {
-                    next.setValue(nil, forHTTPHeaderField: name)
-                }
-            }
+        lock.lock(); redirectCount += 1; let count = redirectCount; lock.unlock()
+        guard count <= 5, let original = response.url, let destination = request.url,
+              !sameOriginOnly || Phim4KTransportPolicy.sameOrigin(original, destination) else {
+            completionHandler(nil); return
         }
-        completionHandler(next)
+        completionHandler(Phim4KTransportPolicy.redirectedRequest(request, from: original, allowLoopbackHTTP: allowLoopbackHTTP,
+                                                                 allowRemoteHTTP: allowRemoteHTTP))
     }
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                     completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {

@@ -29,6 +29,7 @@ enum MovieSourceDirectory {
         do {
             var request = URLRequest(url: URL(string: "https://rip.cryboiz.workers.dev/api/add")!)
             request.timeoutInterval = 3.5
+            request.setValue("Dart/3.12 (dart:io)", forHTTPHeaderField: "User-Agent")
             let (data, response) = try await session.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200, data.count < 65_536 else { throw MovieSourceError.invalidData }
             let envelope = try MovieCatalog.object(data)

@@ -166,6 +166,9 @@ final class MovieProvider {
             let native = Self.isNative(selected)
             return ResolvedPlayback(url: native ? url : episode.url, headers: headers, webURL: episode.url, isWeb: !native)
         case .catalogEpisode(let detailURL, let serverName, let episodeKey):
+            if source == .phim4k {
+                return try await appProvider.resolveFree(detailURL: detailURL, serverName: serverName, episodeKey: episodeKey)
+            }
             // Refresh the exact provider, server and episode, even if the API reorders rows.
             let activeDetailURL = detailURL
             let json = try await (source == .phim4k ? appProvider.episodeJSON(detailURL) : request(detailURL))
@@ -179,6 +182,9 @@ final class MovieProvider {
             guard source == .phim4k else { throw MovieSourceError.invalidData }
             return try await appProvider.resolveCore(detailURL: detailURL, seasonID: seasonID, episodeID: episodeID)
         case .directStream(let url, let webURL, let isWeb, let referer):
+            if source == .phim4k, !isWeb {
+                return ResolvedPlayback(url: url, headers: Phim4KProvider.mediaHeaders, webURL: webURL, isWeb: false)
+            }
             let refURL = referer ?? baseURL
             let originHost = refURL.scheme.flatMap { s in refURL.host.map { "\(s)://\($0)" } } ?? baseURL.absoluteString
             return ResolvedPlayback(url: url, headers: ["Referer": originHost + "/", "Origin": originHost, "User-Agent": AnimeService.userAgent],

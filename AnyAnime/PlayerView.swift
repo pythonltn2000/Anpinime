@@ -176,7 +176,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 else if self.shouldUseMediaRelay(for: resolved.url) {
                     self.filmRelay?.stop()
                     let relay = FilmMediaRelay(origin: self.baseURL, headers: resolved.headers,
-                                              preserveMediaExtensions: self.episode.source == .phim4k)
+                                              preserveMediaExtensions: self.episode.source == .phim4k,
+                                              useSharedCookies: self.episode.source != .phim4k)
                     relay.onQualities = { [weak self] options in
                         guard let self, self.active else { return }
                         if self.playback.qualities != options { self.playback.qualities = options }
@@ -367,7 +368,11 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         playback.error = nil
         var headers = ["User-Agent": AnimeService.userAgent, "Referer": (referer ?? episodeURL).absoluteString]
         if episode.source.isMovie {
-            headers.merge(providerHeaders) { _, provider in provider }
+            if episode.source == .phim4k, providerWebURL == nil {
+                // Original media_kit sends only the source-2 media map (oxoo),
+                // not the Core API/website Referer, Origin or account cookies.
+                headers = providerHeaders
+            } else { headers.merge(providerHeaders) { _, provider in provider } }
             if let referer {
                 headers["Referer"] = referer.absoluteString
                 if let scheme = referer.scheme, let host = referer.host { headers["Origin"] = scheme + "://" + host }
@@ -375,7 +380,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             // A provider's session ticket must never be forwarded to a third-party iframe/CDN.
             if url.host != baseURL.host { headers.removeValue(forKey: "X-F4K-PT") }
         }
-        let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
+        let cookies: [HTTPCookie] = episode.source == .phim4k && providerWebURL == nil
+            ? [] : (HTTPCookieStorage.shared.cookies(for: url) ?? [])
         var useMPV = true
         #if DEBUG
         // Retain the independent AVPlayer smoke test; mpv has its own MKV fixture.

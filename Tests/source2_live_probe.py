@@ -51,7 +51,7 @@ if groups and groups[0].get("server_data"):
     row = groups[0]["server_data"][0]
     url = next((row[key] for key in ["link_m3u8", "m3u8", "stream_url", "video_url", "file_url", "link"] if row.get(key)), None)
     if url and urllib.parse.urlsplit(url).scheme == "https":
-        headers = {"Origin": FREE, "Referer": FREE + "/"}
+        headers = {"User-Agent": "oxoo"}
         manifest = read("Free1 original manifest", url, headers=headers, limit=65536)
         if manifest and manifest.startswith(b"#EXTM3U"):
             lines = manifest.decode("utf-8").splitlines()
@@ -67,7 +67,7 @@ observations["coreServerIDs"] = [row.get("video_file_id") for row in videos]
 if videos:
     url = next((row.get("file_url") for row in videos if row.get("video_file_id") == "31937"), None)
     if url and urllib.parse.urlsplit(url).scheme == "https":
-        read("Core original server 31937", url, headers={"User-Agent": "exoplayer", "Range": "bytes=0-2047"})
+        read("Core virtual URL before gateway exchange (not resolved playback)", url, headers={"User-Agent": "exoplayer", "Range": "bytes=0-2047"})
 
 pathlib.Path("previews").mkdir(exist_ok=True)
 pathlib.Path("previews/source2-live-network.json").write_text(json.dumps(observations, indent=2))
