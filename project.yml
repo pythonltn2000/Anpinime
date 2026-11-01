@@ -37,6 +37,21 @@ targets:
         SWIFT_VERSION: '5.0'
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGN_STYLE: Manual
+  AnyAnimeUI:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/AIDramaUITests.swift
+    dependencies:
+      - target: AnyAnime
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.xemphim.aipinime.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: AnyAnime
+        TARGETED_DEVICE_FAMILY: '1,2'
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGN_STYLE: Manual
 schemes:
   AnyAnime:
     build:
@@ -44,5 +59,9 @@ schemes:
         AnyAnime: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - AnyAnimeUI
     archive:
       config: Release

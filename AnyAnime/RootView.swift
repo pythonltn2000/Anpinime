@@ -1,12 +1,31 @@
 import SwiftUI
 
+@MainActor
 struct RootView: View {
     @EnvironmentObject private var service: AnimeService
+    @StateObject private var aiDramaStore = AIDramaCatalogStore()
     @State private var enteredLibrary = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var introVisible = true
     @State private var transition: (from: String, to: String)?
     @State private var transitionTask: Task<Void, Never>?
+    @State private var selectedLibraryTab = 0
+
+    init() {
+        #if DEBUG
+        if AIDramaDebugSupport.fixtureEnabled {
+            AIDramaDebugSupport.clearFixtureProgress()
+            let configuration = PineDramaProvider.Configuration(
+                baseURL: URL(string: "http://127.0.0.1:8768")!, commonParameters: [:], allowLoopbackHTTP: true)
+            _aiDramaStore = StateObject(wrappedValue: AIDramaCatalogStore(provider: PineDramaProvider(configuration: configuration)))
+        }
+        if AIDramaDebugSupport.enabled {
+            _enteredLibrary = State(initialValue: true)
+            _introVisible = State(initialValue: false)
+            _selectedLibraryTab = State(initialValue: 3)
+        }
+        #endif
+    }
 
     var body: some View {
         Group {
@@ -25,6 +44,11 @@ struct RootView: View {
             else if let transition { LibraryTransition(from: transition.from, to: transition.to, intro: false).transition(.opacity) }
         }
         .onDisappear { transitionTask?.cancel() }
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+            if AIDramaDebugSupport.enabled { AIDramaDebugOwnerView() }
+        }
+        #endif
     }
 
     private func chooseLibrary(_ source: ContentSource) {
@@ -44,28 +68,31 @@ struct RootView: View {
     }
 
     private var library: some View {
-        TabView {
+        TabView(selection: $selectedLibraryTab) {
             NavigationView { HomeView(onChooseLibrary: { enteredLibrary = false }) }
                 .navigationViewStyle(.stack)
                 .tabItem { Label("Trang chủ", systemImage: "house.fill") }
+                .tag(0)
 
             NavigationView { AnimeSearchView() }
                 .navigationViewStyle(.stack)
                 .tabItem { Label("Tìm kiếm", systemImage: "magnifyingglass") }
+                .tag(1)
 
             NavigationView { BrowseView() }
                 .navigationViewStyle(.stack)
                 .tabItem { Label("Thể loại", systemImage: "square.grid.2x2.fill") }
+                .tag(2)
 
-            if !service.source.isMovie {
-                NavigationView { AnimeScheduleView() }
-                    .navigationViewStyle(.stack)
-                    .tabItem { Label("Lịch chiếu", systemImage: "calendar") }
-            }
+            NavigationView { AIDramaTabView(store: aiDramaStore) }
+                .navigationViewStyle(.stack)
+                .tabItem { Label("Phim AI", systemImage: "film.fill") }
+                .tag(3)
 
             NavigationView { AppSettingsView() }
                 .navigationViewStyle(.stack)
                 .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
+                .tag(4)
         }
         .id(service.source)
         .tint(.anpinimeAccent)
@@ -191,7 +218,11 @@ struct HomeView: View {
                     }
                 }
             }
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if !service.source.isMovie {
+                    NavigationLink(destination: AnimeScheduleView()) { Image(systemName: "calendar") }
+                        .accessibilityLabel("Lịch chiếu anime")
+                }
                 Button { Task { await service.loadHome(forceDomainRefresh: true) } } label: {
                     Image(systemName: "arrow.clockwise")
                 }

@@ -11,12 +11,16 @@ on:
         description: 'Check live gateway playback past 15 seconds using captured Core metadata'
         type: boolean
         default: false
+      ai_drama_only:
+        description: 'Verify the independent Phim AI provider and vertical episode UI'
+        type: boolean
+        default: false
   push:
     branches: [main]
 
 jobs:
   build-ios:
-    if: ${{ !inputs.gateway_frame_only }}
+    if: ${{ !inputs.gateway_frame_only && !inputs.ai_drama_only }}
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -125,7 +129,7 @@ jobs:
           retention-days: 14
 
   preview:
-    if: github.event_name == 'workflow_dispatch' && inputs.preview && !inputs.gateway_frame_only
+    if: github.event_name == 'workflow_dispatch' && inputs.preview && !inputs.gateway_frame_only && !inputs.ai_drama_only
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -216,7 +220,7 @@ jobs:
           retention-days: 14
 
   gateway-video:
-    if: github.event_name == 'workflow_dispatch' && inputs.gateway_frame_only
+    if: github.event_name == 'workflow_dispatch' && inputs.gateway_frame_only && !inputs.ai_drama_only
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -243,4 +247,27 @@ jobs:
         with:
           name: AnPinime_Source2_Gateway_Video
           path: previews/*
+          retention-days: 14
+
+  ai-drama:
+    if: github.event_name == 'workflow_dispatch' && inputs.ai_drama_only
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify PineDrama data and complete-playlist contracts
+        run: |
+          swiftc AnyAnime/AIDrama/AIDramaModels.swift AnyAnime/AIDrama/PineDramaProvider.swift Tests/AIDramaProviderTests.swift -o "$RUNNER_TEMP/anpinime-ai-drama-provider-tests"
+          "$RUNNER_TEMP/anpinime-ai-drama-provider-tests"
+      - name: Prepare iOS project and test media tools
+        run: |
+          brew install xcodegen ffmpeg
+          xcodegen generate
+      - name: Verify actual portrait swipes, full playlist and player lifetime
+        run: bash Tests/ai-drama-smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnPinime_AI_Drama_Verification
+          path: previews/**
           retention-days: 14
