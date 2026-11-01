@@ -9,7 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+AGENT = "Dart/3.12 (dart:io)"
 FREE = "https://free.cryboiz.workers.dev"
 CORE = "https://api.phim4k.space"
 observations = {"playbackVerified": False, "scope": "network prefixes only", "requests": []}
@@ -61,7 +61,7 @@ if groups and groups[0].get("server_data"):
                     read("Free1 segment " + str(index), segment, headers={**headers, "Range": "bytes=0-2047"})
 
 detail = object(read("Core Wakanda detail", CORE + "/rest-api/v130/single_details?type=movie&id=10403",
-                     headers={"User-Agent": "exoplayer", "API-KEY": "bbbb411dea44849"}, limit=262144))
+                     headers={"API-KEY": "bbbb411dea44849"}, limit=262144))
 videos = detail.get("videos", [])
 observations["coreServerIDs"] = [row.get("video_file_id") for row in videos]
 if videos:

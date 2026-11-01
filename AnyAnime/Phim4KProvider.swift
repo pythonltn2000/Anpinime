@@ -340,7 +340,9 @@ final class Phim4KProvider {
         if !fresh, let (date, json) = cache[url], Date().timeIntervalSince(date) < 120 { return json }
         var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue(AnimeService.userAgent, forHTTPHeaderField: "User-Agent")
+        // The original catalog client uses dart:io's default user agent;
+        // native media has its separate oxoo map.
+        req.setValue("Dart/3.12 (dart:io)", forHTTPHeaderField: "User-Agent")
         if coreRequest { req.setValue(config.core?.apiKey, forHTTPHeaderField: "API-KEY") }
         let (data, response) = try await session.data(for: req)
         try Task.checkCancellation()

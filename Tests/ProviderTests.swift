@@ -222,6 +222,9 @@ struct ProviderTests {
         require(Set(captured.compactMap { $0.url?.host }) == ["core.example", "free1.example", "free2.example", "vip.example"], "Source 2 never directly queries NguonC or KKPhim")
         require(captured.filter { $0.url?.host != "core.example" }.allSatisfy { $0.value(forHTTPHeaderField: "API-KEY") == nil }, "Core API credentials stay on the Core host")
         require(captured.filter { $0.url?.host == "core.example" }.allSatisfy { $0.value(forHTTPHeaderField: "API-KEY") == "fixture-key" }, "Core app requests retain the required API header")
+        require(captured.filter { ["core.example", "free1.example", "free2.example"].contains($0.url?.host ?? "") }.allSatisfy {
+            $0.value(forHTTPHeaderField: "User-Agent") == "Dart/3.12 (dart:io)"
+        }, "Source-2 catalogs use the original Dart client user agent, independently of native media")
         let freeDetail = try await app.detail(search[1])
         let freePlayback = try await app.resolve(freeDetail.episodes[0])
         require(!freePlayback.isWeb && freePlayback.url.host == "stream.example" && freePlayback.url.path == "/api/content/stream/hls", "Free1 uses its actual app HLS endpoint rather than an embed")
@@ -384,6 +387,12 @@ struct ProviderTests {
         require(!freePlayback.isWeb && freePlayback.url.absoluteString == "https://cdn.phim4k.lol/FREE_SOURCE_HANDLE.mkv"
                 && ProviderProtocol.captured().allSatisfy { $0.url?.host == "free1.example" }, "Free-source context bypasses signing even for a virtual-CDN-shaped URL")
         require(freePlayback.headers["User-Agent"] == "oxoo" && ["API-KEY", "Authorization", "Cookie", "Referer", "Origin"].allSatisfy { freePlayback.headers[$0] == nil }, "Free media uses the original app's user agent without website or premium headers")
+        ProviderProtocol.setFreeMediaURL("https://embed.example/watch/opaque")
+        let webPlayback = try await provider.resolve(freeDetail.episodes[0])
+        require(webPlayback.isWeb && webPlayback.webURL == nil && webPlayback.url.host == "embed.example",
+                "A link-only opaque Free embed retains web-backed playback without an optional embed URL")
+        require(webPlayback.headers["User-Agent"] == AnimeService.userAgent && webPlayback.headers["Referer"] == "https://free1.example/",
+                "Web-backed Free playback retains website headers for its WebKit-to-native handoff")
         ProviderProtocol.reset()
     }
 
