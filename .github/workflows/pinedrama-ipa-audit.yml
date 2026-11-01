@@ -15,7 +15,7 @@ jobs:
       - name: Fetch PineDrama IPA from shared Google Drive
         run: |
           python -m pip install --quiet --disable-pip-version-check gdown
-          gdown --fuzzy "https://drive.google.com/file/d/1lHSC81n5GKolWBJRnFRnDAwfFIo9aZQ1/view" --output pinedrama.ipa
+          gdown 1lHSC81n5GKolWBJRnFRnDAwfFIo9aZQ1 --output pinedrama.ipa
           ls -lh pinedrama.ipa
       - name: Scan IPA metadata, URL strings, and Mach-O encryption flags
         run: python tools/pinedrama_ipa_audit.py
