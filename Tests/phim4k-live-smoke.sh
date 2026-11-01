@@ -75,7 +75,11 @@ for directory in (Path(sys.argv[1])/'Documents', Path('previews')):
 PY
 xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime "$ANPINIME_FLAG" --mpv-playback-smoke
 for attempt in $(seq 1 75); do
-  if [ -f "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT.json" ]; then break; fi
+  if [ -f "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT.json" ]; then
+    # The movie opens on a black intro. Capture the live gateway proof later
+    # while retaining the same overall wait and app/network cleanup bounds.
+    if [ "$ANPINIME_MODE" != gateway ] || python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["time"]>=15 else 1)' "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT.json"; then break; fi
+  fi
   if [ -f "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT-diagnostics.json" ] && python3 -c 'import json,sys; sys.exit(0 if any(e["event"]=="failure" for e in json.load(open(sys.argv[1]))["events"]) else 1)' "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT-diagnostics.json"; then break; fi
   sleep 1
 done
@@ -97,13 +101,14 @@ import json,sys
 r=json.load(open('previews/playback-'+sys.argv[1]+'.json'))
 assert r['backend']=='mpv' and r['advancingVideoVerified'] and r['videoWidth']>0 and r['videoHeight']>0 and r['time']>1 and r['landscape'], r
 if sys.argv[1]=='phim4k-gateway':
+    assert r['time']>=15, r
     assert r['coreMetadataReplayed'] is True and r['liveGateway'] is True and r['metadataServerCount']==5 and r['selectedServerID']=='31937', r
     assert set(r['replayedCoreServerIDs'])=={'31937','33090','27463','31938','31939'}, r
     assert not r.get('fullCoreLive',False), r
 print(r)
 PY
 if [ "$ANPINIME_MODE" = gateway ]; then
-  echo "### $ANPINIME_RESULT: PASS — Core metadata replayed; live gateway and decoded media playback verified; full Core API playback not verified" >> "$GITHUB_STEP_SUMMARY"
+  echo "### $ANPINIME_RESULT: PASS — Core metadata replayed; live gateway and decoded media playback verified past 15 seconds; full Core API playback not verified" >> "$GITHUB_STEP_SUMMARY"
 else
   echo "### $ANPINIME_RESULT: PASS — decoded video dimensions and advancing playback verified" >> "$GITHUB_STEP_SUMMARY"
 fi
