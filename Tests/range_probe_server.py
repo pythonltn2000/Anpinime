@@ -1,9 +1,39 @@
 """A virtual 12 GB resource. Never stores the file and stops when a client closes."""
+import sys
+import faulthandler
+
+
+def startup_phase(name):
+    print('RANGE_FIXTURE_STARTUP: '+name, file=sys.stderr, flush=True)
+
+
+startup_phase('process-start')
+faulthandler.enable()
+faulthandler.dump_traceback_later(5)
+startup_phase('before-imports')
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 from pathlib import Path
 import json
 import os
+import socketserver
+startup_phase('imports-complete')
+
+
+class NumericLoopbackHTTPServer(ThreadingHTTPServer):
+    # HTTPServer.server_bind normally calls socket.getfqdn(), which can wait
+    # for reverse DNS even though this fixture only uses numeric loopback.
+    def server_bind(self):
+        startup_phase('bind-start')
+        socketserver.TCPServer.server_bind(self)
+        self.server_name = '127.0.0.1'
+        self.server_port = self.server_address[1]
+        startup_phase('bind-complete')
+
+    def server_activate(self):
+        startup_phase('listen-start')
+        super().server_activate()
+        startup_phase('listen-complete')
 
 TOTAL = 12_285_989_889
 MAGIC = b'\x00\x00\x00\x18ftypisom'
@@ -52,13 +82,19 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError,ConnectionResetError): pass
         print(json.dumps({'event':'response-finished', 'path':path, 'bytesWritten':cursor-start}), flush=True)
 
-server=ThreadingHTTPServer(('127.0.0.1',int(os.environ.get('ANPINIME_RANGE_PORT','8766'))), Handler)
+startup_phase('construct-server')
+server=NumericLoopbackHTTPServer(('127.0.0.1',int(os.environ.get('ANPINIME_RANGE_PORT','8766'))), Handler)
+startup_phase('server-constructed')
 ready={'server':'AnPinime.RangeFixture', 'host':'127.0.0.1', 'port':server.server_port, 'pid':os.getpid()}
 if os.environ.get('ANPINIME_RANGE_READY_FILE'):
+    startup_phase('ready-file-write-start')
     ready_path=Path(os.environ['ANPINIME_RANGE_READY_FILE'])
     ready_path.parent.mkdir(parents=True,exist_ok=True)
     temporary=ready_path.with_name(ready_path.name+'.tmp')
     temporary.write_text(json.dumps(ready)+'\n')
     temporary.replace(ready_path)
+    startup_phase('ready-file-write-complete')
 print(json.dumps({'event':'ready', **ready}), flush=True)
+faulthandler.cancel_dump_traceback_later()
+startup_phase('serve-forever')
 server.serve_forever()
