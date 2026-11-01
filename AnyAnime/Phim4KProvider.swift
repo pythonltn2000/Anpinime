@@ -343,7 +343,10 @@ final class Phim4KProvider {
         // The original catalog client uses dart:io's default user agent;
         // native media has its separate oxoo map.
         req.setValue("Dart/3.12 (dart:io)", forHTTPHeaderField: "User-Agent")
-        if coreRequest { req.setValue(config.core?.apiKey, forHTTPHeaderField: "API-KEY") }
+        if coreRequest {
+            req.setValue(config.core?.apiKey, forHTTPHeaderField: "API-KEY")
+            req.setValue(config.core?.authorization, forHTTPHeaderField: "Authorization")
+        }
         let (data, response) = try await session.data(for: req)
         try Task.checkCancellation()
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {

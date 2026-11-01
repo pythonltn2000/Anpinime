@@ -3,6 +3,7 @@
 Uses the app's documented samples and public client header. Never signs URLs,
 changes a host, uses an account session or substitutes another provider.
 """
+import base64
 import json
 import pathlib
 import urllib.error
@@ -12,6 +13,8 @@ import urllib.request
 AGENT = "Dart/3.12 (dart:io)"
 FREE = "https://free.cryboiz.workers.dev"
 CORE = "https://api.phim4k.space"
+# Public API-client fallback shipped in the original IPA, not an account login.
+CORE_CLIENT_AUTH = "Basic " + base64.b64encode(bytes([97,100,109,105,110,58,49,50,51,52])).decode()
 observations = {"playbackVerified": False, "scope": "network prefixes only", "requests": []}
 
 
@@ -61,7 +64,7 @@ if groups and groups[0].get("server_data"):
                     read("Free1 segment " + str(index), segment, headers={**headers, "Range": "bytes=0-2047"})
 
 detail = object(read("Core Wakanda detail", CORE + "/rest-api/v130/single_details?type=movie&id=10403",
-                     headers={"API-KEY": "bbbb411dea44849"}, limit=262144))
+                     headers={"API-KEY": "bbbb411dea44849", "Authorization": CORE_CLIENT_AUTH}, limit=262144))
 videos = detail.get("videos", [])
 observations["coreServerIDs"] = [row.get("video_file_id") for row in videos]
 if videos:

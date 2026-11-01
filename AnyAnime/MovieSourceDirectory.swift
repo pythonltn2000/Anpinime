@@ -7,22 +7,80 @@ enum MovieSourceDirectory {
     struct CoreAPI {
         let baseURL: URL
         let apiKey: String
+        let authorization: String?
+
+        init(baseURL: URL, apiKey: String, authorization: String? = nil) {
+            self.baseURL = baseURL; self.apiKey = apiKey; self.authorization = authorization
+        }
     }
 
-    static func coreAPI() -> CoreAPI {
-        let saved = UserDefaults.standard.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
-        let host = saved["api"].flatMap(address) ?? URL(string: "https://api.phim4k.space")!
-        let token = saved["tokens"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let key = (token?.isEmpty == false) ? token! : "bbbb411dea44849"
-        return CoreAPI(baseURL: host, apiKey: key)
+    private struct ClientHeaders {
+        let apiKey: String
+        let authorization: String
+    }
+
+    // Public API-client fallback shipped in the reference IPA (PP0xb2a0/0xb2b0),
+    // separate from account logins and the media gateway's signing seed.
+    private static let clientDefaults = Data([97, 100, 109, 105, 110, 58, 49, 50, 51, 52])
+
+    static func coreAPI(defaults: UserDefaults = .standard) -> CoreAPI {
+        let saved = defaults.dictionary(forKey: "AnPinime.source2Directory") ?? [:]
+        let host = (saved["api"] as? String).flatMap(address) ?? URL(string: "https://api.phim4k.space")!
+        let client = clientHeaders(saved["tokens"])
+        let cachedAuthorization = validAuthorization(saved["clientAuthorization"])
+        // Old caches contain only tokens; map/JSON-map caches recover their
+        // client fields, while normalized plain-key caches retain their Basic map.
+        let isPlainKey = (saved["tokens"] as? String).map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("{") } ?? false
+        return CoreAPI(baseURL: host, apiKey: client?.apiKey ?? "bbbb411dea44849",
+                       authorization: isPlainKey && client != nil ? (cachedAuthorization ?? client?.authorization) : (client?.authorization ?? defaultAuthorization()))
+    }
+
+    private static func defaultAuthorization() -> String {
+        "Basic " + clientDefaults.base64EncodedString()
+    }
+
+    private static func validAuthorization(_ raw: Any?) -> String? {
+        guard let value = raw as? String, value.hasPrefix("Basic "),
+              let bytes = Data(base64Encoded: String(value.dropFirst(6))),
+              let pair = String(data: bytes, encoding: .utf8), pair.contains(":") else { return nil }
+        return value
+    }
+
+    private static func text(_ raw: Any?) -> String? {
+        guard let raw = raw as? String else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private static func firstText(_ object: [String: Any], aliases: [String]) -> String? {
+        aliases.lazy.compactMap { text(object[$0]) }.first
+    }
+
+    private static func clientHeaders(_ raw: Any?) -> ClientHeaders? {
+        let object: [String: Any]?
+        let plainKey: String?
+        if let value = text(raw) {
+            if value.hasPrefix("{") || value.hasPrefix("[") {
+                guard let data = value.data(using: .utf8),
+                      let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+                object = parsed; plainKey = nil
+            } else { object = nil; plainKey = value }
+        } else { object = raw as? [String: Any]; plainKey = nil }
+        guard let key = plainKey ?? object.flatMap({ firstText($0, aliases: ["api_key", "apiKey", "key", "token"]) }),
+              key.rangeOfCharacter(from: .controlCharacters) == nil else { return nil }
+        let defaults = String(decoding: clientDefaults, as: UTF8.self).split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+        let user = object.flatMap { firstText($0, aliases: ["username", "user"]) } ?? String(defaults[0])
+        let password = object.flatMap { firstText($0, aliases: ["password", "pass"]) } ?? String(defaults[1])
+        let authorization = "Basic " + Data((user + ":" + password).utf8).base64EncodedString()
+        return ClientHeaders(apiKey: key, authorization: authorization)
     }
 
     /// Announced gateway for the verified Core JSON exchange. It is not a
     /// playable media URL or a replacement host for the catalog's virtual URL.
     /// No default is supplied when the original app directory omits it.
     static func cdnGateway(defaults: UserDefaults = .standard) -> URL? {
-        let saved = defaults.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
-        return saved["cdn"].flatMap(address)
+        let saved = defaults.dictionary(forKey: "AnPinime.source2Directory") ?? [:]
+        return (saved["cdn"] as? String).flatMap(address)
     }
 
     static func refresh(session: URLSession, defaults: UserDefaults = .standard) async {
@@ -45,12 +103,16 @@ enum MovieSourceDirectory {
             guard let config = decoded["data"] as? MovieCatalog.Object else { throw MovieSourceError.invalidData }
             // A partial bootstrap response must not erase an already-known
             // Free2 catalog or a valid Core configuration.
-            var updated = defaults.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
+            var updated = defaults.dictionary(forKey: "AnPinime.source2Directory") ?? [:]
             for name in ["free1", "free2", "api", "cdn"] {
                 if let value = config[name] as? String, let url = address(value) { updated[name] = url.absoluteString }
             }
-            if let token = config["tokens"] as? String, !token.isEmpty {
-                updated["tokens"] = token
+            if let client = clientHeaders(config["tokens"]) {
+                // Retain the original tokens cache key as a normalized API key
+                // for older app versions; never replace valid headers with a
+                // missing/invalid partial response or an account session.
+                updated["tokens"] = client.apiKey
+                updated["clientAuthorization"] = client.authorization
             }
             if !updated.isEmpty {
                 defaults.set(updated, forKey: "AnPinime.source2Directory")
@@ -60,12 +122,12 @@ enum MovieSourceDirectory {
 
     // These are catalogs actually announced by the reference app, never substitutes
     // for NguonC/KKPhim. A missing Free2 must not be replaced with phim.nguonc.com.
-    static func catalogs() -> [(id: String, url: URL, format: Phim4KFormat)] {
-        let saved = UserDefaults.standard.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]
+    static func catalogs(defaults: UserDefaults = .standard) -> [(id: String, url: URL, format: Phim4KFormat)] {
+        let saved = defaults.dictionary(forKey: "AnPinime.source2Directory") ?? [:]
         var result: [(String, URL, Phim4KFormat)] = [
-            ("free1", saved["free1"].flatMap(address) ?? Phim4KFormat.free1.defaultURL, .free1)
+            ("free1", (saved["free1"] as? String).flatMap(address) ?? Phim4KFormat.free1.defaultURL, .free1)
         ]
-        if let url = saved["free2"].flatMap(address) { result.append(("free2", url, .free2)) }
+        if let url = (saved["free2"] as? String).flatMap(address) { result.append(("free2", url, .free2)) }
         return result
     }
 

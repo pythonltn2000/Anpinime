@@ -163,7 +163,9 @@ struct ProviderTests {
         config.protocolClasses = [ProviderProtocol.self]
         let session = URLSession(configuration: config)
         try await verifyDirectoryMetadata(session: session)
-        let source2 = Phim4KProvider.Configuration(core: .init(baseURL: URL(string: "https://core.example")!, apiKey: "fixture-key"), catalogs: [
+        try await verifyCoreClientHeaders(session: session)
+        let fixtureAuthorization = "Basic " + Data("fixture-user:fixture-pass".utf8).base64EncodedString()
+        let source2 = Phim4KProvider.Configuration(core: .init(baseURL: URL(string: "https://core.example")!, apiKey: "fixture-key", authorization: fixtureAuthorization), catalogs: [
             .init(id: "free1", url: URL(string: "https://free1.example")!, format: .free1),
             .init(id: "free2", url: URL(string: "https://free2.example")!, format: .free2)
         ], gateway: URL(string: "https://gateway.example")!)
@@ -220,8 +222,12 @@ struct ProviderTests {
         require(playback.url.absoluteString == "https://vip.example/original.mkv", "VIP selection retains the exact Core link")
         let captured = ProviderProtocol.captured()
         require(Set(captured.compactMap { $0.url?.host }) == ["core.example", "free1.example", "free2.example", "vip.example"], "Source 2 never directly queries NguonC or KKPhim")
-        require(captured.filter { $0.url?.host != "core.example" }.allSatisfy { $0.value(forHTTPHeaderField: "API-KEY") == nil }, "Core API credentials stay on the Core host")
-        require(captured.filter { $0.url?.host == "core.example" }.allSatisfy { $0.value(forHTTPHeaderField: "API-KEY") == "fixture-key" }, "Core app requests retain the required API header")
+        require(captured.filter { $0.url?.host != "core.example" }.allSatisfy {
+            $0.value(forHTTPHeaderField: "API-KEY") == nil && $0.value(forHTTPHeaderField: "Authorization") == nil
+        }, "Core API and client Basic headers stay on the exact Core origin")
+        require(captured.filter { $0.url?.host == "core.example" }.allSatisfy {
+            $0.value(forHTTPHeaderField: "API-KEY") == "fixture-key" && $0.value(forHTTPHeaderField: "Authorization") == fixtureAuthorization
+        }, "Core app requests retain their required API and original client Basic headers")
         require(captured.filter { ["core.example", "free1.example", "free2.example"].contains($0.url?.host ?? "") }.allSatisfy {
             $0.value(forHTTPHeaderField: "User-Agent") == "Dart/3.12 (dart:io)"
         }, "Source-2 catalogs use the original Dart client user agent, independently of native media")
@@ -258,7 +264,8 @@ struct ProviderTests {
         let core = URL(string: "https://core.example")!
         let movie = Anime(title: "Selected premium movie", url: URL(string: "https://core.example/rest-api/v130/single_details?type=movie&id=41")!,
                           imageURL: nil, episodeText: "", quality: "", score: "", source: .phim4k)
-        let configuration = Phim4KProvider.Configuration(core: .init(baseURL: core, apiKey: "fixture-key"), catalogs: [
+        let fixtureAuthorization = "Basic " + Data("gateway-test-client:fixture-pass".utf8).base64EncodedString()
+        let configuration = Phim4KProvider.Configuration(core: .init(baseURL: core, apiKey: "fixture-key", authorization: fixtureAuthorization), catalogs: [
             .init(id: "free1", url: URL(string: "https://free1.example")!, format: .free1)
         ], gateway: URL(string: "https://gateway.example")!)
         let provider = MovieProvider(source: .phim4k, session: session, source2Configuration: configuration)
@@ -283,6 +290,9 @@ struct ProviderTests {
         ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 405; ProviderProtocol.lock.unlock()
         let resolved = try await provider.resolve(selected)
         let requests = ProviderProtocol.captured()
+        require(requests.filter { $0.url?.host == "core.example" }.allSatisfy {
+            $0.value(forHTTPHeaderField: "Authorization") == fixtureAuthorization
+        }, "Exact premium detail refresh uses its Core client authorization before gateway exchange")
         let gateway = requests.first { $0.url?.host == "gateway.example" }!
         let query = URLComponents(url: gateway.url!, resolvingAgainstBaseURL: false)!.queryItems!
         require(gateway.url?.lastPathComponent == "REFRESHED_HANDLE" && Set(query.map(\.name)) == ["token", "ts"], "Fresh exact server ID determines the gateway file handle after API reordering and URL refresh")
@@ -529,4 +539,81 @@ threading.Event().wait()
         require(MovieSourceDirectory.cdnGateway(defaults: defaults)?.host == "announced-cdn.example", "An unauthenticated directory envelope cannot replace CDN metadata")
         ProviderProtocol.reset()
     }
+    @MainActor static func verifyCoreClientHeaders(session: URLSession) async throws {
+        let suite = "AnPinime.CoreClientHeadersTests." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let cacheKey = "AnPinime.source2Directory"
+        let original = ["api": "https://core.example", "free1": "https://free1.example", "free2": "https://free2.example", "cdn": "https://gateway.example"]
+        defaults.set(original, forKey: cacheKey)
+        let fallback = MovieSourceDirectory.coreAPI(defaults: defaults)
+        let pair = fallback.authorization.flatMap { Data(base64Encoded: String($0.dropFirst(6))) } ?? Data()
+        let digest = SHA256.hash(data: pair).map { String(format: "%02x", $0) }.joined()
+        require(fallback.authorization?.hasPrefix("Basic ") == true && digest == "f8e68e8d44bfb5314974a97f787d017ff6ac9d0046083f28665fcf96f0cef80c", "Production fallback Basic matches the original shipped API-client fingerprint without recording its value")
+        require(MovieSourceDirectory.CoreAPI(baseURL: fallback.baseURL, apiKey: "fixture").authorization == nil, "Explicit fixture Core configurations remain authorization-free unless supplied")
+        let fallbackAuthorization = fallback.authorization
+        let expectedAliasAuthorization = "Basic " + Data("alias-client:alias-password".utf8).base64EncodedString()
+        let mapped: [(Any, String, String?)] = [
+            ("  legacy-plain-key  ", "legacy-plain-key", fallbackAuthorization),
+            (["api_key": " first-key ", "username": " alias-client ", "password": " alias-password "], "first-key", expectedAliasAuthorization),
+            (["apiKey": "second-key", "user": "alias-client", "pass": "alias-password"], "second-key", expectedAliasAuthorization),
+            (["key": "third-key"], "third-key", fallbackAuthorization),
+            (["token": "fourth-key"], "fourth-key", fallbackAuthorization),
+            (#"{"api_key":"","apiKey":"json-key","username":"","user":"alias-client","pass":"alias-password"}"#, "json-key", expectedAliasAuthorization)
+        ]
+        for (input, expectedKey, expectedAuthorization) in mapped {
+            var stored: [String: Any] = original
+            stored["tokens"] = input
+            defaults.set(stored, forKey: cacheKey)
+            let client = MovieSourceDirectory.coreAPI(defaults: defaults)
+            require(client.baseURL.host == "core.example" && client.apiKey == expectedKey && client.authorization == expectedAuthorization,
+                    "Legacy/plain/map/JSON-map Core client configuration preserves traced aliases and original defaults")
+        }
+        var legacyMap: [String: Any] = original
+        legacyMap["tokens"] = ["apiKey": "legacy-map-key", "user": "alias-client", "pass": "alias-password"]
+        defaults.set(legacyMap, forKey: cacheKey)
+        require(MovieSourceDirectory.cdnGateway(defaults: defaults)?.host == "gateway.example"
+                && MovieSourceDirectory.catalogs(defaults: defaults).map(\.url.host) == ["free1.example", "free2.example"],
+                "Map-valued legacy tokens never hide independently cached Free or CDN addresses")
+        try ProviderProtocol.setDirectory(["cdn": "map-cache-gateway.example"])
+        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        require(MovieSourceDirectory.coreAPI(defaults: defaults).apiKey == "legacy-map-key"
+                && MovieSourceDirectory.coreAPI(defaults: defaults).authorization == expectedAliasAuthorization
+                && MovieSourceDirectory.catalogs(defaults: defaults).map(\.url.host) == ["free1.example", "free2.example"],
+                "A partial refresh preserves map-valued legacy client configuration and unrelated addresses")
+        defaults.set(original, forKey: cacheKey)
+        try ProviderProtocol.setDirectory(["tokens": ["apiKey": "new-client-key", "user": "alias-client", "pass": "alias-password"]])
+        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        var stored = defaults.dictionary(forKey: cacheKey) as! [String: String]
+        require(stored["tokens"] == "new-client-key" && stored["clientAuthorization"] == expectedAliasAuthorization,
+                "Authenticated map tokens persist as a backward-compatible normalized key and client Basic header")
+        require(original.allSatisfy { stored[$0.key] == $0.value }, "Updating Core client headers preserves Core, Free and gateway addresses")
+        try ProviderProtocol.setDirectory(["cdn": "gateway-new.example"])
+        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        let partial = MovieSourceDirectory.coreAPI(defaults: defaults)
+        require(partial.apiKey == "new-client-key" && partial.authorization == expectedAliasAuthorization,
+                "Partial directory updates preserve the last normalized Core client headers")
+        let invalid: [Any] = ["", "  ", ["username": "not-a-key"], "{broken-json", ["api_key": "bad\r\nInjected: value"], NSNull(), ["wrong_alias": "ignored"]]
+        for input in invalid {
+            try ProviderProtocol.setDirectory(["tokens": input])
+            await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+            let current = MovieSourceDirectory.coreAPI(defaults: defaults)
+            require(current.apiKey == "new-client-key" && current.authorization == expectedAliasAuthorization,
+                    "Missing or invalid replacement tokens cannot erase valid client headers")
+        }
+        try ProviderProtocol.setDirectory(["tokens": #"{"token":"json-refreshed-key","user":"alias-client","password":"alias-password"}"#])
+        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        require(MovieSourceDirectory.coreAPI(defaults: defaults).apiKey == "json-refreshed-key" && MovieSourceDirectory.coreAPI(defaults: defaults).authorization == expectedAliasAuthorization,
+                "Authenticated JSON-map tokens follow the same client header normalization")
+        try ProviderProtocol.setDirectory(["tokens": "  fresh-plain-key  "])
+        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        stored = defaults.dictionary(forKey: cacheKey) as! [String: String]
+        require(stored["tokens"] == "fresh-plain-key" && stored["clientAuthorization"] == fallbackAuthorization,
+                "A valid plain-key refresh restores the original default API-client Basic pair")
+        require(ProviderProtocol.captured().allSatisfy {
+            $0.url?.host == "rip.cryboiz.workers.dev" && $0.value(forHTTPHeaderField: "API-KEY") == nil && $0.value(forHTTPHeaderField: "Authorization") == nil
+        }, "Directory header normalization never contacts Core/media or sends client credentials to the directory")
+        ProviderProtocol.reset()
+    }
+
 }
