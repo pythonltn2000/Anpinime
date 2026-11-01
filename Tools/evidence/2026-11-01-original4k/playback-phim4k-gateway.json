@@ -1,0 +1,26 @@
+{
+  "advancingVideoVerified": true,
+  "audioChoices": 2,
+  "backend": "mpv",
+  "coreMetadataReplayed": true,
+  "height": 402,
+  "landscape": true,
+  "liveGateway": true,
+  "mediaInfo": "mkv · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 1920 × 1080 · ATSC A/52A (AC-3)",
+  "metadataServerCount": 5,
+  "qualityChoices": 1,
+  "replayedCoreServerIDs": [
+    "31937",
+    "33090",
+    "27463",
+    "31938",
+    "31939"
+  ],
+  "sample": "Replayed Core metadata / Wakanda 10403 / server 31937 / live gateway and media",
+  "selectedServerID": "31937",
+  "subtitleChoices": 3,
+  "time": 3.42,
+  "videoHeight": 1080,
+  "videoWidth": 1920,
+  "width": 874
+}

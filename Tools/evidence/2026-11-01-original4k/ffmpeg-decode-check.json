@@ -1,0 +1,32 @@
+{
+  "movieID": "10403",
+  "serverID": "31937",
+  "check": "ffmpeg-headless-decode",
+  "simulatorPlaybackVerified": false,
+  "checkedAtUTC": "2026-11-01T00:49:04.104542+00:00",
+  "limits": {
+    "outputSeconds": 3,
+    "probesizeBytes": 2000000,
+    "analyzedurationMicroseconds": 3000000,
+    "rwTimeoutMicroseconds": 10000000,
+    "processTimeoutSeconds": 35
+  },
+  "mediaBytesSaved": 0,
+  "headers": {
+    "User-Agent": "oxoo"
+  },
+  "originHeaderSent": false,
+  "freshMediaPrefixHTTP": 206,
+  "freshMediaPrefixSignature": "mkv",
+  "elapsedSeconds": 2.323,
+  "exitCode": 0,
+  "timedOut": false,
+  "codec": "h264",
+  "width": 1920,
+  "height": 1080,
+  "decodedFrames": 72,
+  "decodedOutputSeconds": 3.003,
+  "httpErrorStatuses": [],
+  "headlessDecodeVerified": true,
+  "ffmpegVersion": "ffmpeg version 7.1.5-0+deb13u1 Copyright (c) 2000-2026 the FFmpeg developers"
+}

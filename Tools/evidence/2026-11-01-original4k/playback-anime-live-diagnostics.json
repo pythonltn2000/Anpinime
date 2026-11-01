@@ -1,0 +1,9 @@
+{
+  "events": [
+    {
+      "event": "failure",
+      "message": "Website yêu cầu xác minh trình duyệt.",
+      "stage": "anime-episodes"
+    }
+  ]
+}

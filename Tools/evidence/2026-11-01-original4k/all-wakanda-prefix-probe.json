@@ -1,0 +1,123 @@
+{
+  "movieID": "10403",
+  "playbackVerified": false,
+  "bootstrap": [
+    {
+      "label": "directory",
+      "host": "rip.cryboiz.workers.dev",
+      "status": 200,
+      "mime": "application/json; charset=utf-8",
+      "bytesRead": 875,
+      "totalBytes": 875
+    },
+    {
+      "label": "Core-detail",
+      "host": "api.phim4k.space",
+      "status": 200,
+      "mime": "application/json; charset=UTF-8",
+      "bytesRead": 37714
+    }
+  ],
+  "servers": [
+    {
+      "serverID": "31937",
+      "gateway": {
+        "label": "gateway",
+        "host": "svpc.cryboiz.workers.dev",
+        "status": 200,
+        "mime": "application/json",
+        "bytesRead": 119,
+        "totalBytes": 119
+      },
+      "media": {
+        "label": "media",
+        "host": "sv.p4kzz.workers.dev",
+        "status": 206,
+        "mime": "video/mp4",
+        "bytesRead": 2048,
+        "totalBytes": 9155116283,
+        "prefixSignature": "mkv"
+      }
+    },
+    {
+      "serverID": "33090",
+      "gateway": {
+        "label": "gateway",
+        "host": "svpc.cryboiz.workers.dev",
+        "status": 200,
+        "mime": "application/json",
+        "bytesRead": 119,
+        "totalBytes": 119
+      },
+      "media": {
+        "label": "media",
+        "host": "sv.p4kzz.workers.dev",
+        "status": 206,
+        "mime": "video/mp4",
+        "bytesRead": 2048,
+        "totalBytes": 12811020482,
+        "prefixSignature": "mkv"
+      }
+    },
+    {
+      "serverID": "27463",
+      "gateway": {
+        "label": "gateway",
+        "host": "svpc.cryboiz.workers.dev",
+        "status": 200,
+        "mime": "application/json",
+        "bytesRead": 122,
+        "totalBytes": 122
+      },
+      "media": {
+        "label": "media",
+        "host": "sv.p4kzz.workers.dev",
+        "status": 206,
+        "mime": "video/mp4",
+        "bytesRead": 2048,
+        "totalBytes": 16862722442,
+        "prefixSignature": "mkv"
+      }
+    },
+    {
+      "serverID": "31938",
+      "gateway": {
+        "label": "gateway",
+        "host": "svpc.cryboiz.workers.dev",
+        "status": 200,
+        "mime": "application/json",
+        "bytesRead": 119,
+        "totalBytes": 119
+      },
+      "media": {
+        "label": "media",
+        "host": "sv.p4kzz.workers.dev",
+        "status": 206,
+        "mime": "video/mp4",
+        "bytesRead": 2048,
+        "totalBytes": 17447699322,
+        "prefixSignature": "mkv"
+      }
+    },
+    {
+      "serverID": "31939",
+      "gateway": {
+        "label": "gateway",
+        "host": "svpc.cryboiz.workers.dev",
+        "status": 200,
+        "mime": "application/json",
+        "bytesRead": 119,
+        "totalBytes": 119
+      },
+      "media": {
+        "label": "media",
+        "host": "sv.p4kzz.workers.dev",
+        "status": 206,
+        "mime": "video/mp4",
+        "bytesRead": 2048,
+        "totalBytes": 57170889679,
+        "prefixSignature": "mkv"
+      }
+    }
+  ]
+}

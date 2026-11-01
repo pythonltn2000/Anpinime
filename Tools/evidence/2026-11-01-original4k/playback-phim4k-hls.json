@@ -1,0 +1,15 @@
+{
+  "advancingVideoVerified": true,
+  "audioChoices": 1,
+  "backend": "mpv",
+  "height": 402,
+  "landscape": true,
+  "mediaInfo": "hls · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 640 × 360 · AAC (Advanced Audio Coding)",
+  "qualityChoices": 1,
+  "sample": "Local source-2 HLS through relay",
+  "subtitleChoices": 1,
+  "time": 4.106,
+  "videoHeight": 360,
+  "videoWidth": 640,
+  "width": 874
+}

@@ -1,0 +1,766 @@
+{
+  "events": [
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 164 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 164 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 165 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 165 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 166 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 166 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 167 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 167 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 168 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 168 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 169 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 169 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 170 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 170 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 171 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 171 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 172 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 172 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 173 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 173 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 174 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 174 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 175 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 175 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 176 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 176 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 177 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 177 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 178 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 178 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 179 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 179 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 180 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 180 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 181 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 181 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 182 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 182 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 183 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 183 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 184 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 184 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 185 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 185 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 186 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 186 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "component": "ffmpeg",
+      "event": "mpv-log",
+      "message": "http: HTTP error 404 Response\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Failed to open segment 187 of playlist 0\n"
+    },
+    {
+      "component": "ffmpeg/demuxer",
+      "event": "mpv-log",
+      "message": "hls: Segment 187 of playlist 0 failed too many times, skipping\n"
+    },
+    {
+      "event": "failure",
+      "message": "Máy chủ chưa trả dữ liệu video. Hãy thử lại hoặc chọn máy chủ khác."
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    },
+    {
+      "bytes": 910,
+      "event": "relay-response",
+      "extension": "ts",
+      "host": "s6.kkphimplayer6.com",
+      "status": 404,
+      "type": "text/html"
+    }
+  ]
+}

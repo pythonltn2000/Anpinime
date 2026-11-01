@@ -1,0 +1,101 @@
+{
+  "events": [
+    {
+      "coreMetadataReplayed": true,
+      "event": "gateway-smoke-scope",
+      "gatewayDirectoryAuthenticated": true,
+      "gatewayHost": "svpc.cryboiz.workers.dev",
+      "selectedServerID": "31937"
+    },
+    {
+      "coreMetadataReplayed": true,
+      "event": "gateway-smoke-resolved",
+      "liveGateway": true,
+      "mediaHost": "sv.p4kzz.workers.dev",
+      "metadataServerCount": 5,
+      "selectedServerID": "31937"
+    },
+    {
+      "component": "cplayer",
+      "event": "mpv-log",
+      "message": "The sub-margin-y option must be an integer: 36.0\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": false,
+      "playing": false,
+      "time": 0,
+      "videoHeight": 0,
+      "videoWidth": 0
+    },
+    {
+      "component": "vo/gpu-next/libplacebo",
+      "event": "mpv-log",
+      "message": "Spent 1737.324 ms creating vulkan device (slow!)\n"
+    },
+    {
+      "component": "ffmpeg/video",
+      "event": "mpv-log",
+      "message": "h264: Failed setup for format videotoolbox_vld: hwaccel initialisation returned error.\n"
+    },
+    {
+      "component": "ffmpeg/video",
+      "event": "mpv-log",
+      "message": "h264: no frame!\n"
+    },
+    {
+      "component": "cplayer",
+      "event": "mpv-log",
+      "message": "The sub-margin-y option must be an integer: 36.0\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": true,
+      "playing": true,
+      "time": 0.7919999999999999,
+      "videoHeight": 1080,
+      "videoWidth": 1920
+    },
+    {
+      "component": "cplayer",
+      "event": "mpv-log",
+      "message": "\n"
+    },
+    {
+      "component": "cplayer",
+      "event": "mpv-log",
+      "message": "Audio/Video desynchronisation detected! Possible reasons include too slow\n"
+    },
+    {
+      "component": "cplayer",
+      "event": "mpv-log",
+      "message": "hardware, temporary CPU spikes, broken drivers, and broken files. Audio\n"
+    },
+    {
+      "component": "cplayer",
+      "event": "mpv-log",
+      "message": "position will not match to the video (see A-V status field).\n"
+    },
+    {
+      "component": "cplayer",
+      "event": "mpv-log",
+      "message": "Consider trying `--profile=fast` and/or `--hwdec=auto` as they may help.\n"
+    },
+    {
+      "component": "cplayer",
+      "event": "mpv-log",
+      "message": "\n"
+    },
+    {
+      "buffering": false,
+      "event": "mpv-state",
+      "loaded": true,
+      "playing": true,
+      "time": 16.808,
+      "videoHeight": 1080,
+      "videoWidth": 1920
+    }
+  ]
+}

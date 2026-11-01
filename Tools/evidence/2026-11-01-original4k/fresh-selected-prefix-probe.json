@@ -1,0 +1,37 @@
+{
+  "serverID": "31937",
+  "movieID": "10403",
+  "requests": [
+    {
+      "label": "public-directory",
+      "host": "rip.cryboiz.workers.dev",
+      "status": 200,
+      "mime": "application/json; charset=utf-8",
+      "bytesRead": 875,
+      "contentLength": 875
+    },
+    {
+      "label": "selected-gateway-exchange",
+      "host": "svpc.cryboiz.workers.dev",
+      "status": 200,
+      "mime": "application/json",
+      "bytesRead": 119,
+      "contentLength": 119
+    },
+    {
+      "label": "selected-media-prefix",
+      "host": "sv.p4kzz.workers.dev",
+      "status": 206,
+      "mime": "video/mp4",
+      "bytesRead": 2048,
+      "contentRange": "bytes 0-2047/9155116283",
+      "signature": "mkv"
+    }
+  ],
+  "playbackVerified": false,
+  "announcedGatewayHost": "svpc.cryboiz.workers.dev",
+  "gatewayJSONKeys": [
+    "url",
+    "expires_in"
+  ]
+}

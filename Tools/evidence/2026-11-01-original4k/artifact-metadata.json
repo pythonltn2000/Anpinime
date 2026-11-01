@@ -1,0 +1,11 @@
+{
+  "ipaSize": 26503200,
+  "ipaSHA256": "fd0ef22c4f12e39ed35e335c22eb8dbf6edeb7c1d8be466be690aae6d316aed5",
+  "version": "2.8.4",
+  "build": "65",
+  "bundleID": "ios.phim4k.xyz",
+  "appPathInIPA": "Payload/Runner.app/Frameworks/App.framework/App",
+  "appSHA256": "070b6e44ffa8ca863ae60191179188db8cb3397ae3570c1757cd7a114da5af75",
+  "appSize": 11626496,
+  "magic": "cafebabe"
+}

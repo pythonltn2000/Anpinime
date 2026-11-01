@@ -1,0 +1,49 @@
+{
+  "version": "2.4.4",
+  "build": "13",
+  "validatedAppCommit": "1cf796cde84713c5f3e3e2e20127301abe1c5d96",
+  "appSourceTree": "e386f43b57d3387acd232ddb42c2707d4eb53a65",
+  "fullRun": {
+    "id": 41259259589,
+    "parserCryptoProviderJSRange": "PASS",
+    "mkvAudioDualSubtitles": "PASS",
+    "source2HLS": "PASS",
+    "animeDelayedDOMAndCancellationFixture": "PASS",
+    "animeLiveScriptExit": 1,
+    "free1LiveScriptExit": 1,
+    "coreVIPLiveScriptExit": 1,
+    "gatewayMetadataReplayScriptExit": 0
+  },
+  "laterFrameRun": {
+    "id": 41260161453,
+    "head": "230168a89ca43a0938fcae6ac1f17727b393cb93",
+    "appSourcesIdenticalToFullRun": true,
+    "gatewayScriptExit": 0,
+    "time": 16.808,
+    "videoWidth": 1920,
+    "videoHeight": 1080,
+    "visibleMovieFrameAndVietnameseSubtitleReviewed": true,
+    "coreMetadataReplayed": true,
+    "fullCoreLiveVerified": false,
+    "artifactID": 13064543658,
+    "artifactSHA256": "ad52852f80186ea63cb5e2a8b540c704cf15d7c8c635440d749ec19dd63cce9f"
+  },
+  "ipa": {
+    "artifactID": 13064343562,
+    "artifactSHA256": "48ce69d55f482be6dee3d145f573d7d6308fad6ea889481e0b57fd0bf605dba1",
+    "ipaSHA256": "945c0b75e3db41481235f3c59ab1317b25609452b700641e44aa6b6c96aa1bab",
+    "signed": false
+  },
+  "playbackArtifact": {
+    "id": 13064617518,
+    "sha256": "aa7aaa00c54a1d4c854b16322a5d79558a177ae16a854c4da97fddc9752803f0"
+  },
+  "remaining": {
+    "animeLive": "browser verification required",
+    "free1Live": "HTTP 404 HTML segments",
+    "coreLive": "HTTP 403 before gateway",
+    "physicalIPhonePlaybackVerified": false,
+    "vipAudioAndDualSubtitleSelectionVerified": false
+  },
+  "mainUnmergedAt": "8acf5c0c9c316a16ac0e406ead1f4dcde1a3c2da"
+}

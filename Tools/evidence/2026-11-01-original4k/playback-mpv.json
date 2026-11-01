@@ -1,0 +1,12 @@
+{
+  "audioChoices": 2,
+  "autoplayVerified": true,
+  "backend": "mpv",
+  "height": 402,
+  "landscape": true,
+  "mkvAudioAndDualSubtitlesVerified": true,
+  "qualityChoices": 1,
+  "subtitleChoices": 3,
+  "time": 2.167,
+  "width": 874
+}

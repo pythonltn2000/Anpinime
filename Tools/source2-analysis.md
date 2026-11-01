@@ -203,3 +203,39 @@ original IPA/disassembly is unavailable in this workspace; earlier signing
 claims and fixed success logs are not a substitute for that trace. Wakanda
 stream keys and file handles are distinct, stable fields, not literal aliases.
 Safe metadata and playback evidence live in `Tools/evidence/2026-10-30-followup/`.
+
+
+## Supplied original IPA and verified gateway protocol — 2026-11-01
+
+The user subsequently supplied the original Phim4K 2.8.4 (65) IPA again. Its
+SHA-256 is `fd0ef22c4f12e39ed35e335c22eb8dbf6edeb7c1d8be466be690aae6d316aed5`;
+this differs from the older package hash and is preserved independently.
+[phim4k-original-protocol.md](phim4k-original-protocol.md) supersedes the
+missing-binary and unknown-signing limitations above for this package, with
+exact image hashes, address conventions and independently decoded instructions.
+
+The Core resolver takes the URL's final file handle, derives its daily secret
+from the actual shipped XOR arrays and exchanges a token/ts request at the
+directory-announced CDN. The old Swift seed and fixed gateway were incorrect.
+HTTP 200 JSON must contain a media `url`; failure does not return the gateway
+request itself for playback. Free sources bypass this signer. The original
+native media header is `User-Agent: oxoo`, separate from the Dart catalog client.
+The HTTPS gateway legitimately returns HTTP media, preserved without host or
+scheme rewriting. Core/gateway credentials do not belong on that media request.
+
+All five original Wakanda servers returned 200 gateway JSON then 206 MKV prefixes
+in bounded 2-KB checks. A fresh November 1 check of exact server 31937 also decoded
+72 H.264 frames at 1920x1080 over 3.003 seconds in FFmpeg, with no media saved.
+These observations establish the protocol and real decoding; the Linux result
+does not substitute for the separately recorded iOS simulator/live checks.
+See [../REPAIR_REPORT_V6.md](../REPAIR_REPORT_V6.md) for the final app verification
+and remaining anime/Free1 limitations. Sanitized evidence is in
+[evidence/2026-11-01-original4k/](evidence/2026-11-01-original4k/).
+
+The iOS gateway check subsequently decoded/rendered the exact 31937 movie at
+1920x1080 through 16.808 seconds, with a visible film frame and Vietnamese
+subtitles inspected in artifact `13064543658`, run `41260161453`. Only Core
+metadata was replayed; directory, signing, gateway, media and native player were
+real. Full Core live still returned 403 before resolution, anime required browser
+verification, and Free1 segments returned 404. This is not a claim that those
+three live entry points or sustained whole-film playback are repaired.

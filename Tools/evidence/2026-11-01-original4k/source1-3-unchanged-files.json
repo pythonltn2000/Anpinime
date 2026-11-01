@@ -1,0 +1,37 @@
+{
+  "baselineCommit": "8acf5c0",
+  "scope": "Baseline comparison for shared catalog/model/transform files; MPV changes are DEBUG smoke telemetry only. Conditional source-2 player/relay/provider changes require separate routing review and regressions.",
+  "files": [
+    {
+      "path": "AnyAnime/MovieCatalog.swift",
+      "unchangedFrom8acf5c0": true,
+      "baselineSHA256": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da",
+      "currentSHA256": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da"
+    },
+    {
+      "path": "AnyAnime/MovieBrowseCatalog.swift",
+      "unchangedFrom8acf5c0": true,
+      "baselineSHA256": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055",
+      "currentSHA256": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055"
+    },
+    {
+      "path": "AnyAnime/Models.swift",
+      "unchangedFrom8acf5c0": true,
+      "baselineSHA256": "d2479a9cfd958f7ff3bf08c58468201c69607bec999566160184a70d448bcef9",
+      "currentSHA256": "d2479a9cfd958f7ff3bf08c58468201c69607bec999566160184a70d448bcef9"
+    },
+    {
+      "path": "AnyAnime/FilmMediaTransform.swift",
+      "unchangedFrom8acf5c0": true,
+      "baselineSHA256": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9",
+      "currentSHA256": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9"
+    },
+    {
+      "path": "AnyAnime/MPVPlaybackController.swift",
+      "unchangedFrom8acf5c0": false,
+      "baselineSHA256": "7fb18dc531d54c3670da2266891a78cc34d1a306d7e24da46359e327c9ff75eb",
+      "currentSHA256": "7455a2124e7b26b398e323b1409ff54aafb2c31071d4bc66a9793970910fc243",
+      "changeScope": "DEBUG smoke diagnostics only; release mpv playback code unchanged"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "events": [
+    {
+      "event": "failure",
+      "message": "Nguồn phim trả lỗi HTTP 403. Hãy thử lại sau.",
+      "stage": "catalog-detail"
+    }
+  ]
+}
