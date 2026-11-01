@@ -17,8 +17,8 @@ enum MovieSourceDirectory {
         return CoreAPI(baseURL: host, apiKey: key)
     }
 
-    /// Announced gateway metadata only. It is not a playable media URL and
-    /// must not be used to rewrite a film URL or invent a signing request.
+    /// Announced gateway for the verified Core JSON exchange. It is not a
+    /// playable media URL or a replacement host for the catalog's virtual URL.
     /// No default is supplied when the original app directory omits it.
     static func cdnGateway(defaults: UserDefaults = .standard) -> URL? {
         let saved = defaults.dictionary(forKey: "AnPinime.source2Directory") as? [String: String] ?? [:]

@@ -2,10 +2,13 @@
 These tests do not claim that FilmMediaRelay forwards progressive byte ranges.
 """
 import http.client
+import os
 TOTAL = 12_285_989_889
+PORT = int(os.environ.get('ANPINIME_RANGE_PORT','8766'))
 
 def req(path='/range', headers=None, limit=1024, method='GET'):
-    c = http.client.HTTPConnection('127.0.0.1',8766,timeout=5)
+    print(f'RANGE_HTTP: method={method} path={path} range={(headers or {}).get("Range","")} port={PORT}',flush=True)
+    c = http.client.HTTPConnection('127.0.0.1',PORT,timeout=5)
     c.request(method,path,headers=headers or {})
     r=c.getresponse(); body=r.read(limit); result=(r.status,dict(r.getheaders()),body);c.close();return result
 

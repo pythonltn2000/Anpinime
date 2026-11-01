@@ -27,10 +27,27 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/anpinime-js-tests" jsdom@26.1.0 --no-audit --no-fund
           NODE_PATH="$RUNNER_TEMP/anpinime-js-tests/node_modules" node Tests/player.test.cjs
           swiftc AnyAnime/Phim4KTransportPolicy.swift AnyAnime/Phim4KMediaProbe.swift Tests/RangeProbeTests.swift -o "$RUNNER_TEMP/anpinime-range-tests"
-          python3 Tests/range_probe_server.py > "$RUNNER_TEMP/anpinime-range-server.log" 2>&1 &
+          ANPINIME_RANGE_READY_FILE="$RUNNER_TEMP/anpinime-range-ready.json"
+          python3 - "$ANPINIME_RANGE_READY_FILE" <<'PY'
+          from pathlib import Path
+          import sys
+          Path(sys.argv[1]).unlink(missing_ok=True)
+          PY
+          ANPINIME_RANGE_PORT=0 ANPINIME_RANGE_READY_FILE="$ANPINIME_RANGE_READY_FILE" python3 -u Tests/range_probe_server.py > "$RUNNER_TEMP/anpinime-range-server.log" 2>&1 &
           ANPINIME_RANGE_SERVER=$!
-          trap 'kill "$ANPINIME_RANGE_SERVER" || true' EXIT
-          sleep 1
+          range_fixture_cleanup() {
+            ANPINIME_RANGE_EXIT=$?
+            kill "$ANPINIME_RANGE_SERVER" 2>/dev/null || true
+            wait "$ANPINIME_RANGE_SERVER" 2>/dev/null || true
+            mkdir -p previews
+            cp "$RUNNER_TEMP/anpinime-range-server.log" previews/anpinime-range-server.log || true
+            if [ -f "$ANPINIME_RANGE_READY_FILE" ]; then cp "$ANPINIME_RANGE_READY_FILE" previews/anpinime-range-ready.json || true; fi
+            if [ "$ANPINIME_RANGE_EXIT" != 0 ]; then cat "$RUNNER_TEMP/anpinime-range-server.log" || true; fi
+            return "$ANPINIME_RANGE_EXIT"
+          }
+          trap range_fixture_cleanup EXIT
+          if ! ANPINIME_RANGE_PORT=$(python3 Tests/range_fixture_ready.py --pid "$ANPINIME_RANGE_SERVER" --ready-file "$ANPINIME_RANGE_READY_FILE"); then exit 1; fi
+          export ANPINIME_RANGE_PORT
           "$RUNNER_TEMP/anpinime-range-tests"
           python3 Tests/range_virtual_test.py
 

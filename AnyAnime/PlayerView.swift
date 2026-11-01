@@ -52,6 +52,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
     private var fallbackLoadedURL: URL?
     private let loadingLabel = UILabel()
     private var providerHeaders: [String: String] = [:]
+    private var providerIsWeb = false
     private var providerWebURL: URL?
     private var providerRefreshAttempted = false
     private var resumeAfterRefresh = 0.0
@@ -171,6 +172,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 try Task.checkCancellation()
                 guard self.active else { return }
                 self.providerHeaders = resolved.headers
+                self.providerIsWeb = resolved.isWeb
                 self.providerWebURL = resolved.webURL
                 if resolved.isWeb { self.startFallback(url: resolved.url) }
                 else if self.shouldUseMediaRelay(for: resolved.url) {
@@ -368,7 +370,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         playback.error = nil
         var headers = ["User-Agent": AnimeService.userAgent, "Referer": (referer ?? episodeURL).absoluteString]
         if episode.source.isMovie {
-            if episode.source == .phim4k, providerWebURL == nil {
+            if episode.source == .phim4k, !providerIsWeb {
                 // Original media_kit sends only the source-2 media map (oxoo),
                 // not the Core API/website Referer, Origin or account cookies.
                 headers = providerHeaders
@@ -380,7 +382,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             // A provider's session ticket must never be forwarded to a third-party iframe/CDN.
             if url.host != baseURL.host { headers.removeValue(forKey: "X-F4K-PT") }
         }
-        let cookies: [HTTPCookie] = episode.source == .phim4k && providerWebURL == nil
+        let cookies: [HTTPCookie] = episode.source == .phim4k && !providerIsWeb
             ? [] : (HTTPCookieStorage.shared.cookies(for: url) ?? [])
         var useMPV = true
         #if DEBUG
