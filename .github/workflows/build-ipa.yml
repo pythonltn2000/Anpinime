@@ -7,11 +7,16 @@ on:
         description: 'Capture simulator UI previews'
         type: boolean
         default: false
+      gateway_frame_only:
+        description: 'Check live gateway playback past 15 seconds using captured Core metadata'
+        type: boolean
+        default: false
   push:
     branches: [main]
 
 jobs:
   build-ios:
+    if: ${{ !inputs.gateway_frame_only }}
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -120,7 +125,7 @@ jobs:
           retention-days: 14
 
   preview:
-    if: github.event_name == 'workflow_dispatch' && inputs.preview
+    if: github.event_name == 'workflow_dispatch' && inputs.preview && !inputs.gateway_frame_only
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -207,5 +212,35 @@ jobs:
         if: always()
         with:
           name: AnPinime_Interface_Previews
+          path: previews/*
+          retention-days: 14
+
+  gateway-video:
+    if: github.event_name == 'workflow_dispatch' && inputs.gateway_frame_only
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare simulator project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Build simulator app
+        run: |
+          xcodebuild -quiet -project AnyAnime.xcodeproj -scheme AnyAnime \
+            -configuration Debug -sdk iphonesimulator -derivedDataPath build-simulator \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Boot simulator and install app
+        run: |
+          ANPINIME_SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPhone" in d["name"] and d["isAvailable"]))')
+          xcrun simctl boot "$ANPINIME_SIMULATOR_ID"
+          xcrun simctl bootstatus "$ANPINIME_SIMULATOR_ID" -b
+          xcrun simctl install "$ANPINIME_SIMULATOR_ID" build-simulator/Build/Products/Debug-iphonesimulator/anpinime.app
+      - name: Verify live gateway and later video frame with captured Core metadata
+        run: bash Tests/phim4k-live-smoke.sh gateway
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnPinime_Source2_Gateway_Video
           path: previews/*
           retention-days: 14
