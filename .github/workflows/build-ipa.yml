@@ -96,6 +96,10 @@ jobs:
         continue-on-error: true
         run: bash Tests/phim4k-live-smoke.sh vip
 
+      - name: Check live source-2 gateway and media using captured Core metadata
+        continue-on-error: true
+        run: bash Tests/phim4k-live-smoke.sh gateway
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

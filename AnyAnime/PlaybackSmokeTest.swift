@@ -11,7 +11,8 @@ enum PlaybackSmokeTest {
     static var animeSmoke: Bool { animeFixture || liveAnime }
     static var source2HLS: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-hls-smoke") }
     static var liveVIP: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-vip-smoke") }
-    static var source2Diagnostic: Bool { liveSource2 || source2HLS || liveVIP }
+    static var gatewaySmoke: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-gateway-smoke") }
+    static var source2Diagnostic: Bool { liveSource2 || source2HLS || liveVIP || gatewaySmoke }
     static var webOnly: Bool { ProcessInfo.processInfo.arguments.contains("--web-playback-smoke") }
     static var providerFixture: Bool { source2HLS || ProcessInfo.processInfo.arguments.contains("--movie-provider-smoke") || ProcessInfo.processInfo.arguments.contains("--phim4k-provider-smoke") }
     static var movieSource: ContentSource? {
@@ -21,10 +22,12 @@ enum PlaybackSmokeTest {
     }
     static var liveMovie: Bool { ProcessInfo.processInfo.arguments.contains("--film4k-live-smoke") }
     static var liveSource2: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-live-smoke") }
-    static var resultName: String? { animeFixture ? "anime-provider" : liveAnime ? "anime-live" : liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : liveVIP ? "phim4k-vip" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
+    static var resultName: String? { animeFixture ? "anime-provider" : liveAnime ? "anime-live" : liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : liveVIP ? "phim4k-vip" : gatewaySmoke ? "phim4k-gateway" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
     @MainActor static var animeEpisodeCount = 0
     @MainActor static var selectedAnimeEpisodeNumber: Int?
     @MainActor static var cancelledAnimeLoadVerified = false
+    @MainActor static var replayedCoreServerIDs: [String] = []
+    @MainActor static var liveGatewayPrepared = false
     @MainActor private static var firstVideoTime: Double?
     @MainActor private static var events: [[String: Any]] = []
     @MainActor static func diagnostic(_ event: String, fields: [String: Any]) {
@@ -80,6 +83,16 @@ enum PlaybackSmokeTest {
                 result["videoWidth"] = videoSize.width
                 result["videoHeight"] = videoSize.height
                 result["advancingVideoVerified"] = true
+                if gatewaySmoke {
+                    guard liveGatewayPrepared,
+                          Set(replayedCoreServerIDs) == Set(["31937", "33090", "27463", "31938", "31939"]) else { return }
+                    result["sample"] = "Replayed Core metadata / Wakanda 10403 / server 31937 / live gateway and media"
+                    result["coreMetadataReplayed"] = true
+                    result["liveGateway"] = true
+                    result["metadataServerCount"] = replayedCoreServerIDs.count
+                    result["selectedServerID"] = "31937"
+                    result["replayedCoreServerIDs"] = replayedCoreServerIDs
+                }
                 if animeSmoke {
                     result["sample"] = liveAnime ? "AnimeVietsub .news / Bleach a5985" : "Local anime metadata → dynamic episodes → player"
                     result["episodeCount"] = animeEpisodeCount
@@ -201,6 +214,10 @@ private struct MovieSmokeView: View {
                 Text(error.isEmpty ? "Kiểm thử danh sách → chi tiết → video" : error)
                     .task {
                         do {
+                            if PlaybackSmokeTest.gatewaySmoke {
+                                detail = try await prepareGatewayPlayback()
+                                return
+                            }
                             service.selectSource(source)
                             let items: [Anime]
                             if PlaybackSmokeTest.liveVIP {
@@ -225,6 +242,57 @@ private struct MovieSmokeView: View {
                     }
             }
         }
+    }
+
+    /// Replays only the captured Core metadata. The authenticated directory,
+    /// production provider/resolver, returned URL and native playback stay live.
+    @MainActor private func prepareGatewayPlayback() async throws -> AnimeDetail {
+        let namespace = "AnPinime.GatewaySmoke." + UUID().uuidString
+        guard let defaults = UserDefaults(suiteName: namespace) else { throw MovieSourceError.invalidData }
+        defer { defaults.removePersistentDomain(forName: namespace) }
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        try Task.checkCancellation()
+        guard let gateway = MovieSourceDirectory.cdnGateway(defaults: defaults) else {
+            throw Phim4KVIPResolver.Failure.missingGateway
+        }
+        PlaybackSmokeTest.diagnostic("gateway-smoke-scope", fields: ["coreMetadataReplayed": true,
+            "gatewayDirectoryAuthenticated": true, "gatewayHost": gateway.host ?? "", "selectedServerID": "31937"])
+        let localCore = URL(string: "http://127.0.0.1:8767")!
+        let detailURL = MovieCatalog.route(Phim4KCatalog.prefix + "single_details", base: localCore,
+            query: [.init(name: "type", value: "movie"), .init(name: "id", value: "10403")])
+        let item = Anime(title: "Wakanda Forever", url: detailURL, imageURL: nil,
+                         episodeText: "", quality: "", score: "", source: .phim4k)
+        let configuration = Phim4KProvider.Configuration(core: .init(baseURL: localCore, apiKey: ""),
+                                                        catalogs: [], gateway: gateway)
+        let provider = Phim4KProvider(session: session, configuration: configuration)
+        let captured = try await provider.detail(item)
+        let serverIDs = captured.episodes.compactMap { episode -> String? in
+            if case .phim4kCore(_, nil, let id) = episode.playback { return id }
+            return nil
+        }
+        guard serverIDs.count == 5,
+              Set(serverIDs) == Set(["31937", "33090", "27463", "31938", "31939"]),
+              let selected = captured.episodes.first(where: {
+                  if case .phim4kCore(_, nil, let id) = $0.playback { return id == "31937" }
+                  return false
+              }) else { throw MovieSourceError.invalidData }
+        let resolved = try await provider.resolveCore(detailURL: detailURL, seasonID: nil, episodeID: "31937")
+        try Task.checkCancellation()
+        guard !resolved.isWeb, !Phim4KVIPResolver.requiresGateway(resolved.url) else {
+            throw Phim4KVIPResolver.Failure.invalidMediaURL
+        }
+        PlaybackSmokeTest.replayedCoreServerIDs = serverIDs
+        PlaybackSmokeTest.liveGatewayPrepared = true
+        PlaybackSmokeTest.diagnostic("gateway-smoke-resolved", fields: ["coreMetadataReplayed": true,
+            "liveGateway": true, "metadataServerCount": serverIDs.count,
+            "selectedServerID": "31937", "mediaHost": resolved.url.host ?? ""])
+        let direct = Episode(title: selected.title, url: detailURL, number: selected.number,
+                             season: selected.season, qualityBadge: selected.qualityBadge, source: .phim4k,
+                             playback: .directStream(url: resolved.url, webURL: nil, isWeb: false, referer: nil))
+        return AnimeDetail(title: captured.title + " · Core metadata replay", posterURL: nil,
+                           bannerURL: nil, summary: "", info: "", episodes: [direct])
     }
 }
 #endif
