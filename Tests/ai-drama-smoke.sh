@@ -58,30 +58,27 @@ PY
 }
 trap ai_drama_cleanup EXIT
 
-# Every clip is generated test imagery: moving test bars, a colored title, and a tone.
+# Generated test imagery with a colored panel, moving bars, tone and embedded episode label.
 python3 - "$ANPINIME_TEMP/media" <<'PY'
 from pathlib import Path
 import subprocess
 import sys
 
 root = Path(sys.argv[1])
-fonts = [Path('/System/Library/Fonts/Supplemental/Arial Bold.ttf'),
-         Path('/System/Library/Fonts/Helvetica.ttc'),
-         Path('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf')]
-font = next((str(path) for path in fonts if path.is_file()), None)
-if font is None:
-    raise SystemExit('A system font is required for visible fixture episode titles')
 for episode, color, tone in [(1, '0x1e40af', 440), (3, '0x047857', 660), (40, '0x9d174d', 880)]:
-    escaped_font = font.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
-    filters = (f'drawbox=x=0:y=0:w=360:h=180:color={color}:t=fill,'
-               f"drawtext=fontfile='{escaped_font}':text='EPISODE {episode:02d}':"
-               'fontcolor=white:fontsize=43:x=(w-text_w)/2:y=70')
+    # mov_text is built into minimal ffmpeg; no drawtext, font or subtitle filter is needed.
+    subtitle = root / f'episode-{episode:02d}.srt'
+    subtitle.write_text(f'1\n00:00:00,000 --> 00:00:48,000\nEPISODE {episode:02d}\n', encoding='utf-8')
+    filters = f'drawbox=x=0:y=0:w=360:h=180:color={color}:t=fill'
     subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
                     '-f', 'lavfi', '-i', 'testsrc2=size=360x640:rate=15',
                     '-f', 'lavfi', '-i', f'sine=frequency={tone}:sample_rate=44100',
+                    '-f', 'srt', '-i', str(subtitle), '-map', '0:v:0', '-map', '1:a:0', '-map', '2:s:0',
                     '-t', '48', '-vf', filters, '-c:v', 'libx264', '-preset', 'ultrafast',
                     '-crf', '30', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
-                    '-movflags', '+faststart', '-shortest', str(root / f'episode-{episode:02d}.mp4')], check=True)
+                    '-c:s', 'mov_text', '-metadata:s:s:0', 'language=vie',
+                    '-metadata:s:s:0', f'title=EPISODE {episode:02d}', '-disposition:s:0', 'default',
+                    '-movflags', '+faststart', str(root / f'episode-{episode:02d}.mp4')], check=True)
 PY
 
 python3 -u Tests/serve_ai_drama.py --media-root "$ANPINIME_TEMP/media" --port 8768 \
