@@ -119,7 +119,7 @@ struct PlayerView: View {
                     if let error = playback.error {
                         VStack(spacing: 16) {
                             Image(systemName: "wifi.exclamationmark").font(.largeTitle)
-                            Text(error).multilineTextAlignment(.center)
+                            Text(ContentDisplayText.sourceLabels(error)).multilineTextAlignment(.center)
                             HStack(spacing: 12) {
                                 Button("Thử phát lại") { retry() }.buttonStyle(.borderedProminent).tint(.anpinimeAccent)
                                 if availableSeasons.count > 1 {
@@ -134,7 +134,7 @@ struct PlayerView: View {
                         HStack {
                             if geometry.size.width > geometry.size.height { Spacer(minLength: 0) }
                             if ["settings", "audio", "subtitles", "display", "speed", "general", "info"].contains(panel) {
-                                PlayerSettingsPanel(playback: playback, initialTab: panel, title: title, source: current.season,
+                                PlayerSettingsPanel(playback: playback, initialTab: panel, title: title, source: ContentDisplayText.sourceLabels(current.season),
                                                     close: closePanel, reload: { closePanel(); retry() })
                                     .frame(width: min(720, geometry.size.width - 24), height: min(geometry.size.height - 24, 620)).padding(12)
                             } else {
@@ -206,7 +206,7 @@ struct PlayerView: View {
                     controlButton("chevron.left", "Đóng trình phát") { dismiss() }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title).font(.headline).lineLimit(1)
-                        Text(current.source.isMovie ? "\(current.season) · \(current.title)" : current.title).font(.caption).foregroundColor(.white.opacity(0.65)).lineLimit(1)
+                        Text(ContentDisplayText.sourceLabels(current.source.isMovie ? "\(current.season) · \(current.title)" : current.title)).font(.caption).foregroundColor(.white.opacity(0.65)).lineLimit(1)
                     }
                     Spacer(minLength: 0)
                     controlButton("gearshape", "Cài đặt phát") { openPanel("settings") }
@@ -319,7 +319,7 @@ struct PlayerView: View {
         return VStack(spacing: 14) {
             if seasons.count > 1 {
                 Button { panel = "seasons" } label: {
-                    HStack { Text(season); Spacer(); MorphIcon(name: "down").frame(width: 18, height: 18) }.frame(minHeight: 44)
+                    HStack { Text(ContentDisplayText.sourceLabels(season)); Spacer(); MorphIcon(name: "down").frame(width: 18, height: 18) }.frame(minHeight: 44)
                 }
             }
             ScrollViewReader { proxy in
@@ -388,7 +388,7 @@ struct PlayerView: View {
                 MorphIcon(name: kind == "subtitles" ? "captions" : kind).frame(width: 22, height: 22)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(panelTitle(kind)).font(.subheadline.weight(.semibold))
-                    Text(value).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    Text(ContentDisplayText.sourceLabels(value)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption)
@@ -443,7 +443,7 @@ struct PlayerView: View {
                                 }
                             } label: {
                                 HStack(spacing: 12) {
-                                    Text(option.title).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                                    Text(ContentDisplayText.sourceLabels(option.title)).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                                     Spacer(minLength: 8)
                                     if selectedChoice(kind) == option.id { MorphIcon(name: "check").frame(width: 20, height: 20) }
                                 }

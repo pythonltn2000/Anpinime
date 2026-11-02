@@ -87,7 +87,7 @@ struct PlayerSettingsPanel: View {
             } else {
                 Text("Phụ đề kép và file rời dùng cho luồng phát trực tiếp. Trình phát của trang chỉ hỗ trợ phụ đề chính.").font(.footnote).foregroundStyle(.secondary)
             }
-            if let importError { Text(importError).font(.footnote).foregroundColor(.orange) }
+            if let importError { Text(ContentDisplayText.sourceLabels(importError)).font(.footnote).foregroundColor(.orange) }
             Text("Phụ đề phụ hiển thị phía trên. Chữ đã ghép vào hình không thể tắt.").font(.caption).foregroundStyle(.secondary)
         case "display":
             heading("Hiển thị phụ đề")
@@ -149,16 +149,16 @@ struct PlayerSettingsPanel: View {
                 Button { playback.chooseOption?(kind, track.id) } label: {
                     HStack(spacing: 9) {
                         Image(systemName: selected == track.id ? "checkmark.circle.fill" : "circle").foregroundColor(selected == track.id ? .anpinimeAccent : .gray)
-                        Text(track.title).font(.subheadline).multilineTextAlignment(.leading)
+                        Text(ContentDisplayText.sourceLabels(track.title)).font(.subheadline).multilineTextAlignment(.leading)
                         Spacer(minLength: 0)
                     }.frame(minHeight: 38).padding(.vertical, 3)
                 }.buttonStyle(.plain)
             }
         }
     }
-    private func heading(_ value: String) -> some View { Text(value).font(.headline) }
+    private func heading(_ value: String) -> some View { Text(ContentDisplayText.sourceLabels(value)).font(.headline) }
     private func info(_ name: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) { Text(name).font(.caption).foregroundStyle(.secondary); Text(value).font(.subheadline).textSelection(.enabled) }
+        VStack(alignment: .leading, spacing: 5) { Text(name).font(.caption).foregroundStyle(.secondary); Text(ContentDisplayText.sourceLabels(value)).font(.subheadline).textSelection(.enabled) }
     }
     private func labeledSlider(_ name: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, step: Double = 1) -> some View {
         VStack(alignment: .leading, spacing: 6) {

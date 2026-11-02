@@ -45,7 +45,7 @@ PY
   fi
   if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     if [ "$ANPINIME_STATUS" = 0 ]; then
-      printf '### Phim AI: PASS — native swipes, 40 episodes, decoded portrait playback, pause lifecycle and player release\n' >> "$GITHUB_STEP_SUMMARY"
+      printf '### Phim AI: PASS — independent library, native catalog paging and filters, 40-episode playback, history and player lifecycle\n' >> "$GITHUB_STEP_SUMMARY"
     else
       printf '### Phim AI: FAIL — see AI drama UI xcresult and fixture artifacts\n' >> "$GITHUB_STEP_SUMMARY"
     fi
@@ -107,6 +107,7 @@ for _ in range(100):
         assert health['service'] == 'anpinime-ai-drama-fixture'
         assert health['pid'] == pid and health['identity'] == identity and health['port'] == 8768
         assert health['episodeCount'] == 40
+        assert health['fixtureVersion'] == 2
         break
     except ProcessLookupError:
         raise SystemExit('AI drama fixture process exited before readiness')
@@ -149,6 +150,7 @@ xcodebuild test -project AnyAnime.xcodeproj -scheme AnyAnime -configuration Debu
   -destination "platform=iOS Simulator,id=$ANPINIME_SIMULATOR_ID" \
   -derivedDataPath "${ANPINIME_AI_DERIVED_DATA:-$ANPINIME_TEMP/DerivedData}" \
   -resultBundlePath "$ANPINIME_ARTIFACTS/ui.xcresult" \
+  -only-testing:AnyAnimeUI/AIDramaUITests/testCatalogPagingFiltersAndLibraryChoices \
   -only-testing:AnyAnimeUI/AIDramaUITests/testVerticalEpisodesPlaylistAndLifecycle -parallel-testing-enabled NO \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 2>&1 | tee "$ANPINIME_ARTIFACTS/xcodebuild.log"
 ANPINIME_TEST_STATUS=${PIPESTATUS[0]}

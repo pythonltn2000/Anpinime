@@ -48,6 +48,8 @@ actor PineDramaProvider: AIDramaProviding {
     private let configuration: Configuration
     private let session: URLSession
     private static let bodyLimit = 2 * 1024 * 1024
+    private var metadataCache: AIDramaCatalogMetadata?
+    private var nativeCategoryFilters: [[[String: Any]]]?
 
     init(configuration: Configuration = .production, session suppliedSession: URLSession? = nil) {
         self.configuration = configuration
@@ -65,10 +67,97 @@ actor PineDramaProvider: AIDramaProviding {
     deinit { session.invalidateAndCancel() }
 
     func discover(cursor: String?) async throws -> AIDramaCatalogPage {
-        let (data, _) = try await request("mini_drama_center/v1/", parameters: [
-            "scene": "1", "category_id": "", "cursor": cursor ?? "", "count": "12", "is_mixed_column_page": "0"
-        ])
+        try await catalog(query: .home, cursor: cursor, loadedSeriesIDs: [])
+    }
+
+    func catalog(query: AIDramaCatalogQuery, cursor: String?, loadedSeriesIDs: [String] = []) async throws -> AIDramaCatalogPage {
+        var plan = try Self.catalogRequest(query: query, cursor: cursor, loadedSeriesIDs: loadedSeriesIDs)
+        if case .categories(let selection) = query {
+            if nativeCategoryFilters == nil && selection != .init() { _ = try await catalogMetadata() }
+            if let groups = nativeCategoryFilters {
+                let ids = [selection.backgroundID, selection.characterID, selection.storyID]
+                let filters = try groups.enumerated().map { index, options -> [String: Any] in
+                    let selected = options.first { option in
+                        if index < 3 {
+                            if let id = ids[index] { return Self.identifier(option["category_id"]) == id && Self.integer(option["filter_type"]) == 2 }
+                            return Self.integer(option["filter_type"]) == 1
+                        }
+                        return selection.recentDays == 0 ? Self.integer(option["filter_type"]) == 1 :
+                            Self.integer(option["filter_type"]) == 3 && Self.integer(option["recent_days"]) == selection.recentDays
+                    }
+                    guard let selected else { throw AIDramaError.invalidResponse }
+                    return selected
+                }
+                plan.body = try JSONSerialization.data(withJSONObject: ["category_filters": filters, "cursor": cursor ?? "", "count": 12], options: [.sortedKeys])
+            }
+        }
+        let (data, _) = try await request(plan.path, parameters: plan.parameters, body: plan.body)
+        if case .categories = query, try Self.jsonObject(data)["category_filter_lists"] != nil { try cacheMetadata(data) }
         return try Self.decodeCatalog(data)
+    }
+
+    func catalogMetadata() async throws -> AIDramaCatalogMetadata {
+        if let metadataCache { return metadataCache }
+        let plan = try Self.catalogRequest(query: .categories(.init()), cursor: nil, loadedSeriesIDs: [])
+        let (data, _) = try await request(plan.path, parameters: plan.parameters, body: plan.body)
+        try cacheMetadata(data)
+        guard let metadataCache else { throw AIDramaError.invalidResponse }
+        return metadataCache
+    }
+
+    private func cacheMetadata(_ data: Data) throws {
+        let metadata = try Self.decodeCatalogMetadata(data)
+        let object = try Self.jsonObject(data)
+        guard let lists = object["category_filter_lists"] as? [[String: Any]] else { throw AIDramaError.invalidResponse }
+        let filters = try lists.map { list -> [[String: Any]] in
+            guard let rows = list["category_filters"] as? [[String: Any]] else { throw AIDramaError.invalidResponse }
+            return rows
+        }
+        metadataCache = metadata
+        nativeCategoryFilters = filters
+    }
+
+    struct CatalogRequest: Sendable {
+        let path: String
+        let parameters: [String: String]
+        var body: Data? = nil
+    }
+
+    /// Shipped drama_center/prefetch.js supplies scene constants and the POST
+    /// schema. Home continues with actual viewed collection IDs, not a cursor.
+    static func catalogRequest(query: AIDramaCatalogQuery, cursor: String?, loadedSeriesIDs: [String] = []) throws -> CatalogRequest {
+        if let cursor {
+            guard !cursor.isEmpty, cursor.utf8.count <= 4096 else { throw AIDramaError.invalidResponse }
+        }
+        switch query {
+        case .home:
+            guard loadedSeriesIDs.allSatisfy({ identifier($0) != nil }),
+                  Set(loadedSeriesIDs).count == loadedSeriesIDs.count else { throw AIDramaError.invalidResponse }
+            return CatalogRequest(path: "mini_drama_center/v1/", parameters: [
+                "scene": "1", "category_id": "0", "cursor": cursor ?? "", "count": "14",
+                "drama_request_type": loadedSeriesIDs.isEmpty ? "init_fetch" : "load_more",
+                "drama_current_collections": loadedSeriesIDs.suffix(20).joined(separator: ","),
+                "collection_count_in_session": String(loadedSeriesIDs.count)
+            ])
+        case .trending(let ranking):
+            return CatalogRequest(path: "mini_drama_center/v1/", parameters: [
+                "scene": ranking == .hot ? "6" : "7", "category_id": "0", "cursor": cursor ?? "", "count": "12"
+            ])
+        case .newWorks:
+            return CatalogRequest(path: "mini_drama_center/v1/", parameters: [
+                "scene": "8", "category_id": "0", "cursor": cursor ?? "", "count": "12"
+            ])
+        case .categories(let selection):
+            let selectedIDs = [selection.backgroundID, selection.characterID, selection.storyID].compactMap { $0 }
+            guard selectedIDs.allSatisfy({ identifier($0) != nil && $0 != "0" }),
+                  Set(selectedIDs).count == selectedIDs.count, [0, 7, 30].contains(selection.recentDays) else {
+                throw AIDramaError.invalidResponse
+            }
+            var filters: [[String: Any]] = selectedIDs.map { ["filter_type": 2, "category_id": $0] }
+            if selection.recentDays != 0 { filters.append(["filter_type": 3, "recent_days": selection.recentDays]) }
+            let body = try JSONSerialization.data(withJSONObject: ["category_filters": filters, "cursor": cursor ?? "", "count": 12], options: [.sortedKeys])
+            return CatalogRequest(path: "mini_drama/category_filter/v1/", parameters: [:], body: body)
+        }
     }
 
     func playlist(for series: AIDramaSeries) async throws -> AIDramaPlaylist {
@@ -92,7 +181,7 @@ actor PineDramaProvider: AIDramaProviding {
                                     allowLoopbackHTTP: configuration.allowLoopbackHTTP, userAgent: configuration.userAgent)
     }
 
-    private func request(_ path: String, parameters: [String: String]) async throws -> (Data, HTTPURLResponse) {
+    private func request(_ path: String, parameters: [String: String], body: Data? = nil) async throws -> (Data, HTTPURLResponse) {
         guard Self.permitsAPI(configuration.baseURL, allowLoopbackHTTP: configuration.allowLoopbackHTTP),
               var components = URLComponents(url: configuration.baseURL, resolvingAgainstBaseURL: false) else {
             throw AIDramaError.invalidResponse
@@ -104,7 +193,12 @@ actor PineDramaProvider: AIDramaProviding {
         components.queryItems = query.keys.sorted().map { URLQueryItem(name: $0, value: query[$0]) }
         guard let url = components.url else { throw AIDramaError.invalidResponse }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
-        request.httpMethod = "GET"
+        request.httpMethod = body == nil ? "GET" : "POST"
+        request.httpBody = body
+        if body != nil {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("str", forHTTPHeaderField: "Agw-Js-Conv")
+        }
         request.httpShouldHandleCookies = false
         request.setValue(configuration.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/json, application/x-protobuf", forHTTPHeaderField: "Accept")
@@ -122,7 +216,9 @@ actor PineDramaProvider: AIDramaProviding {
     static func decodeCatalog(_ data: Data) throws -> AIDramaCatalogPage {
         let object = try jsonObject(data)
         try checkStatus(object)
-        guard let rows = object["collections"] as? [[String: Any]], !rows.isEmpty else { throw AIDramaError.invalidResponse }
+        guard let more = object["has_more"], !(more is NSNull) else { throw AIDramaError.invalidResponse }
+        let hasMore = try flag(object, "has_more")
+        guard let rows = object["collections"] as? [[String: Any]], !rows.isEmpty || !hasMore else { throw AIDramaError.invalidResponse }
         var seen = Set<String>()
         let series: [AIDramaSeries] = try rows.map { row in
             guard let id = identifier(row["collection_id_str"]) ?? identifier(row["collection_id"]),
@@ -130,10 +226,52 @@ actor PineDramaProvider: AIDramaProviding {
             let total = integer(row["num_videos"])
             guard total == nil || total! > 0 else { throw AIDramaError.invalidResponse }
             return AIDramaSeries(id: id, title: title, coverURL: cover(row["cover"]),
-                                 summary: text(row["description"]) ?? "", episodeCount: total)
+                                 summary: text(row["description"]) ?? "", episodeCount: total,
+                                 viewCount: integer(row["num_watched"]).flatMap { $0 >= 0 ? $0 : nil },
+                                 genreText: text(row["categories"]) ?? "")
         }
-        let cursor = try flag(object, "has_more") ? text(object["cursor"]) : nil
-        return AIDramaCatalogPage(series: series, nextCursor: cursor)
+        let cursor = hasMore ? text(object["cursor"]) : nil
+        return AIDramaCatalogPage(series: series, nextCursor: cursor, hasMore: hasMore)
+    }
+
+    static func decodeCatalogMetadata(_ data: Data) throws -> AIDramaCatalogMetadata {
+        let object = try jsonObject(data)
+        try checkStatus(object)
+        guard let lists = object["category_filter_lists"] as? [[String: Any]], lists.count == 4 else {
+            throw AIDramaError.invalidResponse
+        }
+        let kinds = AIDramaFilterGroup.Kind.allCases
+        let markers = ["all_settings", "all_characters", "all_stories", "all_releases"]
+        let groups = try lists.enumerated().map { index, list -> AIDramaFilterGroup in
+            guard let rows = list["category_filters"] as? [[String: Any]], let first = rows.first,
+                  integer(first["filter_type"]) == 1, text(first["name_en"]) == markers[index],
+                  let title = text(first["name"]) else { throw AIDramaError.invalidResponse }
+            var seen = Set<String>()
+            let options = try rows.map { row -> AIDramaFilterOption in
+                guard let name = text(row["name"]), let type = integer(row["filter_type"]) else {
+                    throw AIDramaError.invalidResponse
+                }
+                let option: AIDramaFilterOption
+                switch type {
+                case 1:
+                    guard text(row["category_id"]) == "0" else { throw AIDramaError.invalidResponse }
+                    option = AIDramaFilterOption(id: "all", title: name, categoryID: nil, recentDays: nil)
+                case 2:
+                    guard index < 3, let id = identifier(row["category_id"]) else { throw AIDramaError.invalidResponse }
+                    option = AIDramaFilterOption(id: id, title: name, categoryID: id, recentDays: nil)
+                case 3:
+                    guard index == 3, let days = integer(row["recent_days"]), [7, 30].contains(days) else {
+                        throw AIDramaError.invalidResponse
+                    }
+                    option = AIDramaFilterOption(id: "days:\(days)", title: name, categoryID: nil, recentDays: days)
+                default: throw AIDramaError.invalidResponse
+                }
+                guard seen.insert(option.id).inserted else { throw AIDramaError.invalidResponse }
+                return option
+            }
+            return AIDramaFilterGroup(kind: kinds[index], title: title, options: options)
+        }
+        return AIDramaCatalogMetadata(filterGroups: groups)
     }
 
     static func decodePlaylist(_ data: Data, series: AIDramaSeries) throws -> AIDramaPlaylist {

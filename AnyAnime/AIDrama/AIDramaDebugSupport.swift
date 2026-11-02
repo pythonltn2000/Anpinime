@@ -23,7 +23,9 @@ final class AIDramaDebugSupport: ObservableObject {
     }
 
     static func clearFixtureProgress() {
+        let firstPreparation = !preparedSeries.contains("7000000000000000001")
         clearProgress(seriesID: "7000000000000000001")
+        if firstPreparation { AIDramaHistoryStore.shared.removeFixtureHistory() }
     }
 
     static func clearProgress(seriesID: String) {

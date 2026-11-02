@@ -7,6 +7,23 @@ struct AIDramaSeries: Identifiable, Hashable, Codable, Sendable {
     var coverURL: URL? = nil
     var summary: String = ""
     var episodeCount: Int? = nil
+    var viewCount: Int? = nil
+    var genreText: String = ""
+}
+
+extension AIDramaSeries {
+    private enum CodingKeys: String, CodingKey { case id, title, coverURL, summary, episodeCount, viewCount, genreText }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        title = try values.decode(String.self, forKey: .title)
+        coverURL = try values.decodeIfPresent(URL.self, forKey: .coverURL)
+        summary = try values.decodeIfPresent(String.self, forKey: .summary) ?? ""
+        episodeCount = try values.decodeIfPresent(Int.self, forKey: .episodeCount)
+        viewCount = try values.decodeIfPresent(Int.self, forKey: .viewCount)
+        genreText = try values.decodeIfPresent(String.self, forKey: .genreText) ?? ""
+    }
 }
 
 struct AIDramaEpisode: Identifiable, Hashable, Codable, Sendable {
@@ -23,6 +40,52 @@ struct AIDramaEpisode: Identifiable, Hashable, Codable, Sendable {
 struct AIDramaCatalogPage: Sendable {
     let series: [AIDramaSeries]
     let nextCursor: String?
+    let hasMore: Bool
+
+    init(series: [AIDramaSeries], nextCursor: String?, hasMore: Bool? = nil) {
+        self.series = series
+        self.nextCursor = nextCursor
+        self.hasMore = hasMore ?? (nextCursor != nil)
+    }
+}
+
+enum AIDramaRanking: String, CaseIterable, Hashable, Sendable {
+    case hot, latest
+}
+
+struct AIDramaCategorySelection: Hashable, Sendable {
+    var backgroundID: String? = nil
+    var characterID: String? = nil
+    var storyID: String? = nil
+    var recentDays: Int = 0
+}
+
+enum AIDramaCatalogQuery: Hashable, Sendable {
+    case home
+    case trending(AIDramaRanking)
+    case categories(AIDramaCategorySelection)
+    case newWorks
+}
+
+struct AIDramaFilterOption: Identifiable, Hashable, Sendable {
+    let id: String
+    let title: String
+    let categoryID: String?
+    let recentDays: Int?
+}
+
+struct AIDramaFilterGroup: Identifiable, Hashable, Sendable {
+    enum Kind: String, CaseIterable, Hashable, Sendable {
+        case background, character, story, releaseTime
+    }
+    let kind: Kind
+    let title: String
+    let options: [AIDramaFilterOption]
+    var id: Kind { kind }
+}
+
+struct AIDramaCatalogMetadata: Sendable {
+    let filterGroups: [AIDramaFilterGroup]
 }
 
 /// Providers return this only after consuming and validating the full episode list.
@@ -39,8 +102,21 @@ struct AIDramaStream: Sendable {
 
 protocol AIDramaProviding: Sendable {
     func discover(cursor: String?) async throws -> AIDramaCatalogPage
+    func catalog(query: AIDramaCatalogQuery, cursor: String?, loadedSeriesIDs: [String]) async throws -> AIDramaCatalogPage
+    func catalogMetadata() async throws -> AIDramaCatalogMetadata
     func playlist(for series: AIDramaSeries) async throws -> AIDramaPlaylist
     func resolve(_ episode: AIDramaEpisode) async throws -> AIDramaStream
+}
+
+extension AIDramaProviding {
+    func catalog(query: AIDramaCatalogQuery, cursor: String?, loadedSeriesIDs: [String] = []) async throws -> AIDramaCatalogPage {
+        guard query == .home else { throw AIDramaError.unavailable("Nguồn Phim AI chưa cung cấp mục này.") }
+        return try await discover(cursor: cursor)
+    }
+
+    func catalogMetadata() async throws -> AIDramaCatalogMetadata {
+        AIDramaCatalogMetadata(filterGroups: [])
+    }
 }
 
 enum AIDramaError: LocalizedError {

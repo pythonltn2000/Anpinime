@@ -92,6 +92,22 @@ struct AIDramaProviderTests {
         check(page.series[0].title == "Native fixture" && page.series[0].episodeCount == 40, "Catalog trims title and retains complete-series count")
         check(page.series[0].coverURL?.absoluteString == "https://media.example/cover.jpg", "Catalog filters invalid cover candidates")
         check(page.nextCursor == "page-two", "Catalog exposes the actual next-page cursor")
+        check(page.hasMore, "Catalog retains native has_more independently of the cursor")
+        let home = try PineDramaProvider.decodeCatalog(json(["status_code": 0, "collections": [row], "has_more": true, "cursor": ""]))
+        check(home.hasMore && home.nextCursor == nil, "Home recommendation continuation does not fabricate a cursor")
+        let terminal = try PineDramaProvider.decodeCatalog(json(["status_code": 0, "collections": [], "has_more": false]))
+        check(terminal.series.isEmpty && !terminal.hasMore && terminal.nextCursor == nil, "Empty terminal catalog page is valid")
+        rejects("empty catalog without explicit pagination envelope", kind: .invalid) {
+            _ = try PineDramaProvider.decodeCatalog(json(["status_code": 0, "collections": []]))
+        }
+        var enriched = row
+        enriched["num_watched"] = 17_206_503
+        enriched["categories"] = "Truy thê, Tình thân"
+        let rich = try PineDramaProvider.decodeCatalog(catalog([enriched])).series[0]
+        check(rich.viewCount == 17_206_503 && rich.genreText == "Truy thê, Tình thân", "Card metadata comes from native view count and category text")
+        let oldHistory = Data(#"{"id":"7000000000000000001","title":"Existing history","summary":"","episodeCount":40}"#.utf8)
+        let restored = try JSONDecoder().decode(AIDramaSeries.self, from: oldHistory)
+        check(restored.genreText.isEmpty && restored.viewCount == nil, "Existing saved series decode when newer card metadata is absent")
         var stringRow = row
         stringRow["collection_id"] = String(seriesNumber)
         check(try PineDramaProvider.decodeCatalog(catalog([stringRow])).series[0].id == String(seriesNumber), "String Int64 catalog IDs remain exact")
@@ -107,6 +123,65 @@ struct AIDramaProviderTests {
             var bad = row
             bad["collection_id"] = invalid
             rejects("invalid catalog ID \(invalid)", kind: .invalid) { _ = try PineDramaProvider.decodeCatalog(catalog([bad])) }
+        }
+    }
+
+    static func filterLists() -> [[String: Any]] {
+        [
+            ["category_filters": [["filter_type": 1, "category_id": "0", "name": "Tất cả bối cảnh", "name_en": "all_settings"],
+                                   ["filter_type": 2, "category_id": "7628991192537158672", "name": "Kỳ ảo", "name_en": "fantasy"]]],
+            ["category_filters": [["filter_type": 1, "category_id": "0", "name": "Tất cả nhân vật", "name_en": "all_characters"],
+                                   ["filter_type": 2, "category_id": "7628991193891820560", "name": "Phục thù", "name_en": "revenge"]]],
+            ["category_filters": [["filter_type": 1, "category_id": "0", "name": "Tất cả câu chuyện", "name_en": "all_stories"],
+                                   ["filter_type": 2, "category_id": "7628991193543840769", "name": "Cơ hội thứ hai", "name_en": "second_chance"]]],
+            ["category_filters": [["filter_type": 1, "category_id": "0", "name": "Tất cả tác phẩm", "name_en": "all_releases"],
+                                   ["filter_type": 3, "category_id": "", "name": "Trong 7 ngày", "name_en": "in_7_days", "recent_days": 7],
+                                   ["filter_type": 3, "category_id": "", "name": "Trong 30 ngày", "name_en": "in_30_days", "recent_days": 30]]]
+        ]
+    }
+
+    static func testLibraryContracts() throws {
+        for (query, scene) in [(AIDramaCatalogQuery.trending(.hot), "6"), (.trending(.latest), "7"), (.newWorks, "8")] {
+            let plan = try PineDramaProvider.catalogRequest(query: query, cursor: "1:16:12")
+            check(plan.path == "mini_drama_center/v1/" && plan.body == nil && plan.parameters["scene"] == scene,
+                  "Library route uses original scene \(scene) through GET")
+            check(plan.parameters["cursor"] == "1:16:12", "Library scene \(scene) forwards the server cursor unchanged")
+        }
+        let loaded = (1...35).map { String(seriesNumber + Int64($0)) }
+        let home = try PineDramaProvider.catalogRequest(query: .home, cursor: nil, loadedSeriesIDs: loaded)
+        check(home.parameters["drama_request_type"] == "load_more" && home.parameters["drama_current_collections"] == loaded.suffix(20).joined(separator: ","),
+              "Home continuation carries the last 20 actual loaded collection identities")
+        check(home.parameters["collection_count_in_session"] == "35" && home.parameters["cursor"] == "" && home.parameters["request_count_in_session"] == nil,
+              "Home uses actual loaded count without fabricating a session ID or cursor")
+        let initial = try PineDramaProvider.catalogRequest(query: .home, cursor: nil)
+        check(initial.parameters["drama_request_type"] == "init_fetch" && initial.parameters["collection_count_in_session"] == "0", "Home refresh starts a new actual recommendation state")
+        let selection = AIDramaCategorySelection(backgroundID: "7628991192537158672", characterID: "7628991193891820560",
+                                                 storyID: "7628991193543840769", recentDays: 7)
+        let filtered = try PineDramaProvider.catalogRequest(query: .categories(selection), cursor: "1:14")
+        let object = try JSONSerialization.jsonObject(with: filtered.body!) as! [String: Any]
+        let filters = object["category_filters"] as! [[String: Any]]
+        check(filtered.path == "mini_drama/category_filter/v1/" && filtered.parameters.isEmpty && filters.count == 4,
+              "Four selected groups use original POST JSON category endpoint")
+        check(filters.prefix(3).map { $0["category_id"] as! String } == [selection.backgroundID!, selection.characterID!, selection.storyID!] &&
+              filters.prefix(3).allSatisfy { ($0["filter_type"] as? Int) == 2 }, "All three exact native category IDs remain separate filters")
+        check((filters[3]["filter_type"] as? Int) == 3 && (filters[3]["recent_days"] as? Int) == 7 && object["cursor"] as? String == "1:14",
+              "Time window uses native recent_days filter and exact next cursor")
+        let metadata = try PineDramaProvider.decodeCatalogMetadata(json(["status_code": 0, "category_filter_lists": filterLists()]))
+        check(metadata.filterGroups.map(\.kind) == [.background, .character, .story, .releaseTime], "Service metadata supplies all four filter groups in order")
+        check(metadata.filterGroups[0].options[1].categoryID == selection.backgroundID && metadata.filterGroups[3].options.map(\.recentDays) == [nil, 7, 30],
+              "Metadata preserves the server category IDs and release windows")
+        check(metadata.filterGroups.allSatisfy { $0.options.first?.id == "all" && $0.options.first?.categoryID == nil }, "All choices clear their group without inventing a category ID")
+        rejects("incomplete four-group metadata", kind: .invalid) {
+            _ = try PineDramaProvider.decodeCatalogMetadata(json(["status_code": 0, "category_filter_lists": Array(filterLists().dropLast())]))
+        }
+        rejects("unsupported time window", kind: .invalid) {
+            _ = try PineDramaProvider.catalogRequest(query: .categories(.init(recentDays: 365)), cursor: nil)
+        }
+        rejects("invalid loaded home identity", kind: .invalid) {
+            _ = try PineDramaProvider.catalogRequest(query: .home, cursor: nil, loadedSeriesIDs: ["invented"])
+        }
+        rejects("duplicate loaded home identity", kind: .invalid) {
+            _ = try PineDramaProvider.catalogRequest(query: .home, cursor: nil, loadedSeriesIDs: [series.id, series.id])
         }
     }
 
@@ -325,10 +400,28 @@ struct AIDramaProviderTests {
             await rejectsAsync("unpermitted API base \(base)", kind: .invalid) { _ = try await denied.discover(cursor: nil) }
         }
         check(AIDramaFixtureProtocol.captured().count == 1, "Rejected API bases never reach the network transport")
+        _ = try await provider.catalog(query: .trending(.hot), cursor: "1:16:12")
+        _ = try await provider.catalog(query: .trending(.latest), cursor: nil)
+        _ = try await provider.catalog(query: .newWorks, cursor: nil)
+        _ = try await provider.catalog(query: .categories(.init(recentDays: 7)), cursor: "1:14")
+        let metadata = try await provider.catalogMetadata()
+        check(metadata.filterGroups.count == 4 && AIDramaFixtureProtocol.captured().count == 6, "Category reply caches native metadata without another request")
+        let library = Array(AIDramaFixtureProtocol.captured().dropFirst())
+        check(library.prefix(3).allSatisfy { $0.httpMethod == "GET" }, "Both ranking lists and new works use GET transport")
+        let category = library[4]
+        check(category.httpMethod == "POST" && category.value(forHTTPHeaderField: "Content-Type") == "application/json" && category.value(forHTTPHeaderField: "Agw-Js-Conv") == "str",
+              "Category transport uses original JSON POST and conversion header")
+        let body = try JSONSerialization.jsonObject(with: category.httpBody!) as! [String: Any]
+        let rawFilters = body["category_filters"] as! [[String: Any]]
+        check(rawFilters.count == 4 && rawFilters[0]["name_en"] as? String == "all_settings" &&
+              rawFilters[3]["name_en"] as? String == "in_7_days", "Category requests preserve whole native selected objects and each unselected All object")
+        check(library.allSatisfy { !$0.httpShouldHandleCookies && $0.value(forHTTPHeaderField: "Cookie") == nil && $0.value(forHTTPHeaderField: "Authorization") == nil },
+              "All new library routes preserve account-free transport isolation")
     }
 
     static func main() async throws {
         try testCatalog()
+        try testLibraryContracts()
         try testPlaylist()
         try testJSONVideo()
         try testProtobufVideo()
@@ -350,7 +443,9 @@ private final class AIDramaFixtureProtocol: URLProtocol {
         Self.lock.lock()
         Self.requests.append(request)
         Self.lock.unlock()
-        let body = Data(#"{"status_code":0,"collections":[{"collection_id":7000000000000000001,"title":"Transport fixture","num_videos":40}],"has_more":false}"#.utf8)
+        var object: [String: Any] = ["status_code": 0, "collections": [["collection_id": AIDramaProviderTests.seriesNumber, "title": "Transport fixture", "num_videos": 40]], "has_more": false]
+        if request.url?.path.contains("category_filter") == true { object["category_filter_lists"] = AIDramaProviderTests.filterLists() }
+        let body = try! JSONSerialization.data(withJSONObject: object)
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
                                       headerFields: ["Content-Type": "application/json", "Set-Cookie": "fixture_response=ignored; Path=/"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

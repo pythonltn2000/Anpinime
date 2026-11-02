@@ -1,0 +1,74 @@
+{
+  "sourceArchive": "Payload/Drama.app/TikTokPineDramaImpl.bundle/tiktok_short_drama_center_lynx.zip",
+  "templateSHA256": "8ae099d587cf1a42942d582007bac811e20c8e00856311e326a19b11e1d80192",
+  "prefetchSHA256": "4a7c61a135039347260600d4ea91c3e46c398fdfb3a4d2c0abc2ef0be0244f6b",
+  "offsetConvention": "Byte offsets in uncompressed shipped drama_center/template.js, not Mach-O addresses. Original code was inspected as text and was not executed.",
+  "staticLocations": {
+    "category_filter_types": "0xf5ac7",
+    "scene_enum": "0xf5ba8",
+    "category_request": "0x12f146",
+    "category_response_groups": "0x12f63b",
+    "category_selected_raw_objects": "0x12faed",
+    "category_load_more": "0x1321b7",
+    "home_phase_request_type": "0x128ced",
+    "home_recommend_fields": "0x128f42",
+    "home_wire_query": "0x12a7f4",
+    "home_wire_get": "0x12abc9",
+    "home_load_more": "0x140137",
+    "new_works_scene_caller": "0x143290",
+    "ranking_hot_scene_caller": "0x143487",
+    "ranking_new_scene_caller": "0x143619",
+    "last7days_ui_copy": "0xbbfda"
+  },
+  "scenes": {
+    "home": 1,
+    "hotRanking": 6,
+    "latestRanking": 7,
+    "newWorks": 8
+  },
+  "center": {
+    "method": "GET",
+    "path": "/tiktok/md/mini_drama_center/v1/",
+    "fields": [
+      "scene",
+      "category_id",
+      "cursor",
+      "count"
+    ]
+  },
+  "homeContinuation": {
+    "drama_request_type": "load_more",
+    "drama_current_collections": "Last 20 actually loaded exact collection IDs, comma joined",
+    "collection_count_in_session": "Actual accumulated collection count",
+    "request_count_in_session": "Omitted without an actual native host session ID",
+    "cursor": "Remains empty when service returns empty; no synthesized cursor"
+  },
+  "categories": {
+    "method": "POST",
+    "path": "/tiktok/md/mini_drama/category_filter/v1/",
+    "headers": {
+      "Content-Type": "application/json",
+      "Agw-Js-Conv": "str"
+    },
+    "bodyFields": [
+      "category_filters",
+      "cursor",
+      "count"
+    ],
+    "metadataPath": "category_filter_lists[].category_filters[]",
+    "filterTypes": {
+      "all": 1,
+      "categoryID": 2,
+      "recentDays": 3
+    },
+    "selection": "Preserve each selected raw filter object; use each unselected group native All object",
+    "groupMarkers": [
+      "all_settings",
+      "all_characters",
+      "all_stories",
+      "all_releases"
+    ]
+  },
+  "newWorksCopy": "New releases in the last 7 days; native scene 8 does not add a recent_days parameter",
+  "limits": "Two catalog pages per route only; observed has_more does not establish an unlimited or exhaustive catalog. No playback scope change."
+}

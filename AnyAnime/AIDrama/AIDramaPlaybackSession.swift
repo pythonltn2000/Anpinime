@@ -144,7 +144,8 @@ final class AIDramaPlaybackSession: ObservableObject {
         player.perform("pause", value: 0)
         guard controller === player else { return }
         attached = false
-        savePosition()
+        // Representable dismantling must not publish into SwiftUI's closing graph.
+        savePosition(recordHistory: false)
     }
 
     private func reconcile() {
@@ -315,13 +316,17 @@ final class AIDramaPlaybackSession: ObservableObject {
         attached = false
     }
 
-    private func savePosition(time: Double? = nil) {
+    private func savePosition(time: Double? = nil, recordHistory: Bool = true) {
         guard let id = selectedEpisodeID, let state = playback else { return }
         if let target = pendingResume {
             // Teardown can happen between issuing a seek and MPV's confirming poll.
             positions[id] = target
             lastSavedTime = target
             persistPositions()
+            if recordHistory, let episode = selectedEpisode, state.currentTime > 0 {
+                AIDramaHistoryStore.shared.record(series: playlist.series, episode: episode,
+                                                  position: target, duration: state.duration)
+            }
             return
         }
         let position = time ?? state.currentTime
@@ -330,6 +335,10 @@ final class AIDramaPlaybackSession: ObservableObject {
         positions[id] = state.duration > 0 && position >= state.duration - 1 ? 0 : position
         lastSavedTime = position
         persistPositions()
+        if recordHistory, let episode = selectedEpisode {
+            AIDramaHistoryStore.shared.record(series: playlist.series, episode: episode,
+                                              position: position, duration: state.duration)
+        }
     }
 
     private func persistPositions() {

@@ -155,3 +155,108 @@ Phim AI uses independent models, provider, cache and watch-progress keys. It con
 These implementation choices are separate from verification status. Source 1/3 and existing source-2 live failures are not declared repaired by the PineDrama results. The feature’s UI-test artifacts, regression checks and remaining device limitations belong in the feature delivery report.
 
 Raw IPA/framework files, Capstone listings, service payloads and signed URL files remain in private scratch. The checked-in evidence uses whitelisted identity/count/flag/hash fields only.
+
+## Expanded native library and genuine catalog continuation — 2026-11-02
+
+The supplied archive also contains
+`Payload/Drama.app/TikTokPineDramaImpl.bundle/tiktok_short_drama_center_lynx.zip`.
+Its uncompressed `drama_center/prefetch.js` is readable JavaScript, and
+`drama_center/template.js` retains the original background JavaScript source
+after its compiled data. Both were inspected statically; neither JavaScript nor
+the original IPA was executed. The template SHA-256 is
+`8ae099d587cf1a42942d582007bac811e20c8e00856311e326a19b11e1d80192`, and
+the prefetch SHA-256 is
+`4a7c61a135039347260600d4ea91c3e46c398fdfb3a4d2c0abc2ef0be0244f6b`.
+Addresses in this section are **byte offsets within the uncompressed
+`drama_center/template.js` asset**, not Mach-O addresses.
+
+This recovers the separate library screens, beyond the initial native scene-1
+request documented above:
+
+| Screen | Original request | Bounded live result |
+| --- | --- | --- |
+| Home | Center GET, `scene=1`, `category_id=0`, `count=14`, native recommendation state below | 14 initial rows, then 14 rows containing 3 additional identities |
+| Top hot | Center GET, `scene=6`, actual returned cursor | 12 rows, then 12 additional identities |
+| Latest ranking | Center GET, `scene=7`, actual returned cursor | 12 rows, then 12 additional identities |
+| New works | Center GET, `scene=8`, actual returned cursor | 12 rows, then 12 additional identities |
+| Categories, all | Category-filter POST, initially `category_filters=[]` | Four real filter groups, 12 rows, then 12 additional identities |
+| Categories, Kỳ ảo + 7 days | Category-filter POST with original selected/all objects | 12 rows, then 12 additional identities |
+
+The scene enum is at asset offset `0xf5ba8`. Original hot/latest ranking
+callers at `0x143487` / `0x143619` use scenes 6 / 7 and count 10. The read-only
+API checks and current provider use a supported count of 12; service order is
+preserved. Scene 2 is a different trending list and must not be substituted for
+the ranking screens. No local sorting of a home page produces either ranking.
+
+The new-works caller at `0x143290` selects scene 8. The shipped UI copy at
+`0xbbfda` explicitly reads **“New releases in the last 7 days”**. This screen
+does not add a `recent_days` parameter; that field belongs to category filtering.
+
+### Four independent native category rows
+
+```text
+POST /tiktok/md/mini_drama/category_filter/v1/
+Content-Type: application/json
+Agw-Js-Conv: str
+
+{"category_filters":[<original selected filter objects>],"cursor":"","count":12}
+```
+
+The original request generator is readable in the shipped prefetch asset.
+Template request code at `0x12f146` and response mapping at `0x12f63b` use
+top-level **`category_filter_lists[].category_filters[]`**. The four actual
+groups are marked `all_settings`, `all_characters`, `all_stories`, and
+`all_releases`, matching the supplied screenshots. Their names, category IDs
+and options come from the service; they are not hardcoded genre lists.
+
+Filter type definitions at `0xf5ac7` are `1=All`, `2=category_id`, and
+`3=recent_days`. The release group returned actual options for 7 and 30 days.
+Selection helper `0x12faed` preserves each selected item's whole original
+object and each unselected group's original All object. The provider caches
+that metadata and sends these same objects. A selected category therefore
+does not erase the other two category choices or the release window.
+
+The bounded selected-filter check used the service's Kỳ ảo ID
+`7628991192537158672`, its original other-group All objects and its original
+7-day object. It returned `status_code=0`, 12 rows and cursor `1:14`; forwarding
+that exact cursor returned 12 additional identities and cursor `1:41`.
+The original category load-more caller at `0x1321b7` likewise passes the actual
+nonempty cursor and selected filters. A valid filtered/terminal empty page is
+accepted only with an explicit `has_more=false`; a missing pagination envelope
+is invalid.
+
+### Home recommendations use actual loaded state
+
+Scene 1 still returns `has_more=true` with an empty cursor. The missing native
+contract is now established by helper `0x128ced`, request fields at `0x128f42`,
+and the actual load-more caller at `0x140137`:
+
+```text
+drama_request_type=init_fetch | load_more
+drama_current_collections=<last 20 actually loaded collection IDs, comma joined>
+collection_count_in_session=<actual accumulated collection count>
+```
+
+The native `loadmore` phase explicitly selects `load_more` even while the
+cursor remains empty. `request_count_in_session` is only included when the
+native host has a real session ID; it is omitted in these account-free checks
+and the provider. No session identity or cursor is fabricated.
+
+The observed continuation added **3** unique series to the first 14. It was not
+14 new series: repeated rows must be deduplicated by exact collection ID. The
+store sends actual accumulated IDs, retains the server's `has_more`, and stops
+when a response adds no new identities. Ranking, new-works and category feeds
+instead require actual advancing server cursors and stop on cursor repetition.
+
+All requests targeted `api-va.tiktokv.com` with the previously verified common
+app parameters. They were sequential, limited to first/second pages per route,
+with a 12-second timeout and a 2-MiB response cap. No account, install
+registration, cookie, signature, purchase change or media download was used.
+These checks establish bounded continuation, not an exhaustive or unlimited
+catalog. Existing selected-episode identity and playback validation remain as
+documented above.
+
+Sanitized contract locations, response hashes, exact collection identities,
+counts and cursors are in
+[evidence/2026-11-02-pinedrama-library](evidence/2026-11-02-pinedrama-library/README.md).
+Raw service replies and recovered source remain in private scratch.

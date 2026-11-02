@@ -1,7 +1,7 @@
 import XCTest
 import CoreFoundation
 
-/// Exercises the real five-tab app with separate fixture and bounded live checks.
+/// Exercises the independent AI library with separate fixture and bounded live checks.
 final class AIDramaUITests: XCTestCase {
     private var app: XCUIApplication!
     private let seriesID = "7000000000000000001"
@@ -157,9 +157,130 @@ final class AIDramaUITests: XCTestCase {
         }
         XCTAssertFalse(app.buttons["aidrama.close"].exists)
         capture("five-native-tabs-after-player-close")
+
+        // History is a user-visible route back to the exact episode, including its pause state.
+        let history = app.buttons["aidrama.history." + seriesID]
+        for _ in 0..<8 {
+            if history.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(history.isHittable, "Watching creates an entry on the AI home screen")
+        history.tap()
+        try waitFor("History resumes the exact last watched episode") {
+            guard let state = self.playerState() else { return false }
+            return state.selectedEpisodeID == self.episodeID(40) && !state.resolving
+                && state.manuallyPaused && state.currentTime > 0.5
+                && state.mediaInfo.contains("360 × 640") && state.ownedPlayers == 1
+        }
+        capture("history-resumes-episode-40")
+        app.buttons["aidrama.close"].tap()
+    }
+
+    func testCatalogPagingFiltersAndLibraryChoices() throws {
+        try assertFiveTabs()
+        try waitFor("The AI home has a real catalog card") {
+            self.app.buttons["aidrama.series." + self.seriesID].isHittable
+        }
+
+        // The second page must append from scrolling, without the refresh action.
+        app.tabBars.buttons["Mới"].tap()
+        let newScroll = app.scrollViews["aidrama.new.results"]
+        let secondPage = app.buttons["aidrama.series." + fixtureSeriesID(3012)]
+        try scrollUntilHittable(secondPage, in: newScroll, message: "Scrolling appends new works page 2")
+        XCTAssertTrue(secondPage.label.contains("New Fixture 13"))
+        let newStats = try fixtureJSON("/__smoke__/stats")
+        XCTAssertEqual(eventCount(newStats, "catalog_started", feed: "new", page: 1), 1,
+                       "Infinite paging does not refresh and replace page 1")
+        XCTAssertEqual(eventCount(newStats, "catalog_started", feed: "new", page: 2), 1)
+        capture("new-works-appends-native-cursor-page-2")
+
+        app.tabBars.buttons["Thịnh hành"].tap()
+        let hot = app.buttons["aidrama.series." + fixtureSeriesID(1000)]
+        try waitFor("The hot ranking finishes loading") { hot.isHittable }
+        let previousHotRequests = eventCount(try fixtureJSON("/__smoke__/stats"), "catalog_started", feed: "hot", page: 1)
+        let rankings = app.scrollViews["aidrama.ranking.results"]
+        rankings.swipeDown()
+        try waitFor("Refreshing starts a delayed hot ranking request") {
+            guard let stats = try? self.fixtureJSON("/__smoke__/stats") else { return false }
+            return self.eventCount(stats, "catalog_started", feed: "hot", page: 1) > previousHotRequests
+        }
+        let latestSegment = app.segmentedControls["aidrama.ranking.mode"].buttons["Mới nhất"]
+        XCTAssertTrue(latestSegment.isHittable)
+        latestSegment.tap()
+        let latest = app.buttons["aidrama.series." + fixtureSeriesID(2000)]
+        try waitFor("Switching ranking displays the latest response") { latest.isHittable }
+        try waitFor("The former hot response reaches its stale-response window", timeout: 8) {
+            guard let stats = try? self.fixtureJSON("/__smoke__/stats") else { return false }
+            return self.eventCount(stats, "catalog_finished", feed: "hot", page: 1) > previousHotRequests
+        }
+        XCTAssertTrue(latest.isHittable)
+        XCTAssertFalse(hot.exists, "A late hot response must not replace the selected latest ranking")
+        XCTAssertTrue(latestSegment.isSelected)
+        capture("latest-ranking-survives-delayed-hot-response")
+
+        app.tabBars.buttons["Danh mục"].tap()
+        let fantasy = app.buttons["aidrama.filter.background.7628991192537158672"]
+        let revenge = app.buttons["aidrama.filter.character.7628991193891820560"]
+        let story = app.buttons["aidrama.filter.story.7628991193543840769"]
+        let recent = app.buttons["aidrama.filter.releaseTime.days:7"]
+        try waitFor("All four native category filter rows are usable") {
+            [fantasy, revenge, story, recent].allSatisfy { $0.isHittable }
+        }
+        fantasy.tap()
+        try waitFor("The first category selection starts its delayed response") {
+            guard let stats = try? self.fixtureJSON("/__smoke__/stats") else { return false }
+            return self.categoryEventCount(stats, "catalog_started", mask: 1, days: 0) > 0
+        }
+        revenge.tap()
+        story.tap()
+        recent.tap()
+        let filtered = app.buttons["aidrama.series." + fixtureSeriesID(4707)]
+        let categories = app.scrollViews["aidrama.categories.results"]
+        try scrollUntilHittable(filtered, in: categories, message: "The four combined filters load the matching catalog")
+        XCTAssertTrue(filtered.label.contains("Category 7-7 Fixture 1"))
+        try waitFor("The earlier single-filter response completes", timeout: 8) {
+            guard let stats = try? self.fixtureJSON("/__smoke__/stats") else { return false }
+            return self.categoryEventCount(stats, "catalog_finished", mask: 1, days: 0) > 0
+        }
+        XCTAssertTrue(filtered.isHittable)
+        XCTAssertFalse(app.buttons["aidrama.series." + fixtureSeriesID(4100)].exists,
+                       "An obsolete filter response must not overwrite the combined selection")
+        let filteredSecondPage = app.buttons["aidrama.series." + fixtureSeriesID(4719)]
+        try scrollUntilHittable(filteredSecondPage, in: categories, message: "The combined category selection appends its own next page")
+        capture("four-native-filters-and-category-cursor-paging")
+
+        app.buttons["aidrama.library.choose"].tap()
+        try assertLibraryChoices()
+        app.buttons["library.choice.movie"].tap()
+        try assertTabs(["Trang chủ", "Tìm kiếm", "Thể loại", "Cài đặt"])
+        let sourceMenu = app.buttons["movie.source.choose"]
+        try waitFor("The movie source chooser is available") { sourceMenu.isHittable }
+        sourceMenu.tap()
+        for source in ["film4k", "phim4k", "kkphim"] {
+            XCTAssertTrue(app.buttons["movie.source." + source].exists, "Existing source ID remains independently selectable: \(source)")
+        }
+        app.buttons["movie.source.phim4k"].tap()
+        try waitFor("The selected movie source is Premium") { sourceMenu.value as? String == "Anpinime Premium" }
+        try openLibraryChooserFromSettings()
+        app.buttons["library.choice.aiDrama"].tap()
+        try assertFiveTabs()
+        app.buttons["aidrama.library.choose"].tap()
+        app.buttons["library.choice.movie"].tap()
+        try assertTabs(["Trang chủ", "Tìm kiếm", "Thể loại", "Cài đặt"])
+        XCTAssertEqual(app.buttons["movie.source.choose"].value as? String, "Anpinime Premium",
+                       "Entering AI preserves the user's selected movie provider")
+        try openLibraryChooserFromSettings()
+        try assertLibraryChoices()
+        app.buttons["library.choice.anime"].tap()
+        try assertTabs(["Trang chủ", "Tìm kiếm", "Thể loại", "Lịch chiếu", "Cài đặt"])
+        try openLibraryChooserFromSettings()
+        app.buttons["library.choice.aiDrama"].tap()
+        try assertFiveTabs()
+        capture("independent-ai-library-after-movie-and-anime")
     }
 
     func testLivePineDramaPlaylistAndVideo() throws {
+        try assertFiveTabs()
         let catalogCards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "aidrama.series."))
         try waitForLive("The fresh PineDrama catalog loads", timeout: 15) { catalogCards.count > 0 }
         // Commit the objective before requesting its panel; never try another series.
@@ -310,13 +431,48 @@ final class AIDramaUITests: XCTestCase {
     private func episodeID(_ number: Int) -> String { String(Int64(7_000_000_000_000_000_100) + Int64(number)) }
 
     private func assertFiveTabs() throws {
+        try assertTabs(["Trang chủ", "Thịnh hành", "Danh mục", "Mới", "Cài đặt"])
+    }
+
+    private func assertTabs(_ titles: [String]) throws {
         let tabs = app.tabBars.firstMatch
-        try waitFor("The native five-tab bar is visible") { tabs.exists && tabs.buttons.count == 5 }
-        for title in ["Trang chủ", "Tìm kiếm", "Thể loại", "Phim AI", "Cài đặt"] {
+        try waitFor("The selected library's native tabs are visible") { tabs.exists && tabs.buttons.count == titles.count }
+        for title in titles {
             XCTAssertTrue(tabs.buttons[title].exists, "Missing native tab: \(title)")
         }
         XCTAssertFalse(tabs.buttons["More"].exists)
         XCTAssertFalse(tabs.buttons["Thêm"].exists)
+    }
+
+    private func assertLibraryChoices() throws {
+        try waitFor("The library chooser has three independent choices") {
+            ["anime", "movie", "aiDrama"].allSatisfy { self.app.buttons["library.choice." + $0].exists }
+        }
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.choice.")).count, 3)
+    }
+
+    private func openLibraryChooserFromSettings() throws {
+        app.tabBars.buttons["Cài đặt"].tap()
+        let choose = app.buttons["Đổi thư viện"]
+        for _ in 0..<6 {
+            if choose.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(choose.isHittable)
+        choose.tap()
+        try assertLibraryChoices()
+    }
+
+    private func fixtureSeriesID(_ offset: Int) -> String {
+        String(Int64(7_000_000_000_000_000_001) + Int64(offset))
+    }
+
+    private func scrollUntilHittable(_ element: XCUIElement, in scroll: XCUIElement, message: String) throws {
+        for _ in 0..<14 {
+            if element.isHittable { return }
+            if scroll.exists { scroll.swipeUp() } else { app.swipeUp() }
+        }
+        try waitFor(message, timeout: 5) { element.isHittable }
     }
 
     private func assertNoSocialControls() {
@@ -471,6 +627,19 @@ final class AIDramaUITests: XCTestCase {
         (stats["events"] as? [[String: Any]] ?? []).first {
             $0["event"] as? String == event && $0["episode"] as? Int == episode
         }?["elapsed"] as? Double
+    }
+
+    private func eventCount(_ stats: [String: Any], _ event: String, feed: String, page: Int) -> Int {
+        (stats["events"] as? [[String: Any]] ?? []).filter {
+            $0["event"] as? String == event && $0["feed"] as? String == feed && $0["page"] as? Int == page
+        }.count
+    }
+
+    private func categoryEventCount(_ stats: [String: Any], _ event: String, mask: Int, days: Int) -> Int {
+        (stats["events"] as? [[String: Any]] ?? []).filter {
+            $0["event"] as? String == event && $0["feed"] as? String == "category"
+                && $0["mask"] as? Int == mask && $0["days"] as? Int == days
+        }.count
     }
 
     private func capture(_ name: String) {

@@ -103,7 +103,7 @@ struct AnimeDetailView: View {
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
                             if !detail.info.isEmpty {
-                                Text(detail.info)
+                                Text(ContentDisplayText.sourceLabels(detail.info))
                                     .font(.caption)
                                     .foregroundColor(.white.opacity(0.82))
                                     .lineLimit(2)
@@ -135,7 +135,7 @@ struct AnimeDetailView: View {
                 if !detail.summary.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Nội dung").font(.headline)
-                        Text(detail.summary)
+                        Text(ContentDisplayText.sourceLabels(detail.summary))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -227,7 +227,7 @@ struct AnimeDetailView: View {
                     .tint(.red)
 
                 case .unavailable(let text):
-                    Text(text)
+                    Text(ContentDisplayText.sourceLabels(text))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -302,7 +302,7 @@ struct AnimeDetailView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Không thể tải danh sách tập")
                             .font(.caption.weight(.bold))
-                        Text(errText)
+                        Text(ContentDisplayText.sourceLabels(errText))
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .lineLimit(2)
@@ -322,7 +322,7 @@ struct AnimeDetailView: View {
         case .unavailable(let reason):
             VStack(alignment: .leading, spacing: 8) {
                 Text("Danh sách tập").font(.headline)
-                Text(reason)
+                Text(ContentDisplayText.sourceLabels(reason))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -358,10 +358,10 @@ struct AnimeDetailView: View {
                                 HStack(spacing: 6) {
                                     Image(systemName: season == active ? "checkmark.circle.fill" : "server.rack")
                                         .font(.caption2)
-                                    Text(season)
+                                    Text(ContentDisplayText.sourceLabels(season))
                                         .font(.caption.weight(.semibold))
                                     if !badge.isEmpty {
-                                        Text(badge)
+                                        Text(ContentDisplayText.sourceLabels(badge))
                                             .font(.system(size: 9, weight: .bold))
                                             .padding(.horizontal, 5)
                                             .padding(.vertical, 2)
@@ -543,7 +543,7 @@ struct ServerPickerSheet: View {
                                             .foregroundColor(.anpinimeAccent)
 
                                         if !server.badge.isEmpty {
-                                            Badge(text: server.badge, color: server.badge.contains("4K") ? .purple : .blue)
+                                            Badge(text: ContentDisplayText.sourceLabels(server.badge), color: server.badge.contains("4K") ? .purple : .blue)
                                         }
                                         if server.count > 1 {
                                             Text("\(server.count) tập")
@@ -552,7 +552,7 @@ struct ServerPickerSheet: View {
                                         }
                                     }
 
-                                    Text(server.name)
+                                    Text(ContentDisplayText.sourceLabels(server.name))
                                         .font(.subheadline.weight(.bold))
                                         .foregroundColor(.primary)
                                         .multilineTextAlignment(.leading)

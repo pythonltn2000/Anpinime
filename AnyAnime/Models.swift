@@ -6,20 +6,33 @@ enum ContentSource: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .anime: return "AnimeVietsub"
-        case .film4k: return "Nguồn 1 · NguonC"
-        case .phim4k: return "Nguồn 2 · Phim4K"
-        case .kkphim: return "Nguồn 3 · KKPhim"
+        case .film4k: return "Anpinime Free"
+        case .phim4k: return "Anpinime Premium"
+        case .kkphim: return "Anpinime dự phòng"
         }
     }
     var subtitle: String {
         switch self {
         case .anime: return "Anime"
-        case .film4k: return "Nguồn 1 · NguonC"
-        case .phim4k: return "Nguồn 2 · Phim4K"
-        case .kkphim: return "Nguồn 3 · KKPhim"
+        case .film4k: return "Anpinime Free"
+        case .phim4k: return "Anpinime Premium"
+        case .kkphim: return "Anpinime dự phòng"
         }
     }
     var isMovie: Bool { self != .anime }
+}
+
+/// Presentation only: provider identifiers, URLs and saved history stay unchanged.
+enum ContentDisplayText {
+    static func sourceLabels(_ text: String) -> String {
+        [
+            ("NguonC", ContentSource.film4k.title),
+            ("Phim4K", ContentSource.phim4k.title),
+            ("KKPhim", ContentSource.kkphim.title)
+        ].reduce(text) { result, pair in
+            result.replacingOccurrences(of: pair.0, with: pair.1, options: .caseInsensitive)
+        }
+    }
 }
 
 enum EpisodePlayback: Hashable {
