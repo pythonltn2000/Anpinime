@@ -65,7 +65,6 @@ struct AIDramaSeriesButton: View {
         }
         .buttonStyle(.plain)
         .disabled(loading)
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel(series.title + (displayStatistics.map { ", " + $0 } ?? "")
             + (series.episodeCount.map { ", \($0) tập" } ?? ""))
         .accessibilityHint("Mở phim")
@@ -157,8 +156,7 @@ struct AIDramaHeroCarousel: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(loadingID == item.id)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(item.title + (item.viewCount.map { ", \($0.formatted()) lượt xem" } ?? "") + (item.episodeCount.map { ", \($0) tập" } ?? ""))
+                        .accessibilityLabel(item.title + (item.viewCount.map { ", \($0.formatted()) lượt xem" } ?? "") + (item.episodeCount.map { ", \($0) tập" } ?? ""))
                 .accessibilityHint("Mở phim nổi bật")
                 .accessibilityIdentifier("aidrama.series." + item.id)
                 .tag(item.id)
@@ -262,7 +260,6 @@ struct AIDramaRankedRow: View {
         }
         .buttonStyle(.plain)
         .disabled(loading)
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Hạng \(rank), " + series.title + (series.episodeCount.map { ", \($0) tập" } ?? ""))
         .accessibilityHint("Mở phim")
         .accessibilityIdentifier("aidrama.series." + series.id)
