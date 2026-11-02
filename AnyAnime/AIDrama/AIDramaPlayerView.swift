@@ -18,7 +18,6 @@ struct AIDramaPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             AIDramaVerticalPager(session: session).ignoresSafeArea()
-                .accessibilityIdentifier("aidrama.pager")
             VStack(spacing: 0) {
                 header
                 Spacer(minLength: 16)
@@ -45,7 +44,6 @@ struct AIDramaPlayerView: View {
         }
         .preferredColorScheme(.dark)
         .statusBar(hidden: true)
-        .accessibilityIdentifier("aidrama.player")
         .sheet(isPresented: $playlistPresented) { playlistDrawer }
         .onAppear { session.setPresented(true, sceneActive: scenePhase == .active) }
         .onChange(of: scenePhase) { session.setSceneActive($0 == .active) }
@@ -141,7 +139,6 @@ struct AIDramaPlayerView: View {
                     }
                     .padding(20)
                 }
-                .accessibilityIdentifier("aidrama.playlist.episodes")
                 .onAppear { if let id = session.selectedEpisodeID { proxy.scrollTo(id, anchor: .center) } }
             }
             .navigationTitle("Danh sách tập (\(session.playlist.episodes.count))")
@@ -154,7 +151,6 @@ struct AIDramaPlayerView: View {
             }
         }
         .navigationViewStyle(.stack).preferredColorScheme(.dark)
-        .accessibilityIdentifier("aidrama.playlist")
     }
 }
 

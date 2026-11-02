@@ -5,6 +5,7 @@ final class AIDramaUITests: XCTestCase {
     private var app: XCUIApplication!
     private let seriesID = "7000000000000000001"
     private var liveDeadline: Date?
+    private var attachedFailureAccessibilityTree = false
     private var isLiveTest: Bool { name.contains("testLivePineDrama") }
 
     private struct PlayerState: Decodable {
@@ -23,6 +24,7 @@ final class AIDramaUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        attachedFailureAccessibilityTree = false
         XCUIDevice.shared.orientation = .portrait
         app = XCUIApplication()
         if isLiveTest {
@@ -31,6 +33,21 @@ final class AIDramaUITests: XCTestCase {
         }
         app.launchArguments = [isLiveTest ? "--ai-drama-live-smoke" : "--ai-drama-smoke"]
         app.launch()
+    }
+
+    override func record(_ issue: XCTIssue) {
+        if app != nil && !attachedFailureAccessibilityTree {
+            // Set this before querying AX so a snapshot failure cannot recurse.
+            attachedFailureAccessibilityTree = true
+            let tree = app.debugDescription
+            let limit = 30_000
+            let suffix = tree.count > limit ? "\n[Accessibility tree truncated at 30,000 characters]" : ""
+            let attachment = XCTAttachment(string: String(tree.prefix(limit)) + suffix)
+            attachment.name = "ai-drama-failure-accessibility-tree"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        super.record(issue)
     }
 
     override func tearDownWithError() throws {

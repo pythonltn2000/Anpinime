@@ -162,6 +162,11 @@ struct AIDramaProviderTests {
         rejects("JSON with wrong series", kind: .missing) { _ = try decode(video([videoRow()], collection: seriesNumber + 1)) }
         rejects("JSON with no series identity", kind: .missing) { _ = try decode(video([videoRow()], collection: nil)) }
         rejects("JSON with wrong sequence", kind: .missing) { _ = try decode(video([videoRow(sequence: 4)])) }
+        var contradictory = videoRow()
+        var contradictoryAweme = contradictory["aweme"] as! [String: Any]
+        contradictoryAweme["aweme_id"] = String(episodeNumber + 1)
+        contradictory["aweme"] = contradictoryAweme
+        rejects("JSON contradictory paid-video and aweme identities", kind: .missing) { _ = try decode(video([contradictory])) }
         rejects("JSON intro instead of episode", kind: .missing) { _ = try decode(video([videoRow(intro: true)])) }
         rejects("status-zero empty video rows", kind: .missing) { _ = try decode(video([])) }
         let paidIdentity: [String: Any] = ["paid_collection_id": seriesNumber]
@@ -247,6 +252,12 @@ struct AIDramaProviderTests {
         let wrong = pbRow(id: UInt64(episodeNumber + 1), awemeID: String(episodeNumber + 1), sequence: 4, url: "https://media.example/wrong-first.mp4")
         check(try decode(pbResponse([wrong, pbRow()])).url.absoluteString == media, "Protobuf selects the matching row instead of the first row")
         rejects("protobuf wrong episode ID", kind: .missing) { _ = try decode(pbResponse([wrong])) }
+        rejects("protobuf contradictory paid-video and aweme identities", kind: .missing) {
+            _ = try decode(pbResponse([pbRow(awemeID: String(episodeNumber + 1))]))
+        }
+        rejects("protobuf paid-content episode differs from selected video", kind: .missing) {
+            _ = try decode(pbResponse([pbRow(paid: uint(1, UInt64(seriesNumber)) + uint(6, UInt64(episodeNumber + 1)))]))
+        }
         rejects("protobuf wrong series", kind: .missing) { _ = try decode(pbResponse([pbRow()], collection: UInt64(seriesNumber + 1))) }
         rejects("protobuf wrong sequence", kind: .missing) { _ = try decode(pbResponse([pbRow(sequence: 4)])) }
         rejects("protobuf duplicate selected rows", kind: .missing) { _ = try decode(pbResponse([pbRow(), pbRow()])) }

@@ -72,26 +72,20 @@ struct AIDramaDebugStateView: View {
 }
 
 @MainActor
-private struct AIDramaDebugLabel: UIViewRepresentable {
+private struct AIDramaDebugLabel: View {
     let identifier: String
     let value: String
 
-    func makeUIView(context: Context) -> UILabel {
-        let label = UILabel()
-        label.text = "AI"
-        label.font = .systemFont(ofSize: 10)
-        label.textColor = .white
-        label.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-        label.textAlignment = .center
-        label.isAccessibilityElement = true
-        label.isUserInteractionEnabled = false
-        return label
-    }
-
-    func updateUIView(_ label: UILabel, context: Context) {
-        label.accessibilityIdentifier = identifier
-        label.accessibilityLabel = "Kiểm thử phát"
-        label.accessibilityValue = value
+    var body: some View {
+        Button {} label: {
+            Text("AI").font(.system(size: 10)).foregroundColor(.white)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.6))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel("Kiểm thử phát")
+        .accessibilityValue(value)
     }
 }
 

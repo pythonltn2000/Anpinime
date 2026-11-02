@@ -184,7 +184,8 @@ actor PineDramaProvider: AIDramaProviding {
             return identifier(row["paid_video_id"]) == episode.id || identifier(aweme?["aweme_id"]) == episode.id
         }
         guard matching.count == 1, let row = matching.first, integer(row["seq_id"]) == episode.number,
-              let aweme = row["aweme"] as? [String: Any], let video = aweme["video"] as? [String: Any] else {
+              let aweme = row["aweme"] as? [String: Any], let video = aweme["video"] as? [String: Any],
+              identifier(row["paid_video_id"]) == episode.id, identifier(aweme["aweme_id"]) == episode.id else {
             throw AIDramaError.missingEpisode
         }
         guard !(try flag(row, "is_intro")) else { throw AIDramaError.missingEpisode }
@@ -192,6 +193,8 @@ actor PineDramaProvider: AIDramaProviding {
         if let collection = object["collection"] as? [String: Any], let id = identifier(collection["collection_id"]) { seriesIDs.append(id) }
         if let paid = (aweme["paid_content_info"] ?? aweme["paid_content"]) as? [String: Any] {
             if let id = identifier(paid["paid_collection_id"]) { seriesIDs.append(id) }
+            if let id = identifier(paid["paid_video_id"]), id != episode.id { throw AIDramaError.missingEpisode }
+            if let number = integer(paid["episode_num"]), number != episode.number { throw AIDramaError.missingEpisode }
             if try flag(paid, "is_partial_preview") || flag(paid, "should_show_preview") || flag(paid, "is_paid_video_encrypted") {
                 throw AIDramaError.lockedEpisode
             }
@@ -215,12 +218,15 @@ actor PineDramaProvider: AIDramaProviding {
             if try row.identifier(1) == episode.id || aweme.string(1) == episode.id { matching.append((row, aweme)) }
         }
         guard matching.count == 1, let (row, aweme) = matching.first,
-              try row.uint(12) == UInt64(episode.number), let video = try aweme.message(7) else { throw AIDramaError.missingEpisode }
+              try row.uint(12) == UInt64(episode.number), try row.identifier(1) == episode.id,
+              try aweme.string(1) == episode.id, let video = try aweme.message(7) else { throw AIDramaError.missingEpisode }
         guard try row.uint(5) ?? 0 == 0 else { throw AIDramaError.missingEpisode }
         var seriesIDs: [String] = []
         if let collection = try response.message(14), let id = try collection.identifier(1) { seriesIDs.append(id) }
         if let paid = try aweme.message(317) {
             if let id = try paid.identifier(1) { seriesIDs.append(id) }
+            if let id = try paid.identifier(6), id != episode.id { throw AIDramaError.missingEpisode }
+            if let number = try paid.uint(3), number != UInt64(episode.number) { throw AIDramaError.missingEpisode }
             if try paid.uint(7) ?? 0 != 0 || paid.uint(8) ?? 0 != 0 || paid.uint(17) ?? 0 != 0 { throw AIDramaError.lockedEpisode }
         }
         guard !seriesIDs.isEmpty, seriesIDs.allSatisfy({ $0 == episode.seriesID }) else { throw AIDramaError.missingEpisode }
