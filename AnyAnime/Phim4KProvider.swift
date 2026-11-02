@@ -20,6 +20,7 @@ final class Phim4KProvider {
     private let allowLoopbackHTTP: Bool
     private let suppliedConfiguration: Configuration?
     private var configuration: Configuration?
+    private var directoryRefreshedAt: TimeInterval?
     private var cache: [URL: (Date, Any)] = [:]
     private(set) var categories = Phim4KCatalog.categories([:])
     private(set) var notice = ""
@@ -50,7 +51,16 @@ final class Phim4KProvider {
 
     deinit { session.invalidateAndCancel(); mediaSession.invalidateAndCancel() }
 
-    func invalidate() { cache.removeAll(); configuration = nil; notice = "" }
+    func invalidate() { cache.removeAll(); configuration = nil; directoryRefreshedAt = nil; notice = "" }
+
+    private func refreshDirectoryIfNeeded() async {
+        let now = ProcessInfo.processInfo.systemUptime
+        if let last = directoryRefreshedAt, now >= last, now - last < 120,
+           MovieSourceDirectory.cdnGateway() != nil { return }
+        if await MovieSourceDirectory.refresh(session: session) {
+            directoryRefreshedAt = ProcessInfo.processInfo.systemUptime
+        }
+    }
 
     private func configure() async throws -> Configuration {
         if let configuration { return configuration }
@@ -65,7 +75,7 @@ final class Phim4KProvider {
                 return fixture
             }
             #endif
-            await MovieSourceDirectory.refresh(session: session)
+            await refreshDirectoryIfNeeded()
             try Task.checkCancellation()
             let original = Configuration(core: MovieSourceDirectory.coreAPI(), catalogs: MovieSourceDirectory.catalogs().map {
                 Catalog(id: $0.id, url: $0.url, format: $0.format)
@@ -228,9 +238,12 @@ final class Phim4KProvider {
     }
 
     func resolveCore(detailURL: URL, seasonID: String?, episodeID: String) async throws -> ResolvedPlayback {
+        let startedAt = ProcessInfo.processInfo.systemUptime
         let config = try await configure()
+        diagnoseResolution(stage: "configuration", serverID: episodeID, startedAt: startedAt)
         guard isCore(detailURL) else { throw MovieSourceError.invalidData }
         let json = try await object(detailURL, fresh: true)
+        diagnoseResolution(stage: "metadata", serverID: episodeID, startedAt: startedAt)
         guard let stream = Phim4KCatalog.stream(json, seasonID: seasonID, episodeID: episodeID, base: detailURL) else {
             throw MovieSourceError.unavailable("Máy chủ đã chọn chưa cung cấp URL phát trực tiếp hoặc yêu cầu resolver hợp lệ.")
         }
@@ -243,44 +256,37 @@ final class Phim4KProvider {
             let gateway: URL?
             if suppliedConfiguration != nil { gateway = config.gateway }
             else {
-                // Refresh changing CDN metadata, retaining the last authenticated
-                // announcement if the public directory is temporarily offline.
-                await MovieSourceDirectory.refresh(session: session)
+                // Reuse only a recently authenticated directory announcement.
+                // Core detail, selected handle and gateway media URL stay fresh.
+                await refreshDirectoryIfNeeded()
                 gateway = MovieSourceDirectory.cdnGateway()
             }
             guard let gateway else { throw Phim4KVIPResolver.Failure.missingGateway }
             mediaURL = try await Phim4KVIPResolver.shared.resolve(mediaURL, gateway: gateway, session: session,
                                                                 allowLoopbackHTTP: allowLoopbackHTTP)
+            diagnoseResolution(stage: "gateway", serverID: episodeID, startedAt: startedAt)
         }
         if !stream.web {
-            var request = URLRequest(url: mediaURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
-            request.httpMethod = "HEAD"
-            for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
-            let http: HTTPURLResponse
+            // One bounded GET validates the actual bytes and works on servers
+            // that reject/misdescribe HEAD. Cancelling after 2 KiB also bounds
+            // servers that ignore Range and return the entire file with 200.
+            let result: Phim4KMediaProbe.Result
             do {
-                let (_, response) = try await mediaSession.data(for: request)
-                guard let response = response as? HTTPURLResponse else { throw MovieSourceError.invalidData }
-                http = response
+                result = try await Phim4KMediaProbe().inspect(mediaURL, headers: headers,
+                    configuration: mediaSession.configuration, allowLoopbackHTTP: allowLoopbackHTTP,
+                    allowRemoteHTTP: true)
             } catch is CancellationError { throw CancellationError() }
-            catch { throw MovieSourceError.unavailable("Không kết nối được máy chủ đã chọn: " + error.localizedDescription) }
-            let type = http.value(forHTTPHeaderField: "Content-Type") ?? ""
-            var status = http.statusCode
-            var kind = Phim4KCatalog.mediaKind(status: status, contentType: type, url: http.url ?? mediaURL)
-            if [401, 403, 405, 501].contains(status) || kind == .unknown || kind == .intermediate {
-                // A HEAD response can be unsupported or describe an HTML endpoint
-                // while GET is media. Keep Range bounded even for 200 responses.
-                let result: Phim4KMediaProbe.Result
-                do { result = try await Phim4KMediaProbe().inspect(mediaURL, headers: headers, configuration: mediaSession.configuration,
-                                                               allowLoopbackHTTP: allowLoopbackHTTP, allowRemoteHTTP: true) }
-                catch is CancellationError { throw CancellationError() }
-                catch { throw MovieSourceError.unavailable("Không kiểm tra được video: " + error.localizedDescription) }
-                status = result.response.statusCode
-                let contentType = result.response.value(forHTTPHeaderField: "Content-Type") ?? ""
-                kind = Phim4KCatalog.mediaKind(status: status, contentType: contentType, url: result.response.url ?? mediaURL)
-                if (200..<300).contains(status), let signature = Phim4KCatalog.mediaKind(prefix: result.prefix) {
-                    kind = signature
-                }
+            catch { throw MovieSourceError.unavailable("Không kiểm tra được video: " + error.localizedDescription) }
+            let status = result.response.statusCode
+            let finalURL = result.response.url ?? mediaURL
+            let contentType = result.response.value(forHTTPHeaderField: "Content-Type") ?? ""
+            var kind = Phim4KCatalog.mediaKind(status: status, contentType: contentType, url: finalURL)
+            if (200..<300).contains(status), result.prefix.isEmpty { kind = .unknown }
+            if (200..<300).contains(status), let signature = Phim4KCatalog.mediaKind(prefix: result.prefix) {
+                kind = signature
             }
+            diagnoseResolution(stage: "media-prefix", serverID: episodeID, startedAt: startedAt,
+                               bytes: result.prefix.count)
             #if DEBUG
             print("[Phim4K] server_id=\(episodeID) host=\(mediaURL.host ?? "") media_http_status=\(status) playback_kind=\(kind)")
             #endif
@@ -288,8 +294,21 @@ final class Phim4KProvider {
             guard (200..<300).contains(status) else { throw MovieSourceError.unavailable("Máy chủ video trả HTTP \(status). Hãy thử lại hoặc chọn máy chủ khác.") }
             if kind == .intermediate { throw MovieSourceError.unavailable("Máy chủ trả về trang web hoặc JSON thay vì video; cần resolver hợp lệ.") }
             if kind == .unknown { throw MovieSourceError.unavailable("Không xác định được định dạng video từ phản hồi máy chủ.") }
+            // Use only the final URL actually followed by the transport policy;
+            // the player need not repeat an already-validated redirect chain.
+            mediaURL = finalURL
         }
+        diagnoseResolution(stage: "complete", serverID: episodeID, startedAt: startedAt)
         return ResolvedPlayback(url: mediaURL, headers: headers, webURL: nil, isWeb: stream.web)
+    }
+
+    private func diagnoseResolution(stage: String, serverID: String, startedAt: TimeInterval, bytes: Int = 0) {
+        #if DEBUG
+        if PlaybackSmokeTest.source2Diagnostic {
+            PlaybackSmokeTest.diagnostic("source2-resolve-stage", fields: ["stage": stage, "serverID": serverID,
+                "resolveElapsedSeconds": ProcessInfo.processInfo.systemUptime - startedAt, "prefixBytes": bytes])
+        }
+        #endif
     }
 
     /// The original app's is_free_source branch goes straight to media_kit.

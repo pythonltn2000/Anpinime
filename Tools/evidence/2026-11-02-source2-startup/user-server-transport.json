@@ -1,0 +1,95 @@
+{
+  "movieID": "17997",
+  "requestedTitle": "Người Nhện: Khởi Đầu Mới",
+  "checkedAtUTC": "2026-11-02T06:03:38.132251+00:00",
+  "requests": [
+    {
+      "label": "authenticated-directory",
+      "method": "GET",
+      "host": "rip.cryboiz.workers.dev",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "headersSeconds": 0.126,
+      "redirected": false,
+      "bytesRead": 875,
+      "elapsedSeconds": 0.126
+    },
+    {
+      "label": "34793-gateway",
+      "method": "GET",
+      "host": "svpc.cryboiz.workers.dev",
+      "status": 200,
+      "contentType": "application/json",
+      "headersSeconds": 0.782,
+      "redirected": false,
+      "bytesRead": 123,
+      "elapsedSeconds": 0.783,
+      "serverID": "34793"
+    },
+    {
+      "label": "34793-current-head-validation",
+      "method": "HEAD",
+      "host": "sv.p4kzz.workers.dev",
+      "status": 200,
+      "contentType": "video/mp4",
+      "headersSeconds": 0.796,
+      "redirected": false,
+      "bytesRead": 0,
+      "elapsedSeconds": 0.796,
+      "serverID": "34793"
+    },
+    {
+      "label": "34793-candidate-prefix-validation",
+      "method": "GET",
+      "host": "sv.p4kzz.workers.dev",
+      "status": 206,
+      "contentType": "video/mp4",
+      "headersSeconds": 0.489,
+      "redirected": false,
+      "bytesRead": 2048,
+      "elapsedSeconds": 0.489,
+      "contentRange": "bytes 0-2047/9795894395",
+      "serverID": "34793",
+      "signature": "mkv"
+    },
+    {
+      "label": "34794-gateway",
+      "method": "GET",
+      "host": "svpc.cryboiz.workers.dev",
+      "status": 200,
+      "contentType": "application/json",
+      "headersSeconds": 0.368,
+      "redirected": false,
+      "bytesRead": 123,
+      "elapsedSeconds": 0.368,
+      "serverID": "34794"
+    },
+    {
+      "label": "34794-current-head-validation",
+      "method": "HEAD",
+      "host": "sv.p4kzz.workers.dev",
+      "status": 200,
+      "contentType": "video/mp4",
+      "headersSeconds": 0.707,
+      "redirected": false,
+      "bytesRead": 0,
+      "elapsedSeconds": 0.707,
+      "serverID": "34794"
+    },
+    {
+      "label": "34794-candidate-prefix-validation",
+      "method": "GET",
+      "host": "sv.p4kzz.workers.dev",
+      "status": 206,
+      "contentType": "video/mp4",
+      "headersSeconds": 0.514,
+      "redirected": false,
+      "bytesRead": 2048,
+      "elapsedSeconds": 0.514,
+      "contentRange": "bytes 0-2047/27162895108",
+      "serverID": "34794",
+      "signature": "mkv"
+    }
+  ],
+  "mediaBytesSaved": 0
+}

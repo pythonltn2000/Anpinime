@@ -1,0 +1,64 @@
+{
+  "requestedTitle": "Người Nhện: Khởi Đầu Mới",
+  "checkedAtUTC": "2026-11-02T06:02:12.826231+00:00",
+  "requests": [
+    {
+      "label": "authenticated-public-directory",
+      "host": "rip.cryboiz.workers.dev",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "bytesRead": 875,
+      "elapsedSeconds": 0.158,
+      "htmlChallenge": false
+    },
+    {
+      "label": "selected-original-core-detail",
+      "host": "api.phim4k.space",
+      "status": 200,
+      "contentType": "application/json; charset=UTF-8",
+      "bytesRead": 54011,
+      "elapsedSeconds": 0.582,
+      "htmlChallenge": false
+    }
+  ],
+  "playbackVerified": false,
+  "searchResponseReplayed": true,
+  "originalSearchCandidates": [
+    {
+      "videos_id": "17997",
+      "title": "Người Nhện: Khởi Đầu Mới (2026) Spider-Man: Brand New Day",
+      "release": "2026"
+    }
+  ],
+  "titleMatchMethod": "Exact localized title before the provider year/original-title suffix; no title guess.",
+  "returnedResultCount": 1,
+  "exactTitleMatches": 1,
+  "movieID": "17997",
+  "servers": [
+    {
+      "video_file_id": "34793",
+      "label": "1080P.AMZN.WEB-DL.DDP5.1.ATMOS.H.264-BYNDR.MKV 9GB",
+      "file_type": "mp4"
+    },
+    {
+      "video_file_id": "34795",
+      "label": "VIE.AI.1080P.AMZN.WEB-DL.DDP5.1.H.264-KYOGO.MKV 10GB (TM-PĐ)",
+      "file_type": "mp4"
+    },
+    {
+      "video_file_id": "34794",
+      "label": "2160P.IT.WEB-DL.DDP5.1.ATMOS.DV.HDR.H.265-BYNDR.MKV 26GB",
+      "file_type": "mp4"
+    },
+    {
+      "video_file_id": "34798",
+      "label": "VIE.AI.2160P.IT.WEB-DL.DDP5.1.ATMOS.DV.HDR.H.265-BYNDR.MKV 27GB (PĐ-TM)",
+      "file_type": "mp4"
+    },
+    {
+      "video_file_id": "34860",
+      "label": "2160P.IMAX.BCORE.WEB-DL.HDR.MULTI[].MKV 86GB",
+      "file_type": "mp4"
+    }
+  ]
+}

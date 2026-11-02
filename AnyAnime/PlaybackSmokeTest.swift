@@ -11,6 +11,15 @@ enum PlaybackSmokeTest {
     static var animeSmoke: Bool { animeFixture || liveAnime }
     static var source2HLS: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-hls-smoke") }
     static var liveVIP: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-vip-smoke") }
+    private static func smokeArgument(_ name: String, fallback: String, pattern: String) -> String {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: name) else { return fallback }
+        guard index + 1 < args.count, args[index + 1].range(of: pattern, options: .regularExpression) != nil else { return "" }
+        return args[index + 1]
+    }
+    static var liveVIPMovieID: String { smokeArgument("--phim4k-core-id", fallback: "10403", pattern: "^[0-9]{1,20}$") }
+    static var liveVIPServerID: String { smokeArgument("--phim4k-server-id", fallback: "31937", pattern: "^[0-9]{1,20}$") }
+    static var liveVIPResultName: String { smokeArgument("--phim4k-result", fallback: "phim4k-vip", pattern: "^[a-z0-9-]{1,80}$") }
     static var gatewaySmoke: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-gateway-smoke") }
     static var source2Diagnostic: Bool { liveSource2 || source2HLS || liveVIP || gatewaySmoke }
     static var webOnly: Bool { ProcessInfo.processInfo.arguments.contains("--web-playback-smoke") }
@@ -22,7 +31,7 @@ enum PlaybackSmokeTest {
     }
     static var liveMovie: Bool { ProcessInfo.processInfo.arguments.contains("--film4k-live-smoke") }
     static var liveSource2: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-live-smoke") }
-    static var resultName: String? { animeFixture ? "anime-provider" : liveAnime ? "anime-live" : liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : liveVIP ? "phim4k-vip" : gatewaySmoke ? "phim4k-gateway" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
+    static var resultName: String? { animeFixture ? "anime-provider" : liveAnime ? "anime-live" : liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : liveVIP ? liveVIPResultName : gatewaySmoke ? "phim4k-gateway" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
     @MainActor static var animeEpisodeCount = 0
     @MainActor static var selectedAnimeEpisodeNumber: Int?
     @MainActor static var cancelledAnimeLoadVerified = false
@@ -30,6 +39,11 @@ enum PlaybackSmokeTest {
     @MainActor static var liveGatewayPrepared = false
     @MainActor private static var firstVideoTime: Double?
     @MainActor private static var events: [[String: Any]] = []
+    @MainActor private static var diagnosticStartedAt: TimeInterval?
+    @MainActor private static var firstDecodedVideoRecorded = false
+    @MainActor private static var fileLoadedRecorded = false
+    @MainActor private static var firstDecodedVideoElapsed: TimeInterval?
+    @MainActor private static var fileLoadedElapsed: TimeInterval?
     @MainActor static func diagnostic(_ event: String, fields: [String: Any]) {
         guard source2Diagnostic || animeSmoke else { return }
         var entry = fields
@@ -42,7 +56,30 @@ enum PlaybackSmokeTest {
                                           with: "$1=[redacted]", options: .regularExpression)
             }
         }
+        let now = ProcessInfo.processInfo.systemUptime
+        if diagnosticStartedAt == nil { diagnosticStartedAt = now }
+        entry["elapsedSeconds"] = now - diagnosticStartedAt!
         entry["event"] = event
+        if source2Diagnostic, event == "mpv-state" {
+            // Preserve startup milestones before later snapshots are coalesced.
+            if !fileLoadedRecorded, fields["loaded"] as? Bool == true {
+                fileLoadedRecorded = true
+                fileLoadedElapsed = now - diagnosticStartedAt!
+                var milestone = entry
+                milestone["event"] = "source2-file-loaded"
+                events.append(milestone)
+            }
+            if !firstDecodedVideoRecorded, fields["playing"] as? Bool == true,
+               (fields["time"] as? Double ?? 0) > 0,
+               (fields["videoWidth"] as? Double ?? 0) > 0,
+               (fields["videoHeight"] as? Double ?? 0) > 0 {
+                firstDecodedVideoRecorded = true
+                firstDecodedVideoElapsed = now - diagnosticStartedAt!
+                var milestone = entry
+                milestone["event"] = "source2-first-decoded-video"
+                events.append(milestone)
+            }
+        }
         if event == "mpv-state", events.last?["event"] as? String == event { events.removeLast() }
         events.append(entry)
         if events.count > 120 { events.removeFirst(events.count - 120) }
@@ -83,6 +120,19 @@ enum PlaybackSmokeTest {
                 result["videoWidth"] = videoSize.width
                 result["videoHeight"] = videoSize.height
                 result["advancingVideoVerified"] = true
+                if source2Diagnostic {
+                    result["videoCodec"] = playback.mediaInfo.components(separatedBy: " · ").dropFirst().first ?? ""
+                    if let elapsed = firstDecodedVideoElapsed { result["firstDecodedVideoElapsedSeconds"] = elapsed }
+                    if let elapsed = fileLoadedElapsed { result["fileLoadedElapsedSeconds"] = elapsed }
+                    result["startupTimingResolutionSeconds"] = 0.25
+                }
+                if liveVIP {
+                    result["sample"] = "Core movie \(liveVIPMovieID) / server \(liveVIPServerID)"
+                    result["selectedCoreMovieID"] = liveVIPMovieID
+                    result["selectedServerID"] = liveVIPServerID
+                    result["coreMetadataReplayed"] = false
+                    result["fullCoreLive"] = true
+                }
                 if gatewaySmoke {
                     guard liveGatewayPrepared,
                           Set(replayedCoreServerIDs) == Set(["31937", "33090", "27463", "31938", "31939"]) else { return }
@@ -200,7 +250,7 @@ private struct MovieSmokeView: View {
     private var selectedEpisode: Episode? {
         if PlaybackSmokeTest.liveVIP {
             return detail?.episodes.first {
-                if case .phim4kCore(_, _, let id) = $0.playback { return id == "31937" }
+                if case .phim4kCore(_, _, let id) = $0.playback { return id == PlaybackSmokeTest.liveVIPServerID }
                 return false
             }
         }
@@ -221,7 +271,16 @@ private struct MovieSmokeView: View {
                             service.selectSource(source)
                             let items: [Anime]
                             if PlaybackSmokeTest.liveVIP {
-                                items = [Anime(title: "Wakanda Forever", url: URL(string: "https://api.phim4k.space/rest-api/v130/single_details?type=movie&id=10403")!,
+                                let movieID = PlaybackSmokeTest.liveVIPMovieID
+                                let serverID = PlaybackSmokeTest.liveVIPServerID
+                                guard !movieID.isEmpty, !serverID.isEmpty, !PlaybackSmokeTest.liveVIPResultName.isEmpty else {
+                                    throw MovieSourceError.invalidData
+                                }
+                                PlaybackSmokeTest.diagnostic("vip-smoke-start", fields: ["selectedCoreMovieID": movieID,
+                                    "selectedServerID": serverID, "coreMetadataReplayed": false])
+                                let url = MovieCatalog.route(Phim4KCatalog.prefix + "single_details", base: URL(string: "https://api.phim4k.space")!,
+                                    query: [.init(name: "type", value: "movie"), .init(name: "id", value: movieID)])
+                                items = [Anime(title: "Core movie " + movieID, url: url,
                                                imageURL: nil, episodeText: "", quality: "", score: "", source: .phim4k)]
                             } else if PlaybackSmokeTest.liveSource2 {
                                 // Fixed public Free1 sample. This is never used as a production fallback for VIP.
@@ -252,6 +311,8 @@ private struct MovieSmokeView: View {
         defer { defaults.removePersistentDomain(forName: namespace) }
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
+        PlaybackSmokeTest.diagnostic("gateway-smoke-start", fields: ["coreMetadataReplayed": true,
+            "selectedServerID": "31937"])
         await MovieSourceDirectory.refresh(session: session, defaults: defaults)
         try Task.checkCancellation()
         guard let gateway = MovieSourceDirectory.cdnGateway(defaults: defaults) else {

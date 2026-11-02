@@ -242,10 +242,15 @@ struct ProviderTests {
         ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 200; ProviderProtocol.mediaType = "application/json"; ProviderProtocol.mediaGetStatus = 200; ProviderProtocol.mediaGetType = "application/json"; ProviderProtocol.lock.unlock()
         do { _ = try await app.resolve(detail.episodes[0]); fatalError("Expected invalid media response") }
         catch { require(error.localizedDescription.contains("JSON"), "JSON response is not handed to the video decoder") }
+        ProviderProtocol.lock.lock()
+        ProviderProtocol.mediaGetType = "video/mp4"; ProviderProtocol.mediaGetPrefix = Data()
+        ProviderProtocol.lock.unlock()
+        do { _ = try await app.resolve(detail.episodes[0]); fatalError("Expected empty media rejection") }
+        catch { require(error.localizedDescription.contains("định dạng"), "A successful video MIME response with no media bytes is rejected") }
         ProviderProtocol.reset()
         ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 405; ProviderProtocol.lock.unlock()
         let ranged = try await app.resolve(detail.episodes[0])
-        require(ranged.url.absoluteString == "https://vip.example/original.mkv", "HEAD 405 falls back to the same media URL")
+        require(ranged.url.absoluteString == "https://vip.example/original.mkv", "A single prefix GET validates the exact media URL even when HEAD is unsupported")
         let probe = ProviderProtocol.captured().last { $0.httpMethod == "GET" && $0.url?.host == "vip.example" }
         require(probe?.value(forHTTPHeaderField: "Range") == "bytes=0-2047", "GET probe sends a bounded range")
         ProviderProtocol.reset()
@@ -253,6 +258,7 @@ struct ProviderTests {
         let wrongProvider = MovieProvider(source: .kkphim, session: session)
         do { _ = try await wrongProvider.detail(search[0]); fatalError("Expected identity rejection") } catch {}
         try await verifyGatewayIntegration(session: session)
+        try await verifyDirectoryReuse(session: session)
         print("All provider routing regressions passed")
     }
     static func require(_ condition: @autoclosure () -> Bool, _ message: String) {
@@ -288,7 +294,9 @@ struct ProviderTests {
         refreshed[index]["file_url"] = "https://cdn.phim4k.lol/REFRESHED_HANDLE"
         ProviderProtocol.setCoreVideos(refreshed)
         ProviderProtocol.lock.lock(); ProviderProtocol.mediaStatus = 405; ProviderProtocol.lock.unlock()
+        let startupStartedAt = ProcessInfo.processInfo.systemUptime
         let resolved = try await provider.resolve(selected)
+        let startupElapsed = ProcessInfo.processInfo.systemUptime - startupStartedAt
         let requests = ProviderProtocol.captured()
         require(requests.filter { $0.url?.host == "core.example" }.allSatisfy {
             $0.value(forHTTPHeaderField: "Authorization") == fixtureAuthorization
@@ -302,8 +310,11 @@ struct ProviderTests {
         require(gateway.httpMethod == "GET" && gateway.value(forHTTPHeaderField: "Range") == nil, "Gateway exchange is a bounded JSON GET, separate from media Range probing")
         require(resolved.url.absoluteString == "https://vip.example/resolved.mkv?token=media-fixture", "Gateway JSON media URL and its source-supplied query are used exactly")
         let media = requests.filter { $0.url?.host == "vip.example" }
-        require(media.map(\.httpMethod) == ["HEAD", "GET"] && media.allSatisfy { $0.url == resolved.url }, "HEAD rejection triggers a bounded GET on the resolved media URL, not the virtual CDN or gateway")
+        require(media.map(\.httpMethod) == ["GET"] && media.allSatisfy { $0.url == resolved.url }, "Premium validation sends one bounded GET, without a serial HEAD request, to the resolved media URL")
         require(media.last?.value(forHTTPHeaderField: "Range") == "bytes=0-2047", "Resolved premium media probe stays bounded")
+        let resolveRequests = Array(requests.dropFirst()) // The first request opened the detail page.
+        require(resolveRequests.count == 3, "Exact premium resolution needs only fresh metadata, gateway JSON and one media prefix request")
+        print("SOURCE2_STARTUP_METRIC fixtureResolveRequests=\(resolveRequests.count) mediaProbeRequests=\(media.count) elapsedSeconds=\(startupElapsed)")
         require(requests.filter { $0.url?.host != "core.example" }.allSatisfy { request in
             ["API-KEY", "Authorization", "Cookie", "Referer", "Origin"].allSatisfy { request.value(forHTTPHeaderField: $0) == nil }
         }, "Neither gateway nor premium media requests receive Core, account or website headers")
@@ -326,7 +337,7 @@ struct ProviderTests {
         let originalHTTP = try await provider.resolve(selected)
         let httpMedia = ProviderProtocol.captured().filter { $0.url?.host == "vip.example" }
         require(originalHTTP.url.absoluteString == "http://vip.example/original-http.model?token=http-fixture"
-                && httpMedia.map(\.httpMethod) == ["HEAD", "GET"], "A genuine HTTP media URL returned by the HTTPS gateway is preserved without a guessed HTTPS rewrite")
+                && httpMedia.map(\.httpMethod) == ["GET"], "A genuine HTTP media URL returned by the HTTPS gateway is preserved without a guessed HTTPS rewrite")
         require(httpMedia.allSatisfy { request in request.url?.scheme == "http"
             && request.value(forHTTPHeaderField: "User-Agent") == "oxoo"
             && ["API-KEY", "Authorization", "Cookie", "Origin", "Referer"].allSatisfy { request.value(forHTTPHeaderField: $0) == nil }
@@ -404,6 +415,42 @@ struct ProviderTests {
         require(webPlayback.headers["User-Agent"] == AnimeService.userAgent && webPlayback.headers["Referer"] == "https://free1.example/",
                 "Web-backed Free playback retains website headers for its WebKit-to-native handoff")
         ProviderProtocol.reset()
+    }
+
+    @MainActor static func verifyDirectoryReuse(session: URLSession) async throws {
+        let defaults = UserDefaults.standard
+        let keys = ["AnPinime.source2Directory", "AnPinime.phim4kURL"]
+        let original = keys.map { defaults.object(forKey: $0) }
+        defer {
+            for (index, key) in keys.enumerated() {
+                if let value = original[index] { defaults.set(value, forKey: key) }
+                else { defaults.removeObject(forKey: key) }
+            }
+            ProviderProtocol.reset()
+        }
+        for key in keys { defaults.removeObject(forKey: key) }
+        ProviderProtocol.reset()
+        try ProviderProtocol.setDirectory(["api": "core.example", "cdn": "gateway.example", "tokens": "fixture-key"])
+        ProviderProtocol.setCoreVideos([["video_file_id": "31937", "label": "Selected MKV", "file_type": "mkv",
+                                         "file_url": "https://cdn.phim4k.lol/EXACT_HANDLE"]])
+        let movie = Anime(title: "Directory startup fixture", url: URL(string: "https://core.example/rest-api/v130/single_details?type=movie&id=41")!,
+                          imageURL: nil, episodeText: "", quality: "", score: "", source: .phim4k)
+        let provider = Phim4KProvider(session: session)
+        _ = try await provider.detail(movie)
+        _ = try await provider.resolveCore(detailURL: movie.url, seasonID: nil, episodeID: "31937")
+        _ = try await provider.resolveCore(detailURL: movie.url, seasonID: nil, episodeID: "31937")
+        var captured = ProviderProtocol.captured()
+        require(captured.filter { $0.url?.host == "rip.cryboiz.workers.dev" }.count == 1,
+                "Opening detail and resolving twice reuses the recently authenticated directory instead of three serial bootstraps")
+        require(captured.filter { $0.url?.host == "core.example" }.count == 3
+                && captured.filter { $0.url?.host == "gateway.example" }.count == 2
+                && captured.filter { $0.url?.host == "vip.example" }.count == 2,
+                "Directory reuse never caches the exact Core detail, gateway exchange or selected media validation")
+        provider.invalidate()
+        _ = try await provider.resolveCore(detailURL: movie.url, seasonID: nil, episodeID: "31937")
+        captured = ProviderProtocol.captured()
+        require(captured.filter { $0.url?.host == "rip.cryboiz.workers.dev" }.count == 2,
+                "Explicit source-2 invalidation forces a fresh authenticated directory")
     }
 
     @MainActor static func verifyTransportPolicy() async throws {
@@ -517,7 +564,8 @@ threading.Event().wait()
         require(MovieSourceDirectory.cdnGateway(defaults: defaults) == nil, "A missing CDN announcement never invents a default gateway")
         ProviderProtocol.reset()
         try ProviderProtocol.setDirectory(["cdn": "announced-cdn.example"])
-        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        let accepted = await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        require(accepted, "A valid authenticated directory reports success for the provider's refresh TTL")
         require(MovieSourceDirectory.cdnGateway(defaults: defaults)?.absoluteString == "https://announced-cdn.example", "Authenticated directory CDN metadata is normalized to HTTPS")
         var saved = defaults.dictionary(forKey: key) as! [String: String]
         require(original.allSatisfy { saved[$0.key] == $0.value }, "Adding a CDN announcement preserves Core, both Free catalogs and their existing API configuration")
@@ -535,7 +583,8 @@ threading.Event().wait()
             require(MovieSourceDirectory.cdnGateway(defaults: defaults)?.host == "announced-cdn.example", "Invalid CDN metadata cannot erase the last valid announcement")
         }
         try ProviderProtocol.setDirectory(["cdn": "unverified-cdn.example"], tampered: true)
-        await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        let rejected = await MovieSourceDirectory.refresh(session: session, defaults: defaults)
+        require(!rejected, "An unauthenticated directory cannot extend the provider's successful refresh TTL")
         require(MovieSourceDirectory.cdnGateway(defaults: defaults)?.host == "announced-cdn.example", "An unauthenticated directory envelope cannot replace CDN metadata")
         ProviderProtocol.reset()
     }

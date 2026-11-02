@@ -83,7 +83,8 @@ enum MovieSourceDirectory {
         return (saved["cdn"] as? String).flatMap(address)
     }
 
-    static func refresh(session: URLSession, defaults: UserDefaults = .standard) async {
+    @discardableResult
+    static func refresh(session: URLSession, defaults: UserDefaults = .standard) async -> Bool {
         do {
             var request = URLRequest(url: URL(string: "https://rip.cryboiz.workers.dev/api/add")!)
             request.timeoutInterval = 3.5
@@ -104,10 +105,15 @@ enum MovieSourceDirectory {
             // A partial bootstrap response must not erase an already-known
             // Free2 catalog or a valid Core configuration.
             var updated = defaults.dictionary(forKey: "AnPinime.source2Directory") ?? [:]
+            var acceptedAnnouncement = false
             for name in ["free1", "free2", "api", "cdn"] {
-                if let value = config[name] as? String, let url = address(value) { updated[name] = url.absoluteString }
+                if let value = config[name] as? String, let url = address(value) {
+                    updated[name] = url.absoluteString
+                    acceptedAnnouncement = true
+                }
             }
             if let client = clientHeaders(config["tokens"]) {
+                acceptedAnnouncement = true
                 // Retain the original tokens cache key as a normalized API key
                 // for older app versions; never replace valid headers with a
                 // missing/invalid partial response or an account session.
@@ -117,7 +123,11 @@ enum MovieSourceDirectory {
             if !updated.isEmpty {
                 defaults.set(updated, forKey: "AnPinime.source2Directory")
             }
-        } catch { /* A last-known directory remains useful during a temporary bootstrap outage. */ }
+            return acceptedAnnouncement
+        } catch {
+            // A failed/unauthenticated refresh must not extend the caller's TTL.
+            return false
+        }
     }
 
     // These are catalogs actually announced by the reference app, never substitutes

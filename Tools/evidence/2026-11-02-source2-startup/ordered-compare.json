@@ -1,0 +1,87 @@
+{
+  "requestedTitle": "Người Nhện: Khởi Đầu Mới",
+  "checkedAtUTC": "2026-11-02T06:07:31.594485+00:00",
+  "requests": [
+    {
+      "label": "before-fresh-Core-detail",
+      "host": "api.phim4k.space",
+      "status": 200,
+      "contentType": "application/json; charset=UTF-8",
+      "bytesRead": 54011,
+      "elapsedSeconds": 0.571,
+      "htmlChallenge": false
+    },
+    {
+      "label": "before-redundant-directory",
+      "host": "rip.cryboiz.workers.dev",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "bytesRead": 875,
+      "elapsedSeconds": 0.128,
+      "htmlChallenge": false
+    },
+    {
+      "label": "before-gateway",
+      "host": "svpc.cryboiz.workers.dev",
+      "status": 200,
+      "contentType": "application/json",
+      "bytesRead": 123,
+      "elapsedSeconds": 0.773,
+      "htmlChallenge": false
+    },
+    {
+      "label": "before-HEAD",
+      "host": "sv.p4kzz.workers.dev",
+      "status": 200,
+      "contentType": "video/mp4",
+      "bytesRead": 0,
+      "elapsedSeconds": 0.296
+    },
+    {
+      "label": "after-fresh-Core-detail",
+      "host": "api.phim4k.space",
+      "status": 200,
+      "contentType": "application/json; charset=UTF-8",
+      "bytesRead": 54011,
+      "elapsedSeconds": 0.654,
+      "htmlChallenge": false
+    },
+    {
+      "label": "after-gateway",
+      "host": "svpc.cryboiz.workers.dev",
+      "status": 200,
+      "contentType": "application/json",
+      "bytesRead": 123,
+      "elapsedSeconds": 0.451,
+      "htmlChallenge": false
+    },
+    {
+      "label": "after-bounded-prefix",
+      "host": "sv.p4kzz.workers.dev",
+      "status": 206,
+      "contentType": "video/mp4",
+      "bytesRead": 2048,
+      "elapsedSeconds": 0.434,
+      "htmlChallenge": false,
+      "signature": "mkv"
+    }
+  ],
+  "playbackVerified": false,
+  "comparison": "Ordered network harness for exact Core17997/server34793; not production URLSession/iOS timing.",
+  "samples": [
+    {
+      "mode": "before",
+      "resolverWallSeconds": 1.769,
+      "requests": 4,
+      "freshCoreDetail": true,
+      "directoryAnnouncementYoungerThan120s": true
+    },
+    {
+      "mode": "after",
+      "resolverWallSeconds": 1.54,
+      "requests": 3,
+      "freshCoreDetail": true,
+      "directoryAnnouncementYoungerThan120s": true
+    }
+  ]
+}

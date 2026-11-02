@@ -1,0 +1,43 @@
+{
+  "source": "Observed calls and bounded decode from exact Core17997; production Swift tests/iOS timing pending CI at preparation time.",
+  "requestedTitle": "Người Nhện: Khởi Đầu Mới",
+  "movieID": "17997",
+  "selectedOriginalServerIDs": [
+    "34793",
+    "34794"
+  ],
+  "orderedNetworkHarness": {
+    "beforeRequests": 4,
+    "afterRequests": 3,
+    "beforeResolverWallSeconds": 1.769,
+    "afterResolverWallSeconds": 1.54,
+    "pairs": 1,
+    "isNativeIOSStartupTiming": false,
+    "note": "Both refresh exact Core detail; after reuses an authenticated directory younger than120s and validates 2048actualmedia bytes. Onepair does not establish a stable speedup."
+  },
+  "productionChanges": {
+    "successfulDirectoryTTLSeconds": 120,
+    "mediaPrefixLimitBytes": 2048,
+    "mediaRequestsOnHEADRejectedPathBefore": 2,
+    "mediaRequestsOnHEADRejectedPathAfter": 1,
+    "mediaRequestsOnObservedLiveHEAD200PathBefore": 1,
+    "mediaRequestsOnObservedLiveHEAD200PathAfter": 1,
+    "preservesFreshExactCoreDetail": true,
+    "preservesFreshGatewayExchange": true,
+    "usesValidatedFinalRedirectURL": true,
+    "sharedMPVDefaultsChanged": false,
+    "sources1and3TransportChanged": false
+  },
+  "localChecks": {
+    "rangeVirtualOrigin": "PASS with localfixture",
+    "shellSyntax": "PASS",
+    "gitDiffCheck": "PASS",
+    "swiftProviderAndRangeTests": "Notrun locally: swiftc unavailable; required CI tests updated."
+  },
+  "limitations": [
+    "Linux FFmpeg is not native iOS mpv.",
+    "Only20seconds from the beginning of each selectedstream; no sustained-phone-playback claim.",
+    "The latest earlier CI reported WakandaCore403, Free1segments404, animechallenge; this investigation does not repair those upstream failures.",
+    "Native iOS startup before/after is now instrumented but not yet measured."
+  ]
+}

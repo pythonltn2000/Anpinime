@@ -3,6 +3,7 @@ set -euo pipefail
 ANPINIME_MODE=${1:-live}
 ANPINIME_RESULT=phim4k-live
 ANPINIME_FLAG=--phim4k-live-smoke
+ANPINIME_EXTRA_ARGS=(--mpv-playback-smoke)
 cleanup() {
   if [ -n "${ANPINIME_SIMULATOR_ID:-}" ]; then
     xcrun simctl terminate "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime >/dev/null 2>&1 || true
@@ -16,6 +17,11 @@ trap cleanup EXIT
 if [ "$ANPINIME_MODE" = vip ]; then
   ANPINIME_RESULT=phim4k-vip
   ANPINIME_FLAG=--phim4k-vip-smoke
+  if [ -n "${ANPINIME_RESULT_SUFFIX:-}" ]; then
+    [[ "$ANPINIME_RESULT_SUFFIX" =~ ^[a-z0-9-]{1,40}$ ]] || { echo "Invalid source-2 result suffix" >&2; exit 1; }
+    ANPINIME_RESULT="$ANPINIME_RESULT-$ANPINIME_RESULT_SUFFIX"
+  fi
+  ANPINIME_EXTRA_ARGS+=(--phim4k-core-id "${ANPINIME_CORE_ID:-10403}" --phim4k-server-id "${ANPINIME_SERVER_ID:-31937}" --phim4k-result "$ANPINIME_RESULT")
 fi
 if [ "$ANPINIME_MODE" = gateway ]; then
   ANPINIME_RESULT=phim4k-gateway
@@ -64,6 +70,11 @@ if [ "$ANPINIME_MODE" = hls ]; then
   done
   test "$ANPINIME_READY" = 1
 fi
+if [ "$ANPINIME_MODE" = gateway ]; then
+  ANPINIME_MIN_PLAYBACK_SECONDS=${ANPINIME_MIN_PLAYBACK_SECONDS:-15}
+else
+  ANPINIME_MIN_PLAYBACK_SECONDS=${ANPINIME_MIN_PLAYBACK_SECONDS:-1}
+fi
 ANPINIME_SIMULATOR_ID=$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPhone" in d["name"]))')
 ANPINIME_APP_DATA=$(xcrun simctl get_app_container "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime data)
 python3 - "$ANPINIME_APP_DATA" "$ANPINIME_RESULT" <<'PY'
@@ -73,12 +84,11 @@ for directory in (Path(sys.argv[1])/'Documents', Path('previews')):
     for suffix in ('', '-diagnostics'):
         (directory/('playback-'+sys.argv[2]+suffix+'.json')).unlink(missing_ok=True)
 PY
-xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime "$ANPINIME_FLAG" --mpv-playback-smoke
+xcrun simctl launch --terminate-running-process "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime "$ANPINIME_FLAG" "${ANPINIME_EXTRA_ARGS[@]}"
 for attempt in $(seq 1 75); do
   if [ -f "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT.json" ]; then
-    # The movie opens on a black intro. Capture the live gateway proof later
-    # while retaining the same overall wait and app/network cleanup bounds.
-    if [ "$ANPINIME_MODE" != gateway ] || python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["time"]>=15 else 1)' "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT.json"; then break; fi
+    # Wait for the requested media time, independently of first-frame timing.
+    if python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["time"]>=float(sys.argv[2]) else 1)' "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT.json" "$ANPINIME_MIN_PLAYBACK_SECONDS"; then break; fi
   fi
   if [ -f "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT-diagnostics.json" ] && python3 -c 'import json,sys; sys.exit(0 if any(e["event"]=="failure" for e in json.load(open(sys.argv[1]))["events"]) else 1)' "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT-diagnostics.json"; then break; fi
   sleep 1
@@ -96,10 +106,15 @@ if [ ! -f "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT.json" ]; then
   exit 1
 fi
 cp "$ANPINIME_APP_DATA/Documents/playback-$ANPINIME_RESULT.json" previews/
-python3 - "$ANPINIME_RESULT" <<'PY'
+python3 - "$ANPINIME_RESULT" "$ANPINIME_MODE" "${ANPINIME_CORE_ID:-10403}" "${ANPINIME_SERVER_ID:-31937}" "$ANPINIME_MIN_PLAYBACK_SECONDS" <<'PY'
 import json,sys
 r=json.load(open('previews/playback-'+sys.argv[1]+'.json'))
 assert r['backend']=='mpv' and r['advancingVideoVerified'] and r['videoWidth']>0 and r['videoHeight']>0 and r['time']>1 and r['landscape'], r
+assert r['time']>=float(sys.argv[5]), r
+if sys.argv[2]=='vip':
+    assert r['selectedCoreMovieID']==sys.argv[3] and r['selectedServerID']==sys.argv[4], r
+    assert r['coreMetadataReplayed'] is False and r['fullCoreLive'] is True, r
+    assert r['firstDecodedVideoElapsedSeconds']>0 and r['videoCodec'], r
 if sys.argv[1]=='phim4k-gateway':
     assert r['time']>=15, r
     assert r['coreMetadataReplayed'] is True and r['liveGateway'] is True and r['metadataServerCount']==5 and r['selectedServerID']=='31937', r

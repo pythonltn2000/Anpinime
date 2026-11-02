@@ -105,6 +105,24 @@ jobs:
         continue-on-error: true
         run: bash Tests/phim4k-live-smoke.sh vip
 
+      - name: Measure user Spider-Man sample startup on the original low-size server
+        continue-on-error: true
+        env:
+          ANPINIME_CORE_ID: '17997'
+          ANPINIME_SERVER_ID: '34793'
+          ANPINIME_RESULT_SUFFIX: spiderman-34793
+          ANPINIME_MIN_PLAYBACK_SECONDS: '20'
+        run: bash Tests/phim4k-live-smoke.sh vip
+
+      - name: Measure user Spider-Man sample startup on its original 4K server
+        continue-on-error: true
+        env:
+          ANPINIME_CORE_ID: '17997'
+          ANPINIME_SERVER_ID: '34794'
+          ANPINIME_RESULT_SUFFIX: spiderman-34794
+          ANPINIME_MIN_PLAYBACK_SECONDS: '20'
+        run: bash Tests/phim4k-live-smoke.sh vip
+
       - name: Check live source-2 gateway and media using captured Core metadata
         continue-on-error: true
         run: bash Tests/phim4k-live-smoke.sh gateway
@@ -261,6 +279,8 @@ jobs:
         run: |
           swiftc AnyAnime/AIDrama/AIDramaModels.swift AnyAnime/AIDrama/PineDramaProvider.swift Tests/AIDramaProviderTests.swift -o "$RUNNER_TEMP/anpinime-ai-drama-provider-tests"
           "$RUNNER_TEMP/anpinime-ai-drama-provider-tests"
+          swiftc -parse-as-library AnyAnime/AIDrama/AIDramaModels.swift AnyAnime/AIDrama/PineDramaProvider.swift AnyAnime/AIDrama/AIDramaHistoryStore.swift AnyAnime/AIDrama/AIDramaCatalogStore.swift Tests/AIDramaStoreTests.swift -o "$RUNNER_TEMP/anpinime-ai-drama-store-tests"
+          "$RUNNER_TEMP/anpinime-ai-drama-store-tests"
       - name: Prepare iOS project and test media tools
         id: ai_prepare
         run: |

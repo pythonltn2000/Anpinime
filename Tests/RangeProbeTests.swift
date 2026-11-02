@@ -30,6 +30,7 @@ import FoundationNetworking
         assert(ignored.response.statusCode == 200 && ignored.prefix.count == 2048 && ignored.wasTruncated)
         let redirected = try await inspect("redirect")
         assert(redirected.response.statusCode == 206 && redirected.prefix.count == 2048)
+        assert(redirected.response.url?.lastPathComponent == "range")
         let denied = try await inspect("denied")
         assert(denied.response.statusCode == 403)
         let json = try await inspect("json")

@@ -1,0 +1,56 @@
+{
+  "movieID": "17997",
+  "serverID": "34793",
+  "codec": "h264",
+  "durationSeconds": 8700.64,
+  "containerBitrateKbps": 9007,
+  "coreMetadataReplayed": false,
+  "liveGateway": true,
+  "checkedAtUTC": "2026-11-02T06:04:03.151973+00:00",
+  "decoder": "FFmpeg Linux",
+  "outputLimitSeconds": 20,
+  "networkByteBudget": 67108864,
+  "outputFrames": 480,
+  "outputSeconds": 20.02,
+  "firstDecodedFrameWallSeconds": 1.596,
+  "elapsedSeconds": 2.28,
+  "exitCode": 0,
+  "timedOut": false,
+  "width": 1920,
+  "height": 800,
+  "upstreamRequests": [
+    {
+      "method": "GET",
+      "range": "bytes=9795883165-",
+      "bytesRead": 11230,
+      "status": 206,
+      "headersSeconds": 0.392,
+      "contentRange": "bytes 9795883165-9795894394/9795894395",
+      "elapsedSeconds": 0.392
+    },
+    {
+      "method": "GET",
+      "range": "bytes=0-",
+      "bytesRead": 1900544,
+      "status": 206,
+      "headersSeconds": 0.514,
+      "contentRange": "bytes 0-9795894394/9795894395",
+      "endReason": "ConnectionResetError",
+      "elapsedSeconds": 0.956
+    },
+    {
+      "method": "GET",
+      "range": "bytes=9263-",
+      "bytesRead": 10878976,
+      "status": 206,
+      "headersSeconds": 0.441,
+      "contentRange": "bytes 9263-9795894394/9795894395",
+      "endReason": "ConnectionResetError",
+      "elapsedSeconds": 1.256
+    }
+  ],
+  "totalUpstreamBytesRead": 12790750,
+  "mediaBytesSaved": 0,
+  "note": "Loopback observation adapter forwards exact media URL, Range and oxoo User-Agent through inherited proxy; no native iOS timing claim.",
+  "coreDetailFetchedThisInvestigation": true
+}
