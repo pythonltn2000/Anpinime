@@ -268,7 +268,7 @@ jobs:
           xcodegen generate
       - name: Verify actual portrait swipes, full playlist and player lifetime
         run: bash Tests/ai-drama-smoke.sh
-      - name: Verify live PineDrama catalog, complete series and episodes 1, 2 and 40
+      - name: Verify live PineDrama catalog, full playlist and first, second and last episodes
         if: ${{ !cancelled() && steps.ai_prepare.outcome == 'success' }}
         continue-on-error: true
         run: bash Tests/ai-drama-live-smoke.sh

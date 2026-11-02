@@ -70,7 +70,9 @@ struct AIDramaPlayerView: View {
                     Text("\(episode.displayTitle) · \(index + 1)/\(session.playlist.episodes.count)")
                         .font(.subheadline).foregroundColor(.white.opacity(0.85))
                         .accessibilityIdentifier("aidrama.episode.index")
-                        .accessibilityValue(episode.id)
+                        #if DEBUG
+                        .accessibilityValue(AIDramaDebugSupport.enabled ? episode.id : "")
+                        #endif
                 }
             }
             .padding(.top, 6)

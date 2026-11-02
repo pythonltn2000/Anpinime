@@ -27,7 +27,7 @@ ai_drama_live_cleanup() {
   fi
   if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     if [ "$ANPINIME_STATUS" = 0 ]; then
-      printf '### Live Phim AI: PASS — real portrait video advances in episodes 1, 2 and 40\n' >> "$GITHUB_STEP_SUMMARY"
+      printf '### Live Phim AI: PASS — the first fresh catalog series plays its exact first, second and last episodes\n' >> "$GITHUB_STEP_SUMMARY"
     else
       printf '### Live Phim AI: FAIL — see the bounded live UI xcresult and screenshots\n' >> "$GITHUB_STEP_SUMMARY"
     fi
@@ -62,6 +62,11 @@ if command -v xcodegen >/dev/null 2>&1; then
 elif [ ! -d AnyAnime.xcodeproj ]; then
   echo "Generate AnyAnime.xcodeproj with XcodeGen before running the live UI smoke test." >&2
   exit 2
+fi
+
+# Reset only simulator test-app data on ephemeral CI or an explicit local opt-in.
+if [ "${GITHUB_ACTIONS:-}" = true ] || [ "${ANPINIME_AI_RESET_TEST_APP:-}" = 1 ]; then
+  xcrun simctl uninstall "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime >/dev/null 2>&1 || true
 fi
 
 set +e

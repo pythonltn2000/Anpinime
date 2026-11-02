@@ -1,4 +1,5 @@
 import XCTest
+import CoreFoundation
 
 /// Exercises the real five-tab app with separate fixture and bounded live checks.
 final class AIDramaUITests: XCTestCase {
@@ -21,6 +22,10 @@ final class AIDramaUITests: XCTestCase {
     }
 
     private enum HarnessError: Error { case failed(String) }
+    private struct LiveEpisode: Codable {
+        let id: String
+        let number: Int
+    }
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -155,43 +160,55 @@ final class AIDramaUITests: XCTestCase {
     }
 
     func testLivePineDramaPlaylistAndVideo() throws {
-        let liveSeriesID = "7676620083434656784"
-        let liveTitle = "Thần Ẩm Thực Ở Ngục Tù Cổ Đại"
-        let firstID = "7676620734394862865"
-        let secondID = "7676620627842731265"
-        let lastID = "7676620695161310481"
-        let series = app.buttons["aidrama.series." + liveSeriesID]
         let catalogCards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "aidrama.series."))
         try waitForLive("The fresh PineDrama catalog loads", timeout: 15) { catalogCards.count > 0 }
-        for _ in 0..<5 {
-            try requireLiveBudget()
-            if series.exists && series.isHittable { break }
-            let catalog = app.scrollViews.firstMatch
-            if catalog.exists { catalog.swipeUp() } else { break }
+        // Commit the objective before requesting its panel; never try another series.
+        let firstCard = catalogCards.element(boundBy: 0)
+        let identifier = firstCard.identifier
+        let cardLabel = firstCard.label
+        let liveSeriesID = String(identifier.dropFirst("aidrama.series.".count))
+        guard firstCard.isHittable, oracleIdentifier(liveSeriesID) != nil,
+              let countPattern = try? NSRegularExpression(pattern: #"(\d+)\s+tập$"#),
+              let countMatch = countPattern.firstMatch(in: cardLabel, range: NSRange(location: 0, length: (cardLabel as NSString).length)),
+              let total = Int((cardLabel as NSString).substring(with: countMatch.range(at: 1))), total >= 2 else {
+            throw HarnessError.failed("The first fresh catalog card lacks a valid series ID or episode count")
         }
-        guard series.exists && series.isHittable else {
-            XCTFail("The fresh catalog does not contain \(liveTitle) (\(liveSeriesID))")
-            throw HarnessError.failed("Required live series is absent; no substitute series is allowed")
-        }
+        let expected = try livePanelOracle(seriesID: liveSeriesID, expectedCount: total)
+        let first = expected[0], second = expected[1], final = expected[expected.count - 1]
+        let oracleFields: [String: Any] = [
+            "selectionPolicy": "First actual fresh catalog card, fixed before the single panel request",
+            "seriesID": liveSeriesID, "catalogLabel": cardLabel, "episodeCount": total,
+            "panelEpisodeCount": expected.count, "oracleRequestCount": 1,
+            "targets": [first, second, final].map { ["id": $0.id, "number": $0.number] as [String: Any] }
+        ]
+        let oracleData = try JSONSerialization.data(withJSONObject: oracleFields, options: [.sortedKeys])
+        let oracleAttachment = XCTAttachment(string: String(decoding: oracleData, as: UTF8.self))
+        oracleAttachment.name = "live-selected-catalog-panel-oracle"
+        oracleAttachment.lifetime = .keepAlways
+        add(oracleAttachment)
+        let series = app.buttons[identifier]
+        guard series.isHittable else { throw HarnessError.failed("The originally selected catalog card disappeared") }
         series.tap()
-        try waitForLivePlaying(id: firstID, number: 1)
-        XCTAssertEqual(app.staticTexts["aidrama.series.title"].label.lowercased(), liveTitle.lowercased())
-        XCTAssertTrue(app.buttons["aidrama.playlist.open"].label.contains("40"))
+        try waitForLivePlaying(id: first.id, number: first.number, total: total)
+        let displayedTitle = app.staticTexts["aidrama.series.title"].label
+        XCTAssertFalse(displayedTitle.isEmpty)
+        XCTAssertTrue(cardLabel.contains(displayedTitle))
+        XCTAssertTrue(app.buttons["aidrama.playlist.open"].label.contains("(\(total))"))
         assertNoSocialControls()
         attachTelemetry(name: "live-episode-01-decoded-state")
         capture("live-pinedrama-episode-01-portrait-playing")
 
         dragToNextEpisode()
-        try waitForLivePlaying(id: secondID, number: 2)
+        try waitForLivePlaying(id: second.id, number: second.number, total: total)
         attachTelemetry(name: "live-episode-02-decoded-state")
         capture("live-pinedrama-episode-02-after-vertical-swipe")
 
         app.buttons["aidrama.playlist.open"].tap()
-        try waitForLive("The live 40-episode drawer opens", timeout: 5) {
+        try waitForLive("The complete live episode drawer opens", timeout: 5) {
             self.app.buttons["aidrama.playlist.close"].isHittable
         }
-        XCTAssertTrue(app.navigationBars["Danh sách tập (40)"].exists)
-        let last = app.buttons["aidrama.playlist.episode." + lastID]
+        XCTAssertTrue(app.navigationBars["Danh sách tập (\(total))"].exists)
+        let last = app.buttons["aidrama.playlist.episode." + final.id]
         let episodes = app.scrollViews["aidrama.playlist.episodes"]
         for _ in 0..<8 {
             try requireLiveBudget()
@@ -199,14 +216,95 @@ final class AIDramaUITests: XCTestCase {
             if episodes.exists { episodes.swipeUp() } else { app.swipeUp() }
         }
         guard last.isHittable else {
-            XCTFail("The complete live playlist does not expose the real episode 40")
+            XCTFail("The complete live playlist does not expose its independently verified last episode")
             throw HarnessError.failed("Required last live episode is absent")
         }
         last.tap()
-        try waitForLivePlaying(id: lastID, number: 40)
-        attachTelemetry(name: "live-episode-40-decoded-state")
-        capture("live-pinedrama-episode-40-portrait-playing")
+        try waitForLivePlaying(id: final.id, number: final.number, total: total)
+        attachTelemetry(name: "live-episode-\(final.number)-decoded-state")
+        capture("live-pinedrama-episode-\(final.number)-portrait-playing")
         app.buttons["aidrama.close"].tap()
+    }
+
+    /// One independent native panel request, only from the simulator test runner.
+    private func livePanelOracle(seriesID: String, expectedCount: Int) throws -> [LiveEpisode] {
+        try requireLiveBudget()
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        let fields = [
+            "aid": "845221", "app_name": "tiktok_drama", "app_package": "com.ss.iphone.ttmd.video",
+            "channel": "App Store", "version_code": "46.6.0", "app_version": "46.6.0", "build_number": "466003",
+            "device_platform": "iphone", "device_type": ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] ?? "iPhone17,3",
+            "os_version": "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)", "os_api": String(os.majorVersion),
+            "language": "vi", "app_language": "vi", "locale": "vi_VN", "sys_region": "VN", "region": "VN",
+            "content_language": "vi", "tz_name": TimeZone.current.identifier,
+            "tz_offset": String(TimeZone.current.secondsFromGMT()), "collection_id": seriesID
+        ]
+        var components = URLComponents(string: "https://api-va.tiktokv.com/tiktok/md/collection/episode_panel/v1/")!
+        components.queryItems = fields.keys.sorted().map { URLQueryItem(name: $0, value: fields[$0]) }
+        var request = URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
+        request.httpMethod = "GET"
+        request.httpShouldHandleCookies = false
+        request.setValue("PineDrama/466003 CFNetwork/Darwin", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 12
+        configuration.timeoutIntervalForResource = 12
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCache = nil
+        let session = URLSession(configuration: configuration, delegate: LiveOracleRedirectPolicy(), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        let finished = expectation(description: "Single independent native episode panel")
+        var received: Data?
+        var status: Int?
+        var transportFailed = false
+        session.dataTask(with: request) { data, response, error in
+            received = data
+            status = (response as? HTTPURLResponse)?.statusCode
+            transportFailed = error != nil
+            finished.fulfill()
+        }.resume()
+        guard XCTWaiter.wait(for: [finished], timeout: min(13, max(0.1, liveDeadline!.timeIntervalSinceNow))) == .completed,
+              !transportFailed, status == 200, let received, !received.isEmpty, received.count <= 2 * 1024 * 1024,
+              let object = try JSONSerialization.jsonObject(with: received) as? [String: Any],
+              oracleInteger(object["status_code"]) == 0, let rows = object["episode_list"] as? [[String: Any]] else {
+            throw HarnessError.failed("The single bounded native panel oracle failed")
+        }
+        var episodes: [LiveEpisode] = []
+        var ids = Set<String>(), numbers = Set<Int>()
+        for row in rows {
+            if (row["is_intro"] as? NSNumber)?.boolValue == true
+                || ["1", "true"].contains((row["is_intro"] as? String)?.lowercased() ?? "") { continue }
+            guard let id = oracleIdentifier(row["video_id_str"]) ?? oracleIdentifier(row["video_id"]),
+                  let number = oracleInteger(row["seq_id"]), number > 0, oracleInteger(row["num"]) == number,
+                  ids.insert(id).inserted, numbers.insert(number).inserted else {
+                throw HarnessError.failed("The native panel oracle returned invalid or duplicate real episodes")
+            }
+            episodes.append(LiveEpisode(id: id, number: number))
+        }
+        episodes.sort { $0.number < $1.number }
+        guard episodes.count == expectedCount, episodes.map(\.number) == Array(1...expectedCount) else {
+            throw HarnessError.failed("The native panel oracle does not match the complete catalog episode count")
+        }
+        return episodes
+    }
+
+    private func oracleIdentifier(_ raw: Any?) -> String? {
+        let value: String
+        if let text = raw as? String { value = text }
+        else if let number = raw as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                !["f", "d"].contains(String(cString: number.objCType)) { value = number.stringValue }
+        else { return nil }
+        guard !value.isEmpty, value.utf8.count <= 19, value.utf8.allSatisfy({ (48...57).contains($0) }),
+              let exact = UInt64(value), exact > 0, exact <= UInt64(Int64.max) else { return nil }
+        return value
+    }
+
+    private func oracleInteger(_ raw: Any?) -> Int? {
+        if let text = raw as? String { return Int(text) }
+        guard let number = raw as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+              !["f", "d"].contains(String(cString: number.objCType)) else { return nil }
+        return Int(number.stringValue)
     }
 
     private func episodeID(_ number: Int) -> String { String(Int64(7_000_000_000_000_000_100) + Int64(number)) }
@@ -252,7 +350,7 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["aidrama.episode.index"].value as? String, episodeID(episode))
     }
 
-    private func waitForLivePlaying(id: String, number: Int) throws {
+    private func waitForLivePlaying(id: String, number: Int, total: Int) throws {
         var firstDecodedTime: Double?
         try waitForLive("Live episode \(number) decodes portrait video and keeps advancing", timeout: 25) {
             guard let state = self.playerState(), state.selectedEpisodeID == id, !state.resolving,
@@ -266,7 +364,7 @@ final class AIDramaUITests: XCTestCase {
         }
         let index = app.staticTexts["aidrama.episode.index"]
         XCTAssertEqual(index.value as? String, id)
-        XCTAssertTrue(index.label.contains("\(number)/40"))
+        XCTAssertTrue(index.label.contains("\(number)/\(total)"))
         XCTAssertEqual(try requirePlayerState().maximumOwnedPlayers, 1)
     }
 
@@ -397,5 +495,12 @@ final class AIDramaUITests: XCTestCase {
             fixture.lifetime = .keepAlways
             add(fixture)
         }
+    }
+}
+
+private final class LiveOracleRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
     }
 }
