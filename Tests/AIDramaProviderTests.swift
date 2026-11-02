@@ -411,7 +411,8 @@ struct AIDramaProviderTests {
         let category = library[4]
         check(category.httpMethod == "POST" && category.value(forHTTPHeaderField: "Content-Type") == "application/json" && category.value(forHTTPHeaderField: "Agw-Js-Conv") == "str",
               "Category transport uses original JSON POST and conversion header")
-        let body = try JSONSerialization.jsonObject(with: category.httpBody!) as! [String: Any]
+        guard let categoryBody = category.httpBody else { throw URLError(.requestBodyStreamExhausted) }
+        let body = try JSONSerialization.jsonObject(with: categoryBody) as! [String: Any]
         let rawFilters = body["category_filters"] as! [[String: Any]]
         check(rawFilters.count == 4 && rawFilters[0]["name_en"] as? String == "all_settings" &&
               rawFilters[3]["name_en"] as? String == "in_7_days", "Category requests preserve whole native selected objects and each unselected All object")
@@ -440,8 +441,28 @@ private final class AIDramaFixtureProtocol: URLProtocol {
     override func stopLoading() {}
 
     override func startLoading() {
+        // URLSession can expose a Data POST body as a stream to URLProtocol.
+        // Snapshot those actual bytes before inspecting the captured request.
+        var captured = request
+        if captured.httpBody == nil, let stream = captured.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var data = Data()
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while true {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count == 0 { break }
+                guard count > 0, data.count + count <= 2 * 1024 * 1024 else {
+                    client?.urlProtocol(self, didFailWithError: URLError(.requestBodyStreamExhausted))
+                    return
+                }
+                data.append(contentsOf: buffer.prefix(count))
+            }
+            captured.httpBodyStream = nil
+            captured.httpBody = data
+        }
         Self.lock.lock()
-        Self.requests.append(request)
+        Self.requests.append(captured)
         Self.lock.unlock()
         var object: [String: Any] = ["status_code": 0, "collections": [["collection_id": AIDramaProviderTests.seriesNumber, "title": "Transport fixture", "num_videos": 40]], "has_more": false]
         if request.url?.path.contains("category_filter") == true { object["category_filter_lists"] = AIDramaProviderTests.filterLists() }
