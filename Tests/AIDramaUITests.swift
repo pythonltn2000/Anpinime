@@ -201,7 +201,10 @@ final class AIDramaUITests: XCTestCase {
         try waitFor("The hot ranking finishes loading") { hot.isHittable }
         let previousHotRequests = eventCount(try fixtureJSON("/__smoke__/stats"), "catalog_started", feed: "hot", page: 1)
         let rankings = app.scrollViews["aidrama.ranking.results"]
-        rankings.swipeDown()
+        let refreshStart = rankings.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.30))
+        let refreshEnd = rankings.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+        refreshStart.press(forDuration: 0.05, thenDragTo: refreshEnd,
+                           withVelocity: .slow, thenHoldForDuration: 0.3)
         try waitFor("Refreshing starts a delayed hot ranking request") {
             guard let stats = try? self.fixtureJSON("/__smoke__/stats") else { return false }
             return self.eventCount(stats, "catalog_started", feed: "hot", page: 1) > previousHotRequests
