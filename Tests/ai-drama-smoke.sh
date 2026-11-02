@@ -147,9 +147,9 @@ fi
 set +e
 xcodebuild test -project AnyAnime.xcodeproj -scheme AnyAnime -configuration Debug \
   -destination "platform=iOS Simulator,id=$ANPINIME_SIMULATOR_ID" \
-  -derivedDataPath "$ANPINIME_TEMP/DerivedData" \
+  -derivedDataPath "${ANPINIME_AI_DERIVED_DATA:-$ANPINIME_TEMP/DerivedData}" \
   -resultBundlePath "$ANPINIME_ARTIFACTS/ui.xcresult" \
-  -only-testing:AnyAnimeUI/AIDramaUITests -parallel-testing-enabled NO \
+  -only-testing:AnyAnimeUI/AIDramaUITests/testVerticalEpisodesPlaylistAndLifecycle -parallel-testing-enabled NO \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 2>&1 | tee "$ANPINIME_ARTIFACTS/xcodebuild.log"
 ANPINIME_TEST_STATUS=${PIPESTATUS[0]}
 set -e

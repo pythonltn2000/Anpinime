@@ -1,5 +1,6 @@
 #if DEBUG
 import SwiftUI
+import UIKit
 
 /// Instrumentation exists only in explicit simulator checks, never the release UI.
 @MainActor
@@ -9,6 +10,7 @@ final class AIDramaDebugSupport: ObservableObject {
     static var enabled: Bool { fixtureEnabled || ProcessInfo.processInfo.arguments.contains("--ai-drama-live-smoke") }
     @Published var ownedPlayers = 0
     private var activeControllers = Set<ObjectIdentifier>()
+    private static var preparedSeries = Set<String>()
 
     func installed(_ controller: MPVPlaybackController) {
         activeControllers.insert(ObjectIdentifier(controller))
@@ -21,7 +23,11 @@ final class AIDramaDebugSupport: ObservableObject {
     }
 
     static func clearFixtureProgress() {
-        let seriesID = "7000000000000000001"
+        clearProgress(seriesID: "7000000000000000001")
+    }
+
+    static func clearProgress(seriesID: String) {
+        guard preparedSeries.insert(seriesID).inserted else { return }
         for part in ["positions", "selected", "paused"] {
             UserDefaults.standard.removeObject(forKey: "AnPinime.AIDrama." + part + "." + seriesID)
         }
@@ -32,11 +38,8 @@ final class AIDramaDebugSupport: ObservableObject {
 struct AIDramaDebugOwnerView: View {
     @ObservedObject private var support = AIDramaDebugSupport.shared
     var body: some View {
-        Text(String(support.ownedPlayers))
-            .font(.system(size: 1)).foregroundColor(.white.opacity(0.01))
-            .frame(width: 2, height: 2).allowsHitTesting(false)
-            .accessibilityIdentifier("aidrama.debug.ownedPlayers")
-            .accessibilityValue(String(support.ownedPlayers))
+        AIDramaDebugLabel(identifier: "aidrama.debug.ownedPlayers", value: String(support.ownedPlayers))
+            .frame(width: 32, height: 20).padding(.top, 70).padding(.leading, 8)
     }
 }
 
@@ -63,11 +66,32 @@ struct AIDramaDebugStateView: View {
         ]
         let data = (try? JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])) ?? Data()
         let value = String(decoding: data, as: UTF8.self)
-        return Text("Trạng thái kiểm thử")
-            .font(.system(size: 1)).foregroundColor(.white.opacity(0.01))
-            .frame(width: 2, height: 2).allowsHitTesting(false)
-            .accessibilityIdentifier("aidrama.debug.state")
-            .accessibilityValue(value)
+        return AIDramaDebugLabel(identifier: "aidrama.debug.state", value: value)
+            .frame(width: 32, height: 20).padding(.top, 80).padding(.leading, 8)
+    }
+}
+
+@MainActor
+private struct AIDramaDebugLabel: UIViewRepresentable {
+    let identifier: String
+    let value: String
+
+    func makeUIView(context: Context) -> UILabel {
+        let label = UILabel()
+        label.text = "AI"
+        label.font = .systemFont(ofSize: 10)
+        label.textColor = .white
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        label.textAlignment = .center
+        label.isAccessibilityElement = true
+        label.isUserInteractionEnabled = false
+        return label
+    }
+
+    func updateUIView(_ label: UILabel, context: Context) {
+        label.accessibilityIdentifier = identifier
+        label.accessibilityLabel = "Kiểm thử phát"
+        label.accessibilityValue = value
     }
 }
 

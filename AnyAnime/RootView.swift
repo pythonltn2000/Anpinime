@@ -20,6 +20,9 @@ struct RootView: View {
             _aiDramaStore = StateObject(wrappedValue: AIDramaCatalogStore(provider: PineDramaProvider(configuration: configuration)))
         }
         if AIDramaDebugSupport.enabled {
+            if !AIDramaDebugSupport.fixtureEnabled {
+                AIDramaDebugSupport.clearProgress(seriesID: "7676620083434656784")
+            }
             _enteredLibrary = State(initialValue: true)
             _introVisible = State(initialValue: false)
             _selectedLibraryTab = State(initialValue: 3)

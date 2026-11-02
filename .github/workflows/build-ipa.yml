@@ -253,6 +253,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.ai_drama_only
     runs-on: macos-26
     timeout-minutes: 25
+    env:
+      ANPINIME_AI_DERIVED_DATA: ${{ github.workspace }}/build-ai-simulator
     steps:
       - uses: actions/checkout@v4
       - name: Verify PineDrama data and complete-playlist contracts
@@ -265,6 +267,9 @@ jobs:
           xcodegen generate
       - name: Verify actual portrait swipes, full playlist and player lifetime
         run: bash Tests/ai-drama-smoke.sh
+      - name: Verify live PineDrama catalog, complete series and episodes 1, 2 and 40
+        continue-on-error: true
+        run: bash Tests/ai-drama-live-smoke.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
