@@ -232,7 +232,8 @@ final class AIDramaUITests: XCTestCase {
 
     private func dragToNextEpisode() {
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.72))
-        let finish = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.28))
+        // Cross more than half the pager so a deliberate slow drag commits the page.
+        let finish = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12))
         start.press(forDuration: 0.05, thenDragTo: finish)
     }
 

@@ -250,7 +250,7 @@ jobs:
           retention-days: 14
 
   ai-drama:
-    if: github.event_name == 'workflow_dispatch' && inputs.ai_drama_only
+    if: ${{ !inputs.gateway_frame_only }}
     runs-on: macos-26
     timeout-minutes: 25
     env:
@@ -262,12 +262,14 @@ jobs:
           swiftc AnyAnime/AIDrama/AIDramaModels.swift AnyAnime/AIDrama/PineDramaProvider.swift Tests/AIDramaProviderTests.swift -o "$RUNNER_TEMP/anpinime-ai-drama-provider-tests"
           "$RUNNER_TEMP/anpinime-ai-drama-provider-tests"
       - name: Prepare iOS project and test media tools
+        id: ai_prepare
         run: |
           brew install xcodegen ffmpeg
           xcodegen generate
       - name: Verify actual portrait swipes, full playlist and player lifetime
         run: bash Tests/ai-drama-smoke.sh
       - name: Verify live PineDrama catalog, complete series and episodes 1, 2 and 40
+        if: ${{ !cancelled() && steps.ai_prepare.outcome == 'success' }}
         continue-on-error: true
         run: bash Tests/ai-drama-live-smoke.sh
       - uses: actions/upload-artifact@v4
