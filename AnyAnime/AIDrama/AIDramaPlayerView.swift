@@ -359,6 +359,8 @@ private struct AIDramaVerticalPager: UIViewControllerRepresentable {
     static func dismantleUIViewController(_ pager: Pager, coordinator: Coordinator) {
         pager.dataSource = nil
         pager.delegate = nil
-        coordinator.session.setPresented(false, sceneActive: false)
+        // Presentation cleanup belongs to the close action/onDisappear (with deinit
+        // as a fallback). Publishing session changes while SwiftUI destroys this
+        // graph re-enters GraphHost and triggers a Swift exclusivity abort.
     }
 }
