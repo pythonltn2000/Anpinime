@@ -72,11 +72,27 @@ struct AIDramaSeriesButton: View {
     }
 }
 
-struct AIDramaCatalogGrid: View {
+/// One lazy layout owns the cards and their full-width controls/paging sentinel.
+/// Nesting a vertical lazy grid inside a vertical lazy stack can wedge layout
+/// realization during scrolling on the simulator runtime used by our UI checks.
+struct AIDramaCatalogGrid<Header: View, Footer: View>: View {
     let series: [AIDramaSeries]
     let availableWidth: CGFloat
-    var loadingID: String? = nil
+    let loadingID: String?
     let open: (AIDramaSeries) -> Void
+    private let header: Header
+    private let footer: Footer
+
+    init(series: [AIDramaSeries], availableWidth: CGFloat, loadingID: String?,
+         open: @escaping (AIDramaSeries) -> Void,
+         @ViewBuilder header: () -> Header, @ViewBuilder footer: () -> Footer) {
+        self.series = series
+        self.availableWidth = availableWidth
+        self.loadingID = loadingID
+        self.open = open
+        self.header = header()
+        self.footer = footer()
+    }
 
     private var columnCount: Int { min(4, max(2, Int(availableWidth / 155))) }
     private var cardWidth: CGFloat { max(1, (availableWidth - CGFloat(columnCount - 1) * 12) / CGFloat(columnCount)) }
@@ -84,8 +100,14 @@ struct AIDramaCatalogGrid: View {
 
     var body: some View {
         LazyVGrid(columns: columns, alignment: .leading, spacing: 20) {
-            ForEach(series) { item in
-                AIDramaSeriesButton(series: item, width: cardWidth, loading: loadingID == item.id, open: open)
+            Section {
+                ForEach(series) { item in
+                    AIDramaSeriesButton(series: item, width: cardWidth, loading: loadingID == item.id, open: open)
+                }
+            } header: {
+                header.frame(maxWidth: .infinity, alignment: .leading)
+            } footer: {
+                footer
             }
         }
         .frame(width: max(1, availableWidth), alignment: .leading)
@@ -156,7 +178,7 @@ struct AIDramaHeroCarousel: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(loadingID == item.id)
-                        .accessibilityLabel(item.title + (item.viewCount.map { ", \($0.formatted()) lượt xem" } ?? "") + (item.episodeCount.map { ", \($0) tập" } ?? ""))
+                .accessibilityLabel(item.title + (item.viewCount.map { ", \($0.formatted()) lượt xem" } ?? "") + (item.episodeCount.map { ", \($0) tập" } ?? ""))
                 .accessibilityHint("Mở phim nổi bật")
                 .accessibilityIdentifier("aidrama.series." + item.id)
                 .tag(item.id)

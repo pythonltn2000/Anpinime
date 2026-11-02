@@ -48,19 +48,23 @@ struct AIDramaNewWorksView: View {
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 18) {
-                    Text("Mới ra mắt").font(.title2.bold())
-                    Text("Tác phẩm mới trong 7 ngày qua").font(.subheadline).foregroundColor(.secondary)
-                    if state.series.isEmpty {
-                        AIDramaCatalogMessage(loading: state.isLoading, message: state.error,
-                                              retry: { Task { await store.refresh(query: .newWorks) } })
-                    } else {
-                        AIDramaCatalogGrid(series: state.series, availableWidth: max(1, geometry.size.width - 32),
-                                           loadingID: store.loadingPlaylistID, open: open)
+                AIDramaCatalogGrid(series: state.series, availableWidth: max(1, geometry.size.width - 32),
+                                   loadingID: store.loadingPlaylistID, open: open) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        Text("Mới ra mắt").font(.title2.bold())
+                        Text("Tác phẩm mới trong 7 ngày qua").font(.subheadline).foregroundColor(.secondary)
+                        if state.series.isEmpty {
+                            AIDramaCatalogMessage(loading: state.isLoading, message: state.error,
+                                                  retry: { Task { await store.refresh(query: .newWorks) } })
+                        }
+                    }
+                } footer: {
+                    if !state.series.isEmpty {
                         AIDramaPagingFooter(loading: state.isLoadingMore, canLoadMore: state.canLoadMore,
                                             error: state.error, loadMore: { await store.loadMore(query: .newWorks) })
                     }
-                }.padding(16)
+                }
+                .padding(16)
             }
             .accessibilityIdentifier("aidrama.new.results")
             .refreshable { await store.refresh(query: .newWorks) }
@@ -83,34 +87,38 @@ struct AIDramaCategoriesView: View {
         GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 18) {
-                        Color.clear.frame(height: 0).id("aidrama.categories.top")
-                        if let metadata = store.metadata {
-                            VStack(alignment: .leading, spacing: 16) {
-                                ForEach(metadata.filterGroups, id: \.kind) { group in
-                                    filterRow(group)
+                    AIDramaCatalogGrid(series: state.series, availableWidth: max(1, geometry.size.width - 32),
+                                       loadingID: store.loadingPlaylistID, open: open) {
+                        VStack(alignment: .leading, spacing: 18) {
+                            Color.clear.frame(height: 0).id("aidrama.categories.top")
+                            if let metadata = store.metadata {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    ForEach(metadata.filterGroups, id: \.kind) { group in
+                                        filterRow(group)
+                                    }
                                 }
+                                .padding(.vertical, 4)
+                            } else if store.metadataLoading {
+                                ProgressView("Đang tải danh mục…").tint(.anpinimeAccent)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 18)
+                            } else if let error = store.metadataError {
+                                Text(error).font(.footnote).foregroundColor(.secondary)
+                                Button("Tải lại danh mục") { Task { await store.refreshMetadata() } }
                             }
-                            .padding(.vertical, 4)
-                        } else if store.metadataLoading {
-                            ProgressView("Đang tải danh mục…").tint(.anpinimeAccent)
-                                .frame(maxWidth: .infinity).padding(.vertical, 18)
-                        } else if let error = store.metadataError {
-                            Text(error).font(.footnote).foregroundColor(.secondary)
-                            Button("Tải lại danh mục") { Task { await store.refreshMetadata() } }
+                            Divider().overlay(Color.white.opacity(0.04))
+                            Text("Khám phá phim").font(.headline)
+                            if state.series.isEmpty {
+                                AIDramaCatalogMessage(loading: state.isLoading, message: state.error,
+                                                      retry: { Task { await store.refresh(query: query) } })
+                            }
                         }
-                        Divider().overlay(Color.white.opacity(0.04))
-                        Text("Khám phá phim").font(.headline)
-                        if state.series.isEmpty {
-                            AIDramaCatalogMessage(loading: state.isLoading, message: state.error,
-                                                  retry: { Task { await store.refresh(query: query) } })
-                        } else {
-                            AIDramaCatalogGrid(series: state.series, availableWidth: max(1, geometry.size.width - 32),
-                                               loadingID: store.loadingPlaylistID, open: open)
+                    } footer: {
+                        if !state.series.isEmpty {
                             AIDramaPagingFooter(loading: state.isLoadingMore, canLoadMore: state.canLoadMore,
                                                 error: state.error, loadMore: { await store.loadMore(query: query) })
                         }
-                    }.padding(16)
+                    }
+                    .padding(16)
                 }
                 .accessibilityIdentifier("aidrama.categories.results")
                 .refreshable {
