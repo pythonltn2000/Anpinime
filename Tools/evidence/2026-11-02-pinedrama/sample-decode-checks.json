@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-02",
+  "tool": "FFmpeg",
+  "sampleOnly": true,
+  "fullSeriesDecoded": false,
+  "checks": [
+    {
+      "episodeNumber": 1,
+      "episodeID": "7676620734394862865",
+      "collectionID": "7676620083434656784",
+      "check": "headless-three-second-decode",
+      "exitCode": 0,
+      "codec": "hevc",
+      "width": 540,
+      "height": 960,
+      "decodedFrames": 90,
+      "decodedOutputSeconds": 3.0,
+      "elapsedSeconds": 0.394,
+      "mediaBytesSaved": 0,
+      "simulatorPlaybackVerified": false
+    },
+    {
+      "episodeNumber": 2,
+      "episodeID": "7676620627842731265",
+      "collectionID": "7676620083434656784",
+      "check": "headless-three-second-decode",
+      "exitCode": 0,
+      "codec": "hevc",
+      "width": 540,
+      "height": 960,
+      "decodedFrames": 90,
+      "decodedOutputSeconds": 3.0,
+      "elapsedSeconds": 0.695,
+      "mediaBytesSaved": 0,
+      "simulatorPlaybackVerified": false
+    },
+    {
+      "episodeNumber": 40,
+      "episodeID": "7676620695161310481",
+      "collectionID": "7676620083434656784",
+      "check": "headless-three-second-decode",
+      "exitCode": 0,
+      "codec": "hevc",
+      "width": 540,
+      "height": 960,
+      "decodedFrames": 90,
+      "decodedOutputSeconds": 3.0,
+      "elapsedSeconds": 1.588,
+      "mediaBytesSaved": 0,
+      "simulatorPlaybackVerified": false
+    }
+  ]
+}

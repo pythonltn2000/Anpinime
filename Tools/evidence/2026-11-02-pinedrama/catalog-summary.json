@@ -1,0 +1,87 @@
+{
+  "date": "2026-11-02",
+  "path": "/tiktok/md/mini_drama_center/v1/",
+  "response": {
+    "bytes": 18161,
+    "sha256": "aaa40e89f8d7d13e1bd8a28d7795dc00cfc93bc8f2bb97333d1fe18990d452af"
+  },
+  "statusCode": 0,
+  "hasMore": true,
+  "cursor": "",
+  "wholeCatalogVerified": false,
+  "accountSessionUsed": false,
+  "series": [
+    {
+      "id": "7676620083434656784",
+      "title": "Thần Ẩm Thực Ở Ngục Tù Cổ Đại",
+      "episodeCount": 40,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7690401236922831880",
+      "title": "Vợ Béo Lột Xác Chồng Cũ Hối Hận",
+      "episodeCount": 60,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7694329818468717589",
+      "title": "Con Gái Nuôi Thần Kỳ",
+      "episodeCount": 98,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7685437506858439700",
+      "title": "Nữ Đầu Bếp Được Vua Mời Vào Cung",
+      "episodeCount": 116,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7686322557016019975",
+      "title": "Đầu Bếp Hạng Sao Chinh Phục Thời Cổ",
+      "episodeCount": 86,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7662685348623340564",
+      "title": "Bảo Mẫu Đọc Vị Trẻ Thơ",
+      "episodeCount": 48,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7685448909862261781",
+      "title": "Rumah tua berisi ladang ajaib kaya",
+      "episodeCount": 70,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7692167585273795605",
+      "title": "Sai Kết Hôn Với Người Nghèo Trở Thành Phú Nữ",
+      "episodeCount": 59,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7660367113349452821",
+      "title": "Vua Bếp Báo Thù Người Vợ Cũ",
+      "episodeCount": 57,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7673160871375754256",
+      "title": "Cúc Nhi Nông Bảo Đỉnh Cao",
+      "episodeCount": 88,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7691305321054393351",
+      "title": "Mối Tình Cấm Với Tỷ Phú Là Bố Bạn Thân",
+      "episodeCount": 46,
+      "isLimitedFree": true
+    },
+    {
+      "id": "7696279258444141588",
+      "title": "Sáu Ông Lớn Cưng Chiều Bé 3 Tuổi",
+      "episodeCount": 91,
+      "isLimitedFree": true
+    }
+  ]
+}

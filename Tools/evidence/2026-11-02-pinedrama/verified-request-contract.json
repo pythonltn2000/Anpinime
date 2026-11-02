@@ -1,0 +1,90 @@
+{
+  "date": "2026-11-02",
+  "host": "api-va.tiktokv.com",
+  "scheme": "https",
+  "commonParameters": {
+    "aid": "845221",
+    "app_name": "tiktok_drama",
+    "app_package": "com.ss.iphone.ttmd.video",
+    "channel": "App Store",
+    "version_code": "46.6.0",
+    "app_version": "46.6.0",
+    "build_number": "466003",
+    "device_platform": "iphone",
+    "os_version": "26.0",
+    "device_type": "iPhone17,3",
+    "os_api": "26",
+    "language": "vi",
+    "app_language": "vi",
+    "locale": "vi_VN",
+    "sys_region": "VN",
+    "region": "VN",
+    "content_language": "vi",
+    "tz_name": "Etc/UTC",
+    "tz_offset": "0"
+  },
+  "deviceProfile": "Synthetic interoperability test profile, not an original-app device identity. AnPinime derives device/OS/timezone from its runtime.",
+  "userAgent": "PineDrama/466003 CFNetwork/Darwin",
+  "accountSessionUsed": false,
+  "installOrDeviceIDUsed": false,
+  "copiedCookieUsed": false,
+  "guessedSignatureUsed": false,
+  "metadataRequestBounds": {
+    "timeoutSeconds": 12,
+    "bodyLimitBytes": 2097152,
+    "concurrency": 1
+  },
+  "requests": [
+    {
+      "role": "catalog",
+      "method": "GET",
+      "path": "/tiktok/md/mini_drama_center/v1/",
+      "query": {
+        "scene": "1",
+        "category_id": "",
+        "cursor": "",
+        "count": "12",
+        "is_mixed_column_page": "0"
+      }
+    },
+    {
+      "role": "complete episode metadata",
+      "method": "GET",
+      "path": "/tiktok/md/collection/episode_panel/v1/",
+      "query": {
+        "collection_id": "7676620083434656784"
+      }
+    },
+    {
+      "role": "exact selected sequence video resolution",
+      "method": "GET",
+      "path": "/tiktok/md/collection/video/v1/",
+      "query": {
+        "collection_id": "7676620083434656784",
+        "query_type": "seq_id",
+        "current_seq_id": "<selected episode number>",
+        "count": "10",
+        "direction": "1",
+        "root_scene": "2",
+        "query_scene": "mini_drama_container",
+        "enter_from": "series_discover",
+        "drama_request_type": "load_more",
+        "need_collection_detail": "0",
+        "is_trailer_paginated": "0",
+        "iap_country_code": "",
+        "request_source": ""
+      },
+      "responseContentType": "application/x-protobuf",
+      "all40WindowStarts": [
+        1,
+        11,
+        21,
+        31
+      ],
+      "additionalExactSequenceChecks": [
+        2,
+        40
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-02",
+  "files": [
+    {
+      "name": "artifact-identity.json",
+      "bytes": 400,
+      "sha256": "204578dbb1ffad9a4f4d4c52c1dee488cbabe65499e6805df8a6bbed4ec62300"
+    },
+    {
+      "name": "catalog-summary.json",
+      "bytes": 2285,
+      "sha256": "ef5cd6c21f74a89dbe8105ad7cddf6a917b8f5c60b7e74ce875fbb7487d03d9b"
+    },
+    {
+      "name": "complete-series-resolution-summary.json",
+      "bytes": 21215,
+      "sha256": "3d3870bace69e3897a05ed5809d24e45b3e11fdc73e1db5485c7e2d870627152"
+    },
+    {
+      "name": "core-image-identity.json",
+      "bytes": 1539,
+      "sha256": "502fbba5ab5e62c2fa2f911ef58b7c6cbc6cab17ec9f998de25b8b6a0d6e54b6"
+    },
+    {
+      "name": "episode-panel-summary.json",
+      "bytes": 8069,
+      "sha256": "f73a9c20c8d5f404d7df466ade46daa9b8e167816cb1280a96efa95a2c7f2f90"
+    },
+    {
+      "name": "sample-decode-checks.json",
+      "bytes": 1378,
+      "sha256": "67bfdfb42dcf050ddfedb2b47f31befcca37172e40538e20c05715bf28879966"
+    },
+    {
+      "name": "verified-request-contract.json",
+      "bytes": 2427,
+      "sha256": "79b8acde4355459adb6995af9079d02b2d8546420dabc9138a79594ea9fe4723"
+    }
+  ]
+}

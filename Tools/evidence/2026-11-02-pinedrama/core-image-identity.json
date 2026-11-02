@@ -1,0 +1,72 @@
+{
+  "member": "Payload/Drama.app/Frameworks/DramaCore.framework/DramaCore",
+  "bytes": 627688272,
+  "sha256": "f48e895f646d6537828bdf650b7d1b653921741f6a2d62977de12369f069375d",
+  "sliceFileOffset": 0,
+  "cpuType": "0x100000c",
+  "encryptionCommands": [
+    {
+      "cryptoff": 32768,
+      "cryptsize": 517668864,
+      "cryptid": 0
+    }
+  ],
+  "segments": [
+    {
+      "name": "__TEXT",
+      "vmaddr": "0x0",
+      "vmsize": 517718016,
+      "fileoff": 0,
+      "filesize": 517718016
+    },
+    {
+      "name": "__DATA_CONST",
+      "vmaddr": "0x1edbc000",
+      "vmsize": 26443776,
+      "fileoff": 517718016,
+      "filesize": 26443776
+    },
+    {
+      "name": "__DATA",
+      "vmaddr": "0x206f4000",
+      "vmsize": 71729152,
+      "fileoff": 544161792,
+      "filesize": 61931520
+    },
+    {
+      "name": "__LYNX__DATA",
+      "vmaddr": "0x24b5c000",
+      "vmsize": 16384,
+      "fileoff": 606093312,
+      "filesize": 16384
+    },
+    {
+      "name": "HTS_kids_mode",
+      "vmaddr": "0x24b60000",
+      "vmsize": 16384,
+      "fileoff": 606109696,
+      "filesize": 16384
+    },
+    {
+      "name": "__MKSD_DATA",
+      "vmaddr": "0x24b64000",
+      "vmsize": 16384,
+      "fileoff": 606126080,
+      "filesize": 16384
+    },
+    {
+      "name": "Data",
+      "vmaddr": "0x24b68000",
+      "vmsize": 16384,
+      "fileoff": 606142464,
+      "filesize": 16384
+    },
+    {
+      "name": "__LINKEDIT",
+      "vmaddr": "0x24b6c000",
+      "vmsize": 21544960,
+      "fileoff": 606158848,
+      "filesize": 21529424
+    }
+  ]
+}

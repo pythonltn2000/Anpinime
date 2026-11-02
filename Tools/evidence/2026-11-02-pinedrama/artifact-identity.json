@@ -1,0 +1,11 @@
+{
+  "fileName": "PineDrama_46.6.0_1790909917.ipa",
+  "bytes": 370630215,
+  "sha256": "54b4775cf67cd6a5799d877ae8cd40eba4121848feb891cf4a41a224c19ada44",
+  "bundleID": "com.ss.iphone.ttmd.video",
+  "version": "46.6.0",
+  "build": "466003",
+  "executable": "Payload/Drama.app/Drama",
+  "executableSize": 90960,
+  "executableSHA256": "202299f8b3d887e7fd8f367911a5718dc8fe140440d1a918d1df2488978ca0d0"
+}

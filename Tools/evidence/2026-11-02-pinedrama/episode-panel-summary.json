@@ -1,0 +1,376 @@
+{
+  "date": "2026-11-02",
+  "path": "/tiktok/md/collection/episode_panel/v1/",
+  "response": {
+    "bytes": 4241,
+    "sha256": "9eb2197036c51f41bfe8ae328d12fb5e493ceea603ed51b90e51b2b3962a58de"
+  },
+  "statusCode": 0,
+  "collectionID": "7676620083434656784",
+  "title": "Thần Ẩm Thực Ở Ngục Tù Cổ Đại",
+  "reportedTotal": 40,
+  "shortCutNum": 24,
+  "episodeCount": 40,
+  "episodes": [
+    {
+      "number": 1,
+      "sequence": 1,
+      "id": "7676620734394862865",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 2,
+      "sequence": 2,
+      "id": "7676620627842731265",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 3,
+      "sequence": 3,
+      "id": "7676620616883064080",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 4,
+      "sequence": 4,
+      "id": "7676620596293291281",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 5,
+      "sequence": 5,
+      "id": "7676620735950900497",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 6,
+      "sequence": 6,
+      "id": "7676620739872558352",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 7,
+      "sequence": 7,
+      "id": "7676620222379363601",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 8,
+      "sequence": 8,
+      "id": "7676620163785051393",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 9,
+      "sequence": 9,
+      "id": "7676620155127991569",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 10,
+      "sequence": 10,
+      "id": "7676620630330051856",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 11,
+      "sequence": 11,
+      "id": "7676620631273786625",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 12,
+      "sequence": 12,
+      "id": "7676620631961537809",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 13,
+      "sequence": 13,
+      "id": "7676620609379405073",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 14,
+      "sequence": 14,
+      "id": "7676620586478603521",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 15,
+      "sequence": 15,
+      "id": "7676620587585916176",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 16,
+      "sequence": 16,
+      "id": "7676620642669612304",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 17,
+      "sequence": 17,
+      "id": "7676620634721422593",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 18,
+      "sequence": 18,
+      "id": "7676620447353556240",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 19,
+      "sequence": 19,
+      "id": "7676620764547681553",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 20,
+      "sequence": 20,
+      "id": "7676620491578232081",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 21,
+      "sequence": 21,
+      "id": "7676620765252340993",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 22,
+      "sequence": 22,
+      "id": "7676620505524325649",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 23,
+      "sequence": 23,
+      "id": "7676620636134886673",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 24,
+      "sequence": 24,
+      "id": "7676620624424406289",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 25,
+      "sequence": 25,
+      "id": "7676620776178470160",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 26,
+      "sequence": 26,
+      "id": "7676620628887178497",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 27,
+      "sequence": 27,
+      "id": "7676620681789852929",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 28,
+      "sequence": 28,
+      "id": "7676620524151147793",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 29,
+      "sequence": 29,
+      "id": "7676620771464105233",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 30,
+      "sequence": 30,
+      "id": "7676620771954887937",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 31,
+      "sequence": 31,
+      "id": "7676620647962889473",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 32,
+      "sequence": 32,
+      "id": "7676620703352753424",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 33,
+      "sequence": 33,
+      "id": "7676620786383310096",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 34,
+      "sequence": 34,
+      "id": "7676620676005956865",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 35,
+      "sequence": 35,
+      "id": "7676620583764888849",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 36,
+      "sequence": 36,
+      "id": "7676620622780189968",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 37,
+      "sequence": 37,
+      "id": "7676620576357764353",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 38,
+      "sequence": 38,
+      "id": "7676620416017894672",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 39,
+      "sequence": 39,
+      "id": "7676620663129509137",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    },
+    {
+      "number": 40,
+      "sequence": 40,
+      "id": "7676620695161310481",
+      "isIntro": false,
+      "isLimitedFree": true,
+      "isPaid": null,
+      "hasPurchased": null
+    }
+  ]
+}
