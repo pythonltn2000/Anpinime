@@ -14,6 +14,8 @@ struct InterfacePreview: View {
             IntroVideoView(finished: {}).ignoresSafeArea()
         } else if Self.mode == "switch" {
             LibraryTransition(from: "AppLogo", to: "MovieLogo", intro: false)
+        } else if Self.mode == "movie-search-hit" {
+            MovieSearchHitPreview()
         } else if Self.mode == "movies" {
             MovieHomePreview()
         } else if Self.mode == "list" {
@@ -42,4 +44,24 @@ private struct MovieHomePreview: View {
             .task { service.selectSource(.film4k); await service.loadHome() }
     }
 }
+
+private struct MovieSearchHitPreview: View {
+    @State private var selected = ""
+    private let items = (1...3).map { index in
+        Anime(title: "Kết quả tìm kiếm \(index)", subtitle: "Bản độc lập \(index)",
+              url: URL(string: "https://preview.invalid/movie/search-\(index)")!, imageURL: nil,
+              episodeText: "Phim lẻ", quality: "1080p", score: "8.0", source: .phim4k)
+    }
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                Text(selected.isEmpty ? "Chưa chọn" : selected)
+                    .accessibilityIdentifier("search-hit.selected")
+                    .frame(maxWidth: .infinity, minHeight: 36)
+                MovieSearchResultsList(items: items) { selected = $0.id }
+            }.navigationTitle("Kiểm thử tìm kiếm")
+        }.navigationViewStyle(.stack)
+    }
+}
+
 #endif

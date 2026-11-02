@@ -31,7 +31,16 @@ enum PlaybackSmokeTest {
     }
     static var liveMovie: Bool { ProcessInfo.processInfo.arguments.contains("--film4k-live-smoke") }
     static var liveSource2: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-live-smoke") }
-    static var resultName: String? { animeFixture ? "anime-provider" : liveAnime ? "anime-live" : liveMovie ? "film4k-live" : liveSource2 ? "phim4k-live" : liveVIP ? liveVIPResultName : gatewaySmoke ? "phim4k-gateway" : source2HLS ? "phim4k-hls" : movieSource?.rawValue }
+    static var resultName: String? {
+        if animeFixture { return "anime-provider" }
+        if liveAnime { return "anime-live" }
+        if liveMovie { return "film4k-live" }
+        if liveSource2 { return "phim4k-live" }
+        if liveVIP { return liveVIPResultName }
+        if gatewaySmoke { return "phim4k-gateway" }
+        if source2HLS { return "phim4k-hls" }
+        return movieSource?.rawValue
+    }
     @MainActor static var animeEpisodeCount = 0
     @MainActor static var selectedAnimeEpisodeNumber: Int?
     @MainActor static var cancelledAnimeLoadVerified = false

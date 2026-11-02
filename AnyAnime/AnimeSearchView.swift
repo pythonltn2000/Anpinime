@@ -51,19 +51,7 @@ struct AnimeSearchView: View {
             } else if request.query.isEmpty || results.isEmpty {
                 EmptyStateView(icon: "magnifyingglass", title: "Tìm \(service.contentName)", message: request.query.isEmpty ? "Nhập tên phim để tìm trong nguồn đang chọn" : ContentDisplayText.sourceLabels(message), actionTitle: nil, action: nil)
             } else {
-                List(results) { anime in
-                    Button { select(anime) } label: {
-                        SearchResultRow(anime: anime)
-                    }
-                    .buttonStyle(.plain)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .accessibilityLabel(resultAccessibilityLabel(anime))
-                    .accessibilityHint("Mở thông tin phim")
-                    .accessibilityIdentifier("search-result-" + anime.id)
-                }
-                .listStyle(.plain)
+                MovieSearchResultsList(items: results, accessibilityLabel: resultAccessibilityLabel, onSelect: select)
             }
         }
         .background {
@@ -135,6 +123,27 @@ struct AnimeSearchView: View {
             message = error.localizedDescription
             service.register(error)
         }
+    }
+}
+
+/// Shared by normal search and the deterministic UI hit-test preview.
+struct MovieSearchResultsList: View {
+    let items: [Anime]
+    var accessibilityLabel: (Anime) -> String = { $0.title }
+    let onSelect: (Anime) -> Void
+
+    var body: some View {
+        List(items) { anime in
+            Button { onSelect(anime) } label: { SearchResultRow(anime: anime) }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .accessibilityLabel(accessibilityLabel(anime))
+                .accessibilityHint("Mở thông tin phim")
+                .accessibilityIdentifier("search-result-" + anime.id)
+        }
+        .listStyle(.plain)
     }
 }
 
