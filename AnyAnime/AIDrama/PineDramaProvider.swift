@@ -83,9 +83,10 @@ actor PineDramaProvider: AIDramaProviding {
             throw AIDramaError.missingEpisode
         }
         let (data, response) = try await request("collection/video/v1/", parameters: [
-            "collection_id": episode.seriesID, "query_type": "video_id", "video_id": episode.id,
-            "count": "1", "direction": "1", "root_scene": "1", "query_scene": "mini_drama_container",
-            "is_trailer_paginated": "0", "need_collection_detail": "1"
+            "collection_id": episode.seriesID, "query_type": "seq_id", "current_seq_id": String(episode.number),
+            "count": "10", "direction": "1", "root_scene": "2", "query_scene": "mini_drama_container",
+            "enter_from": "series_discover", "is_trailer_paginated": "0", "need_collection_detail": "0",
+            "drama_request_type": "load_more", "iap_country_code": "", "request_source": ""
         ])
         return try Self.decodeVideo(data, contentType: response.value(forHTTPHeaderField: "Content-Type"), episode: episode,
                                     allowLoopbackHTTP: configuration.allowLoopbackHTTP, userAgent: configuration.userAgent)
@@ -189,7 +190,7 @@ actor PineDramaProvider: AIDramaProviding {
         guard !(try flag(row, "is_intro")) else { throw AIDramaError.missingEpisode }
         var seriesIDs: [String] = []
         if let collection = object["collection"] as? [String: Any], let id = identifier(collection["collection_id"]) { seriesIDs.append(id) }
-        if let paid = aweme["paid_content"] as? [String: Any] {
+        if let paid = (aweme["paid_content_info"] ?? aweme["paid_content"]) as? [String: Any] {
             if let id = identifier(paid["paid_collection_id"]) { seriesIDs.append(id) }
             if try flag(paid, "is_partial_preview") || flag(paid, "should_show_preview") || flag(paid, "is_paid_video_encrypted") {
                 throw AIDramaError.lockedEpisode

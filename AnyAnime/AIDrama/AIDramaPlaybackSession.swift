@@ -9,6 +9,9 @@ final class AIDramaPlaybackSession: ObservableObject {
     private let provider: AIDramaProviding
     @Published private(set) var selectedEpisodeID: String?
     @Published private(set) var controller: MPVPlaybackController?
+    // A direct stored reference remains readable during nonisolated deinit;
+    // the @Published controller accessor requires the main actor.
+    private var teardownPlayer: MPVPlaybackController?
     @Published private(set) var playback: PlaybackState?
     @Published private(set) var resolving = false
     @Published private(set) var error: String?
@@ -206,6 +209,7 @@ final class AIDramaPlaybackSession: ObservableObject {
         playback = state
         attached = false
         controller = player
+        teardownPlayer = player
         #if DEBUG
         playerCreations += 1
         if AIDramaDebugSupport.enabled { AIDramaDebugSupport.shared.installed(player) }
@@ -307,6 +311,7 @@ final class AIDramaPlaybackSession: ObservableObject {
         if AIDramaDebugSupport.enabled, let player = controller { AIDramaDebugSupport.shared.stopped(player) }
         #endif
         controller = nil
+        teardownPlayer = nil
         attached = false
     }
 
@@ -356,7 +361,7 @@ final class AIDramaPlaybackSession: ObservableObject {
 
     deinit {
         resolution?.cancel()
-        let player = controller
+        let player = teardownPlayer
         let idleTimer = previousIdleTimer
         let audioActive = ownsAudioSession
         Task { @MainActor in

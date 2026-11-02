@@ -149,13 +149,17 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/tiktok/md/collection/video/v1":
             series = query.get("collection_id", [""])[0]
             base = EPISODE_BASE if series == str(SERIES_ID) else EPISODE_BASE + 100
-            raw_id = query.get("video_id", [""])[0]
+            raw_sequence = query.get("current_seq_id", [""])[0]
             if (series not in (str(SERIES_ID), str(SERIES_ID + 1))
-                    or not raw_id.isdecimal() or not 1 <= int(raw_id) - base <= EPISODE_COUNT
-                    or query.get("query_type") != ["video_id"]):
+                    or not raw_sequence.isdecimal() or not 1 <= int(raw_sequence) <= EPISODE_COUNT
+                    or query.get("query_type") != ["seq_id"]
+                    or query.get("root_scene") != ["2"]
+                    or query.get("drama_request_type") != ["load_more"]
+                    or query.get("need_collection_detail") != ["0"]):
                 self.send_json({"status_code": 1}, 404)
                 return
-            number = int(raw_id) - base
+            number = int(raw_sequence)
+            raw_id = str(base + number)
             self.fixture.record("resolve_started", episode=number, episodeID=raw_id)
             if number == 2:
                 time.sleep(4)
