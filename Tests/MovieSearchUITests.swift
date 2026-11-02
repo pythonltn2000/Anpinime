@@ -3,6 +3,7 @@ import XCTest
 final class MovieSearchUITests: XCTestCase {
     func testEachPartOfAResultSelectsThatExactRow() throws {
         continueAfterFailure = false
+        executionTimeAllowance = 60
         let app = XCUIApplication()
         app.launchArguments = ["--ui-preview", "movie-search-hit"]
         app.launch()

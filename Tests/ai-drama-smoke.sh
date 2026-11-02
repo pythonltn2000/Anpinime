@@ -153,6 +153,7 @@ xcodebuild test -project AnyAnime.xcodeproj -scheme AnyAnime -configuration Debu
   -only-testing:AnyAnimeUI/MovieSearchUITests \
   -only-testing:AnyAnimeUI/AIDramaUITests/testCatalogPagingFiltersAndLibraryChoices \
   -only-testing:AnyAnimeUI/AIDramaUITests/testVerticalEpisodesPlaylistAndLifecycle -parallel-testing-enabled NO \
+  -test-timeouts-enabled YES -default-test-execution-time-allowance 240 -maximum-test-execution-time-allowance 240 \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 2>&1 | tee "$ANPINIME_ARTIFACTS/xcodebuild.log"
 ANPINIME_TEST_STATUS=${PIPESTATUS[0]}
 set -e

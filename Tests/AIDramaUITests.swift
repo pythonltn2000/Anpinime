@@ -35,6 +35,8 @@ final class AIDramaUITests: XCTestCase {
         if isLiveTest {
             executionTimeAllowance = 115
             liveDeadline = Date().addingTimeInterval(108)
+        } else {
+            executionTimeAllowance = 240
         }
         app.launchArguments = [isLiveTest ? "--ai-drama-live-smoke" : "--ai-drama-smoke"]
         app.launch()
