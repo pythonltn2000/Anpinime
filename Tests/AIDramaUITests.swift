@@ -732,6 +732,7 @@ final class AIDramaUITests: XCTestCase {
     private func eventTime(_ stats: [String: Any], _ event: String, episode: Int) -> Double? {
         (stats["events"] as? [[String: Any]] ?? []).first {
             $0["event"] as? String == event && $0["episode"] as? Int == episode
+                && $0["episodeID"] as? String == episodeID(episode)
         }?["elapsed"] as? Double
     }
 
