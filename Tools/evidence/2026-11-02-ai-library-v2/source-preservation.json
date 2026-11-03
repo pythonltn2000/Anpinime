@@ -1,0 +1,93 @@
+{
+  "baselineCommit": "a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a",
+  "sourceRawCasesUnchanged": [
+    "anime",
+    "film4k",
+    "phim4k",
+    "kkphim"
+  ],
+  "remainingModelsAfterDisplayPropertiesByteIdentical": true,
+  "unchangedTransportAndParsingFiles": [
+    {
+      "path": "AnyAnime/AnimeService.swift",
+      "sha256": "6e480dc47feccd515ccf05a21ef249e58d689e60629ebdc42ba0f2163837ad8e",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/MovieProvider.swift",
+      "sha256": "40a9ca83ecb7fdbc9ee8d6871de9963a29c4dfe221000c093f34eea43d7f8d93",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/MovieCatalog.swift",
+      "sha256": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/MovieBrowseCatalog.swift",
+      "sha256": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/FilmMediaRelay.swift",
+      "sha256": "e7f645c93d195a5057b7b05eaa38bdea96fac5867e317620cdb684ce1f3bbbaa",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/FilmMediaTransform.swift",
+      "sha256": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/MPVPlaybackController.swift",
+      "sha256": "7455a2124e7b26b398e323b1409ff54aafb2c31071d4bc66a9793970910fc243",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/PlayerView.swift",
+      "sha256": "0f066d4962cf1eefe8b8b124d0f8a98ef9cebb5f283c0d6840acdcec441d6463",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/HTMLParser.swift",
+      "sha256": "d8d4a7512bb0737b4954b53f58a2768728c146580786ee7baa952bd2da18a6bb",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/DomainResolver.swift",
+      "sha256": "10abe7b61cab6be7e53c94ba1f76c8d8f15e502c367748562da24885aa56c008",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/SearchHistory.swift",
+      "sha256": "3569ae2dc1b920146608b37fbe4b1ad7c241c9f913516c3ed35b3700e63429e2",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/AnimeSiteConfiguration.swift",
+      "sha256": "96250b06e075448e1defa4b207654c7480fdcb4d0b2b19ce5905e1c3c483fd48",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/Phim4KVIPResolver.swift",
+      "sha256": "b2ace2cd0b60a52e4cfe29ca87d7c2964fdb4f9f5718c8393765f99be7693f55",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/Phim4KTransportPolicy.swift",
+      "sha256": "cbcad85fde5a91044d6bb772208e96a4f93052d2ba097ac66405f4ad4c8002c8",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/Phim4KMediaProbe.swift",
+      "sha256": "3b9a6674501c0a6ba1e88a8071f3d08f62e9f7ac6b1278a1f7eaa28e742750b8",
+      "identicalToBaseline": true
+    }
+  ],
+  "intentionalChanges": [
+    "ContentSource display titles and presentation-only branding",
+    "Root library navigation and movie search hit regions",
+    "Source2 provider directory freshness and bounded prefix validation",
+    "DEBUG startup measurements"
+  ]
+}

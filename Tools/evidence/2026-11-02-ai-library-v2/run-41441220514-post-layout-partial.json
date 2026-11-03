@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "run": 41441220514,
+  "commit": "71b662ba0289ca044e01fc6a94f10bcef5f7b1ce",
+  "workflowURL": "https://github.com/thuyan1510/AnPinime/actions/runs/41441220514",
+  "artifactID": 13140217431,
+  "artifactName": "AnPinime_AI_Drama_Verification",
+  "overallVerification": "INCOMPLETE — catalog refresh precondition failed, and the first fresh live sample reported an incomplete episode panel.",
+  "resultSource": "Actual XCTest case logs, native fixture events, accessibility trees and inspected screenshots; adjusted workflow step statuses are not playback proof.",
+  "tests": [
+    {
+      "name": "AIDramaUITests.testCatalogPagingFiltersAndLibraryChoices",
+      "result": "FAIL",
+      "durationSeconds": 51.664
+    },
+    {
+      "name": "AIDramaUITests.testVerticalEpisodesPlaylistAndLifecycle",
+      "result": "PASS",
+      "durationSeconds": 55.004
+    },
+    {
+      "name": "MovieSearchUITests.testEachPartOfAResultSelectsThatExactRow",
+      "result": "PASS",
+      "durationSeconds": 11.788
+    },
+    {
+      "name": "AIDramaUITests.testLivePineDramaPlaylistAndVideo",
+      "result": "FAIL",
+      "durationSeconds": 10.308
+    }
+  ],
+  "layoutBeforeAfter": {
+    "beforeRun": 41439133944,
+    "beforeEvidence": "run-41439133944-layout-hang.json",
+    "before": "Second New scroll caused a main-thread SwiftUI lazy-stack placement CPU loop and a240secondcase timeout.",
+    "change": "One LazyVGrid with Section header/cards/footer replaced the nested vertical LazyVStack/LazyVGrid.",
+    "after": "The same New scroll region completed, native cursor page2 appended, and the UI remained responsive through the later ranking action.",
+    "newPage2RequestStartedSeconds": 208.111,
+    "newPage2ResponseFinishedSeconds": 208.192,
+    "appendedSeriesID": "7000000000000003013",
+    "appendedCardLabel": "New Fixture13",
+    "screenshotShowsPage1TailAndPage2Cards13Through16": true,
+    "pagingWasScrollDriven": true,
+    "sameHangReproduced": false,
+    "claimLimit": "This run verifies the previously failing interaction; complete catalog validation still failed later."
+  },
+  "catalogFailure": {
+    "message": "Refreshing starts a delayed hot ranking request",
+    "interaction": "Slow native pull from rankingScroll(0.5,0.30) to(0.5,0.85),250pixels/second and0.3secondhold.",
+    "observed": "The responsive ranking remained at top with Hot selected. No refresh request reached the fixture before the next test launch.",
+    "rankingStaleWindowVerified": false,
+    "combinedFiltersReached": false,
+    "librarySwitchesReached": false
+  },
+  "proved": {
+    "fixtureLifecycleAndHistory": "PASS — exact1/3/40 decoded, delayed2 cancellation, full40episodeplaylist, pause/background preservation, ownedplayer release and paused40 historyresume assertions passed.",
+    "movieSearchHitRegions": "PASS — four alternating row/region taps selected their exact stableIDs."
+  },
+  "liveFailure": {
+    "seriesID": "7696940578596328500",
+    "catalogTitle": "Thu Phục Giám Đốc Nữ Trại Tù",
+    "catalogEpisodeCount": 45,
+    "stage": "The independent native panel oracle rejected its catalog count/contiguous-sequence completeness check before playback.",
+    "playbackAttempted": false,
+    "laterBoundedPublicPanelProbe": {
+      "dateUTC": "2026-11-02",
+      "relationshipToCI": "A single later follow-up request, not the original CI response. Raw payload and media URLs were not retained.",
+      "httpStatus": 200,
+      "serviceStatus": 0,
+      "realEpisodeCount": 41,
+      "introRows": 0,
+      "minimumSequence": 1,
+      "maximumSequence": 41,
+      "sequencesContiguousFromOne": true,
+      "sequenceEqualsNumber": true,
+      "missingSequencesThroughCatalogCount": [
+        42,
+        43,
+        44,
+        45
+      ]
+    },
+    "strictCompletenessCheckPreserved": true
+  },
+  "evidenceMembers": [
+    {
+      "path": "ai-drama-20261102T120111Z-1750/attachments/0A5BAAEA-2324-4195-B9D7-E851AC3F77FD.png",
+      "sha256": "428ec7ee59b7518dd1a5a091e0b40e63f9c678ab0b96610ed53cd2564b018197"
+    },
+    {
+      "path": "ai-drama-20261102T120111Z-1750/attachments/EF160774-7C31-4B73-9B5B-26310C67A1D7.png",
+      "sha256": "62e87590b4c0f11df73e6b3a842c88c7c572ca52f802423865d0f50b52e622a9"
+    },
+    {
+      "path": "ai-drama-20261102T120111Z-1750/attachments/9886E164-D8E8-4585-9D0F-9297ACDC61E7.txt",
+      "sha256": "7e4d65b3d34281d90267329e762386c11a1e132a227cf79b5bbcd9dbb9e16ae8"
+    },
+    {
+      "path": "ai-drama-live-20261102T120639Z-19125/attachments/B68E4029-C166-4B41-9934-28BA907ED354.txt",
+      "sha256": "d178645e05e80052f6a1d28c9d70aba9598a4326abdda5aee6d087f514476ec3"
+    }
+  ],
+  "retrieval": {
+    "archiveSizeBytes": 182531233,
+    "textAndJSONBytesTransferred": 616979,
+    "selectedPNGBytesTransferred": 1078215,
+    "method": "Connected GitHub artifact file reference and bounded HTTP byte ranges"
+  }
+}

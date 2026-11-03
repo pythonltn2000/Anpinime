@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "run": 41437549754,
+  "commit": "5b3f30c919dd8988db37a90369a0474ce42b78c3",
+  "workflowURL": "https://github.com/thuyan1510/AnPinime/actions/runs/41437549754",
+  "artifactID": 13137517846,
+  "artifactName": "AnPinime_AI_Drama_Verification",
+  "overallVerification": "INCOMPLETE — the full catalog case failed before ranking/filter/library validation completed.",
+  "resultSource": "Actual XCTest case logs, fixture events, single independent native panel oracle, decoded episode states and selected inspected screenshots; continue-on-error workflow status is not playback proof.",
+  "tests": [
+    {
+      "name": "AIDramaUITests.testCatalogPagingFiltersAndLibraryChoices",
+      "result": "FAIL",
+      "durationSeconds": 45.031
+    },
+    {
+      "name": "AIDramaUITests.testVerticalEpisodesPlaylistAndLifecycle",
+      "result": "PASS",
+      "durationSeconds": 55.287
+    },
+    {
+      "name": "MovieSearchUITests.testEachPartOfAResultSelectsThatExactRow",
+      "result": "PASS",
+      "durationSeconds": 11.393
+    },
+    {
+      "name": "AIDramaUITests.testLivePineDramaPlaylistAndVideo",
+      "result": "PASS",
+      "durationSeconds": 57.057
+    }
+  ],
+  "proved": {
+    "newWorksNativeCursorPaging": {
+      "result": "PASS before the later catalog failure",
+      "firstPageRequests": 1,
+      "secondPageRequests": 1,
+      "appendedSeriesID": "7000000000000003013",
+      "appendedLabel": "New Fixture 13",
+      "refreshWasNotUsedForPaging": true
+    },
+    "fixturePlaylistPlayerAndHistory": {
+      "result": "PASS",
+      "episodeCount": 40,
+      "decodedPortraitDimensions": "360 × 640",
+      "manualPauseSurvivedBackground": true,
+      "ownedPlayersAfterCloseVerified": 0,
+      "historyResumedExactPausedEpisodeNumber": 40,
+      "mediaRequestEpisodeSequence": [
+        1,
+        3,
+        40,
+        40,
+        40
+      ]
+    },
+    "movieSearchHitRegions": {
+      "result": "PASS",
+      "alternatingRowTaps": 4,
+      "normalizedHorizontalTapPositions": [
+        0.1,
+        0.48,
+        0.96,
+        0.8
+      ]
+    },
+    "livePlayback": {
+      "result": "PASS",
+      "oracle": {
+        "catalogLabel": "Võ Sĩ Cấp SSS Ra Tù, Toàn Cầu Báo Động, 39,546,078 lượt xem, 105 tập",
+        "episodeCount": 105,
+        "oracleRequestCount": 1,
+        "panelEpisodeCount": 105,
+        "selectionPolicy": "First actual fresh catalog card, fixed before the single panel request",
+        "seriesID": "7688489302510228498",
+        "targets": [
+          {
+            "id": "7688489490830183687",
+            "number": 1
+          },
+          {
+            "id": "7688489513844215048",
+            "number": 2
+          },
+          {
+            "id": "7688489628675951890",
+            "number": 105
+          }
+        ]
+      },
+      "decodedEpisodes": [
+        {
+          "episodeNumber": 1,
+          "selectedEpisodeID": "7688489490830183687",
+          "currentTimeSeconds": 3.7333333333333334,
+          "decodedMediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "maximumOwnedPlayers": 1,
+          "playerCreations": 1,
+          "resolving": false,
+          "manuallyPaused": false,
+          "artifactStateFilename": "6B5196F6-598B-41FD-BD73-07C4224D6B7A.txt"
+        },
+        {
+          "episodeNumber": 2,
+          "selectedEpisodeID": "7688489513844215048",
+          "currentTimeSeconds": 2.8,
+          "decodedMediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 962 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "maximumOwnedPlayers": 1,
+          "playerCreations": 2,
+          "resolving": false,
+          "manuallyPaused": false,
+          "artifactStateFilename": "6F8746F2-2532-4B6C-8D58-64262A20A213.txt"
+        },
+        {
+          "episodeNumber": 105,
+          "selectedEpisodeID": "7688489628675951890",
+          "currentTimeSeconds": 3.966666666666667,
+          "decodedMediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "maximumOwnedPlayers": 1,
+          "playerCreations": 3,
+          "resolving": false,
+          "manuallyPaused": false,
+          "artifactStateFilename": "7F93099C-71C1-43D5-B83D-0F92F4FA6F29.txt"
+        }
+      ]
+    }
+  },
+  "notYetProved": [
+    "Switching rankings during the delayed refresh response",
+    "All four category filters and category cursor paging",
+    "Three-library switching and preserved movie source selection"
+  ],
+  "catalogFailure": {
+    "message": "Refreshing starts a delayed hot ranking request",
+    "diagnosis": "The quick XCTest swipeDown left the responsive ranking screen at its top without issuing another hot request. New cursor paging had already passed. The subsequent patch uses a deliberate slow pull while retaining every socket/stale-result assertion.",
+    "sameGridHangReproduced": false
+  },
+  "evidenceMembers": [
+    {
+      "path": "ai-drama-20261102T113223Z-3556/attachments/03E9DE89-C435-4F42-B320-21EA4DBB3774.png",
+      "sha256": "9f88156a18ccd1634707ced4ec8add12f83e96ec7153754942d60d195a22193b"
+    },
+    {
+      "path": "ai-drama-20261102T113223Z-3556/attachments/20417DAF-8CCD-4914-AD3D-60AAA1732AAD.png",
+      "sha256": "3acbf97c338e97d124ef3db6dbaaa75a2095447ba475d9dd5464539d0e742f6c"
+    },
+    {
+      "path": "ai-drama-20261102T113223Z-3556/attachments/30E386FA-D524-4CEE-A63C-F37FB11207FE.png",
+      "sha256": "6c856e2e4bd4b4d1da79c60cbaef083b44e0bbe0659d779a7cbc09228e3b52cb"
+    },
+    {
+      "path": "ai-drama-live-20261102T113742Z-21469/attachments/CE1A2784-D680-43AF-A70F-63C6201822DF.png",
+      "sha256": "87f33ef74ee36afa8c8aff58ca0c90cd15c7701f07e58cd18a33b2582dffae4a"
+    }
+  ],
+  "retrieval": {
+    "archiveSizeBytes": 187996619,
+    "textAndJSONBytesTransferred": 602941,
+    "selectedPNGBytesTransferred": 5014262,
+    "method": "Connected GitHub artifact file reference with bounded HTTP byte ranges"
+  }
+}

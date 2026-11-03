@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "run": 41434497808,
+  "commit": "19e0354a85b7a91f534659739f96adb67150e49d",
+  "workflowURL": "https://github.com/thuyan1510/AnPinime/actions/runs/41434497808",
+  "artifactID": 13136416765,
+  "artifactName": "AnPinime_AI_Drama_Verification",
+  "resultSource": "Actual XCTest case outcomes, fixture event counts, accessibility trees and inspected screenshots; adjusted continue-on-error workflow status is not used as playback proof.",
+  "tests": [
+    {
+      "name": "AIDramaUITests.testCatalogPagingFiltersAndLibraryChoices",
+      "result": "FAIL",
+      "durationSeconds": 26.603
+    },
+    {
+      "name": "AIDramaUITests.testVerticalEpisodesPlaylistAndLifecycle",
+      "result": "FAIL",
+      "durationSeconds": 23.811
+    },
+    {
+      "name": "MovieSearchUITests.testEachPartOfAResultSelectsThatExactRow",
+      "result": "PASS",
+      "durationSeconds": 12.426
+    },
+    {
+      "name": "AIDramaUITests.testLivePineDramaPlaylistAndVideo",
+      "result": "FAIL",
+      "durationSeconds": 23.248
+    }
+  ],
+  "fixtureObservations": {
+    "catalogResponsesCompleted": {
+      "home": 2,
+      "hot": 2,
+      "new": 2
+    },
+    "playlistRequests": 0,
+    "mediaRequests": 0,
+    "invalidCatalogRequests": 0
+  },
+  "diagnosis": {
+    "failedStage": "The AI tests query app.buttons for the first catalog card before opening any playlist.",
+    "renderedCatalogVerified": true,
+    "fixtureFirstSeriesID": "7000000000000000001",
+    "liveFirstSeriesID": "7689292154279662613",
+    "liveEpisodeCount": 102,
+    "accessibilityFinding": "In both fixture and live trees, the stable aidrama.series.<seriesID> identifier and combined catalog label belong to an Other group. Its child is a real Button without that identifier, so app.buttons[identifier] finds no card despite visible catalog content.",
+    "affectedComponents": [
+      "AIDramaSeriesButton",
+      "AIDramaHeroCarousel",
+      "AIDramaRankedRow"
+    ],
+    "nextFixToVerify": "Keep stable labels/hints/identifiers on the real buttons and avoid creating an outer accessibility element around each button.",
+    "aiPlaybackAttempted": false,
+    "catalogPagingAndFiltersReached": false,
+    "librarySwitchingReached": false,
+    "historyResumeReached": false
+  },
+  "evidenceMembers": [
+    {
+      "path": "ai-drama-20261102T110955Z-1985/attachments/6015B8E2-9B8F-4955-8E47-588D4C0D723C.txt",
+      "sha256": "9fda46f4f49e991db8946780a719dab4b2096550960cac5063deca2a0ff0cb09"
+    },
+    {
+      "path": "ai-drama-20261102T110955Z-1985/attachments/EC933739-2E5A-4CDE-8197-45B910EADCF4.txt",
+      "sha256": "a0790871ba56fa7a53e6bb50762155c85b31ae659926aa4db4b91824a2b04a45"
+    },
+    {
+      "path": "ai-drama-live-20261102T111415Z-14913/attachments/E4044175-38EC-4541-A62C-41D3B13A6699.txt",
+      "sha256": "38a4b3140335ce8f2cd3f969b72ff0b9a7becf749718b1dc2b7d456249b4d94a"
+    },
+    {
+      "path": "ai-drama-20261102T110955Z-1985/attachments/7F5E4001-3DB3-4C65-A93D-D703F59BC3D3.png",
+      "sha256": "ceb9a1fdc93d9245cead5315dfb1951d2f6cd04be44450d3ccd79636e061656d"
+    },
+    {
+      "path": "ai-drama-live-20261102T111415Z-14913/attachments/A86BEFDC-0515-4C1C-B02F-43B473381079.png",
+      "sha256": "c795c31d5a08943428d230bad168df548569ba676b29ab98f4aa3ff55e990024"
+    },
+    {
+      "path": "ai-drama-20261102T110955Z-1985/attachments/EB676167-5774-4C19-883C-4AC325C68CE2.png",
+      "sha256": "0c9ed3664fa9590432a5c438a9ec00c2b858e7159409435b7c1cc49fa4fde24b"
+    }
+  ],
+  "retrieval": {
+    "archiveSizeBytes": 158885764,
+    "textAndJSONBytesTransferred": 624297,
+    "selectedPNGBytesTransferred": 4262985,
+    "method": "Connected GitHub artifact file reference and bounded HTTP byte ranges"
+  }
+}

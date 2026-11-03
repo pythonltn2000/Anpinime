@@ -1,0 +1,18 @@
+{
+  "version": "2.6.0",
+  "build": "16",
+  "bundleID": "com.xemphim.aipinime",
+  "unsigned": true,
+  "appCommit": "c52bf8b026c868cc1ec18c1c6bb838dbb9b4a9f4",
+  "appSourceTree": "33b8b1448ede4c55277fc2f57e058c2bc66511a4",
+  "buildRunID": 41435774478,
+  "buildJobID": 125245062138,
+  "buildJobResult": "success",
+  "artifactID": 13136054548,
+  "expiresAt": "2026-11-16T11:27:58Z",
+  "ipaBytes": 30388899,
+  "ipaSHA256": "6e43307358aca8a5af65e70e4a518f0db67acaeb15ae049bc70c05603b9b9f8a",
+  "appSourceIdenticalThroughCommit": "79ab6d00f18228d79e66460afa89522704b9817d",
+  "verification": "Superseded by pending lazy-grid layout repair; do not use as final delivery artifact.",
+  "deliveryCandidate": false
+}

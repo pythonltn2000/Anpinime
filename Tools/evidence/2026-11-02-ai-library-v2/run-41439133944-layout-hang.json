@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "run": 41439133944,
+  "commit": "79ab6d00f18228d79e66460afa89522704b9817d",
+  "workflowURL": "https://github.com/thuyan1510/AnPinime/actions/runs/41439133944",
+  "artifactID": 13140895090,
+  "artifactName": "AnPinime_AI_Drama_Verification",
+  "overallVerification": "INCOMPLETE — catalog scroll case timed out before ranking/filter/library validation.",
+  "resultSource": "Actual XCTest logs, fixture events, timeout-triggered process spindump, independent native panel oracle and decoded player-state attachments. Adjusted workflow statuses are not used as playback proof.",
+  "tests": [
+    {
+      "name": "AIDramaUITests.testCatalogPagingFiltersAndLibraryChoices",
+      "result": "TIMEOUT",
+      "executionTimeAllowanceSeconds": 240
+    },
+    {
+      "name": "AIDramaUITests.testVerticalEpisodesPlaylistAndLifecycle",
+      "result": "PASS",
+      "durationSeconds": 72.247
+    },
+    {
+      "name": "MovieSearchUITests.testEachPartOfAResultSelectsThatExactRow",
+      "result": "PASS",
+      "durationSeconds": 14.43
+    },
+    {
+      "name": "AIDramaUITests.testLivePineDramaPlaylistAndVideo",
+      "result": "PASS",
+      "durationSeconds": 52.767
+    }
+  ],
+  "catalogHang": {
+    "lastSuccessfulInteraction": "Home card found and New tab opened; first native scroll completed.",
+    "blockingInteraction": "Second upward swipe in aidrama.new.results at test time19.24s; app did not idle after19.84s.",
+    "nativePage2Requests": 0,
+    "rankingPullReached": false,
+    "combinedFiltersReached": false,
+    "librarySwitchesReached": false
+  },
+  "stackEvidence": {
+    "capture": "XCTest Diagnostics requested by testmanagerd at execution timeout",
+    "captureStartUTC": "2026-11-02T11:52:19.349Z",
+    "captureEndUTC": "2026-11-02T11:52:24.356Z",
+    "hostOS": "macOS26.6.2 build25G83",
+    "process": "anpinime",
+    "applicationVersion": "2.6.0 (16)",
+    "architecture": "arm64",
+    "sampleCount": 497,
+    "mainThreadSamples": 497,
+    "mainThreadCPUSeconds": 5.0,
+    "durationSeconds": 5.0,
+    "mainThreadState": "Active CPU in SwiftUI layout/render placement rather than waiting for network or an XCTest reply.",
+    "observedSymbols": [
+      "_UIHostingView.layoutSubviews()",
+      "ViewGraphRootValueUpdater.render(interval:updateDisplayList:targetTimestamp:)",
+      "ViewGraph.updateOutputs(at:)",
+      "GraphHost.runTransaction(_:do:id:)",
+      "AG::Subgraph::update(unsigned int)",
+      "AG::Graph::UpdateStack::update()",
+      "LazySubviewPlacements.updateValue()",
+      "LazySubviewPlacements.placeSubviews(placementContext:in:nearestVisibleRect:containingVisibleRect:)",
+      "LazyStack<>.place(subviews:context:cache:in:)",
+      "StackPlacement<LazyVStackLayout>",
+      "LazyLayout.sizeThatFits(proposedSize:subviews:context:cache:) in conformance LazyVStackLayout"
+    ],
+    "interpretation": "The sampled main thread is spinning through SwiftUI lazy stack placement and AttributeGraph updates. This supports removing the nested vertical lazy containers; the proposed structural change still requires the same UI interaction to pass.",
+    "exactNestedContainerCauseProved": false,
+    "artifactMember": "ai-drama-20261102T114452Z-2088/attachments/9B5064AF-6AD4-4988-B2F3-83EB7D2132F1.txt",
+    "sha256": "d679a3f8b89ee1a4a5eebffe5a0578b32a8b1df8e96396870fc3949ac05c191b"
+  },
+  "proved": {
+    "fixtureLifecycleAndHistory": "PASS — delayed episode2 cancellation, decoded1/3/40, full40episode playlist, pause/background, releasedplayer and exactpaused40 historyresume assertions passed.",
+    "movieSearchHitRegions": "PASS — four alternating row/region taps selected their own stable IDs.",
+    "livePlayback": {
+      "result": "PASS",
+      "oracle": {
+        "catalogLabel": "Võ Sĩ Cấp SSS Ra Tù, Toàn Cầu Báo Động, 39,553,421 lượt xem, 105 tập",
+        "episodeCount": 105,
+        "oracleRequestCount": 1,
+        "panelEpisodeCount": 105,
+        "selectionPolicy": "First actual fresh catalog card, fixed before the single panel request",
+        "seriesID": "7688489302510228498",
+        "targets": [
+          {
+            "id": "7688489490830183687",
+            "number": 1
+          },
+          {
+            "id": "7688489513844215048",
+            "number": 2
+          },
+          {
+            "id": "7688489628675951890",
+            "number": 105
+          }
+        ]
+      },
+      "decodedEpisodes": [
+        {
+          "episodeNumber": 1,
+          "selectedEpisodeID": "7688489490830183687",
+          "currentTimeSeconds": 4.366666666666666,
+          "decodedMediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "maximumOwnedPlayers": 1,
+          "playerCreations": 1,
+          "resolving": false,
+          "manuallyPaused": false,
+          "artifactStateFilename": "859C6C8D-92E9-4305-BB4E-1AC2A3CB7605.txt"
+        },
+        {
+          "episodeNumber": 2,
+          "selectedEpisodeID": "7688489513844215048",
+          "currentTimeSeconds": 2.8,
+          "decodedMediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 962 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "maximumOwnedPlayers": 1,
+          "playerCreations": 2,
+          "resolving": false,
+          "manuallyPaused": false,
+          "artifactStateFilename": "ADA161EC-A42C-4D02-ABDC-23D3344E209E.txt"
+        },
+        {
+          "episodeNumber": 105,
+          "selectedEpisodeID": "7688489628675951890",
+          "currentTimeSeconds": 3.0666666666666664,
+          "decodedMediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "maximumOwnedPlayers": 1,
+          "playerCreations": 3,
+          "resolving": false,
+          "manuallyPaused": false,
+          "artifactStateFilename": "0053D6E0-6FCA-48E5-BF82-68BE59EB2BF4.txt"
+        }
+      ]
+    }
+  },
+  "pending": [
+    "New scrolling and native cursor continuation on the proposed single-layout implementation",
+    "Ranking refresh and in-flight stale response isolation",
+    "Four combined category filters and category cursor paging",
+    "Three-library switching and movie source preservation"
+  ],
+  "retrieval": {
+    "archiveSizeBytes": 176251631,
+    "textAndJSONBytesTransferred": 1124138,
+    "method": "Connected GitHub artifact file reference with bounded HTTP byte ranges"
+  }
+}

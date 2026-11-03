@@ -1,0 +1,340 @@
+{
+  "reproducingRunID": 41369085229,
+  "reproducingCommit": "f27cc5d5e34c5ccc95cc8f586aae714b5d980f15",
+  "bothTestsFailedOnDismissal": true,
+  "rootCause": "Synchronous @Published session mutation from UIViewControllerRepresentable dismantle re-enters SwiftUI GraphHost while its graph is invalidating; Swift dynamic exclusivity abort.",
+  "fixedCommit": "362a7483ca523f3623eb620d647f239086f0a366",
+  "fix": "Pager dismantle only clears delegates. Close/onDisappear own observable session cleanup; deinit remains fallback.",
+  "reports": [
+    {
+      "test": "fixture",
+      "reportSHA256": "7d92dd14550ca9661cfd181a5fd8b29c99ebae1d2b11aa8f23e2acc47044fa4b",
+      "exception": "EXC_CRASH",
+      "signal": "SIGABRT",
+      "triggeredQueue": "com.apple.main-thread",
+      "frames": [
+        {
+          "image": "libsystem_kernel.dylib",
+          "symbol": "__pthread_kill",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libsystem_pthread.dylib",
+          "symbol": "pthread_kill",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libsystem_c.dylib",
+          "symbol": "abort",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libswiftCore.dylib",
+          "symbol": "swift::fatalErrorv(unsigned int, char const*, char*)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libswiftCore.dylib",
+          "symbol": "swift::fatalError(unsigned int, char const*, ...)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libswiftCore.dylib",
+          "symbol": "swift::runtime::AccessSet::insert(swift::runtime::Access*, void*, void*, swift::ExclusivityFlags)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libswiftCore.dylib",
+          "symbol": "swift_beginAccess",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "specialized GraphHost.asyncTransaction<A>(_:id:mutation:style:mayDeferUpdate:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "AttributeInvalidatingSubscriber.invalidateAttribute()",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "specialized AttributeInvalidatingSubscriber.receive(_:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "protocol witness for Subscriber.receive(_:) in conformance AttributeInvalidatingSubscriber<A>",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "SubscriptionLifetime.Connection.receive(_:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "ObservableObjectPublisher.Inner.send()",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "ObservableObjectPublisher.send()",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "PublishedSubject.send(_:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "closure #1 in static Published.subscript.setter",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "specialized static Published.withMutation<A>(of:keyPath:storage:apply:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "specialized static Published.subscript.setter",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "static Published.subscript.setter",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "anpinime.debug.dylib",
+          "symbol": "AIDramaPlaybackSession.transitioning.setter",
+          "sourceFile": "AIDramaPlaybackSession.swift",
+          "sourceLine": null
+        },
+        {
+          "image": "anpinime.debug.dylib",
+          "symbol": "AIDramaPlaybackSession.setPresented(_:sceneActive:)",
+          "sourceFile": "AIDramaPlaybackSession.swift",
+          "sourceLine": 64
+        },
+        {
+          "image": "anpinime.debug.dylib",
+          "symbol": "static AIDramaVerticalPager.dismantleUIViewController(_:coordinator:)",
+          "sourceFile": "AIDramaPlayerView.swift",
+          "sourceLine": 362
+        },
+        {
+          "image": "anpinime.debug.dylib",
+          "symbol": "protocol witness for static UIViewControllerRepresentable.dismantleUIViewController(_:coordinator:) in conformance AIDramaVerticalPager",
+          "sourceFile": "/<compiler-generated>",
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUI",
+          "symbol": "<deduplicated_symbol>",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "PlatformViewChild.destroy()",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "protocol witness for static _AttributeBody._destroySelf(_:) in conformance PlatformViewChild<A>",
+          "sourceFile": null,
+          "sourceLine": null
+        }
+      ]
+    },
+    {
+      "test": "live",
+      "reportSHA256": "d7017f565275d9c48ff224d77fc44a560cb81dffac0e6efe4e34fd8ca89c5faa",
+      "exception": "EXC_CRASH",
+      "signal": "SIGABRT",
+      "triggeredQueue": "com.apple.main-thread",
+      "frames": [
+        {
+          "image": "libsystem_kernel.dylib",
+          "symbol": "__pthread_kill",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libsystem_pthread.dylib",
+          "symbol": "pthread_kill",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libsystem_c.dylib",
+          "symbol": "abort",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libswiftCore.dylib",
+          "symbol": "swift::fatalErrorv(unsigned int, char const*, char*)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libswiftCore.dylib",
+          "symbol": "swift::fatalError(unsigned int, char const*, ...)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libswiftCore.dylib",
+          "symbol": "swift::runtime::AccessSet::insert(swift::runtime::Access*, void*, void*, swift::ExclusivityFlags)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "libswiftCore.dylib",
+          "symbol": "swift_beginAccess",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "specialized GraphHost.asyncTransaction<A>(_:id:mutation:style:mayDeferUpdate:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "AttributeInvalidatingSubscriber.invalidateAttribute()",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "specialized AttributeInvalidatingSubscriber.receive(_:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "protocol witness for Subscriber.receive(_:) in conformance AttributeInvalidatingSubscriber<A>",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "SubscriptionLifetime.Connection.receive(_:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "ObservableObjectPublisher.Inner.send()",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "ObservableObjectPublisher.send()",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "PublishedSubject.send(_:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "closure #1 in static Published.subscript.setter",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "specialized static Published.withMutation<A>(of:keyPath:storage:apply:)",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "specialized static Published.subscript.setter",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "Combine",
+          "symbol": "static Published.subscript.setter",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "anpinime.debug.dylib",
+          "symbol": "AIDramaPlaybackSession.transitioning.setter",
+          "sourceFile": "AIDramaPlaybackSession.swift",
+          "sourceLine": null
+        },
+        {
+          "image": "anpinime.debug.dylib",
+          "symbol": "AIDramaPlaybackSession.setPresented(_:sceneActive:)",
+          "sourceFile": "AIDramaPlaybackSession.swift",
+          "sourceLine": 64
+        },
+        {
+          "image": "anpinime.debug.dylib",
+          "symbol": "static AIDramaVerticalPager.dismantleUIViewController(_:coordinator:)",
+          "sourceFile": "AIDramaPlayerView.swift",
+          "sourceLine": 362
+        },
+        {
+          "image": "anpinime.debug.dylib",
+          "symbol": "protocol witness for static UIViewControllerRepresentable.dismantleUIViewController(_:coordinator:) in conformance AIDramaVerticalPager",
+          "sourceFile": "/<compiler-generated>",
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUI",
+          "symbol": "<deduplicated_symbol>",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "PlatformViewChild.destroy()",
+          "sourceFile": null,
+          "sourceLine": null
+        },
+        {
+          "image": "SwiftUICore",
+          "symbol": "protocol witness for static _AttributeBody._destroySelf(_:) in conformance PlatformViewChild<A>",
+          "sourceFile": null,
+          "sourceLine": null
+        }
+      ]
+    }
+  ]
+}

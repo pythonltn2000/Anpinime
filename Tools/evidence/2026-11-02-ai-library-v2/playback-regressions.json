@@ -1,0 +1,78 @@
+{
+  "runID": 41435774478,
+  "appCommit": "c52bf8b026c868cc1ec18c1c6bb838dbb9b4a9f4",
+  "requiredChecks": {
+    "playback-mpv": {
+      "sha256": "59866dfeba409b041f72a3784469bf3057540ed43d61ac889380392e40917a61",
+      "observations": {
+        "time": 4.833,
+        "audioChoices": 2,
+        "subtitleChoices": 3,
+        "autoplayVerified": true,
+        "mkvAudioAndDualSubtitlesVerified": true
+      }
+    },
+    "playback-phim4k-hls": {
+      "sha256": "0e71695933fd14e2584f9d6e2a9ca86897bfc1c2cc093eb6bea3f23dcc8e18a9",
+      "observations": {
+        "time": 3.648,
+        "mediaInfo": "hls \u00b7 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 \u00b7 640 \u00d7 360 \u00b7 AAC (Advanced Audio Coding)",
+        "videoWidth": 640,
+        "videoHeight": 360,
+        "audioChoices": 1,
+        "subtitleChoices": 1,
+        "firstDecodedVideoElapsedSeconds": 0.6223356666666859,
+        "fileLoadedElapsedSeconds": 0.5640661666666915,
+        "advancingVideoVerified": true
+      }
+    },
+    "playback-anime-provider": {
+      "sha256": "fcd9247ced2e762c8c2ecbd20a8c4651be2dc7b9159ea0e2f6a1ae2ce2bd0ded",
+      "observations": {
+        "time": 3.6666666666666665,
+        "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 \u00b7 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 \u00b7 320 \u00d7 180 \u00b7 AAC (Advanced Audio Coding)",
+        "videoWidth": 320,
+        "videoHeight": 180,
+        "audioChoices": 1,
+        "subtitleChoices": 1,
+        "advancingVideoVerified": true,
+        "cancelledEpisodeLoadVerified": true,
+        "episodeCount": 2,
+        "selectedEpisodeNumber": 1
+      }
+    },
+    "playback-phim4k-gateway": {
+      "sha256": "ed145428f04f339d498cc98865443ede3cf15a2ea2df7144c0c1923abb756c5e",
+      "observations": {
+        "time": 16.474999999999998,
+        "mediaInfo": "mkv \u00b7 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 \u00b7 1920 \u00d7 1080 \u00b7 ATSC A/52A (AC-3)",
+        "videoWidth": 1920,
+        "videoHeight": 1080,
+        "audioChoices": 2,
+        "subtitleChoices": 3,
+        "firstDecodedVideoElapsedSeconds": 2.6031024999999772,
+        "fileLoadedElapsedSeconds": 2.6031024999999772,
+        "advancingVideoVerified": true,
+        "coreMetadataReplayed": true,
+        "liveGateway": true,
+        "selectedServerID": "31937"
+      }
+    },
+    "spiderman-34793": {
+      "coreMovieID": "17997",
+      "serverID": "34793",
+      "result": "blocked before media",
+      "httpStatus": 403,
+      "failureStage": "catalog-detail",
+      "diagnosticSHA256": "7819d725daa002fd24b7c3743c9ce95dfb493ca8ac42e6db50d64ea34936af11"
+    },
+    "spiderman-34794": {
+      "coreMovieID": "17997",
+      "serverID": "34794",
+      "result": "blocked before media",
+      "httpStatus": 403,
+      "failureStage": "catalog-detail",
+      "diagnosticSHA256": "73e9792b5d20816d23c48b449694d1c1d63678e9b59f96a33dd8e4d0b84ee282"
+    }
+  }
+}

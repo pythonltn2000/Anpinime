@@ -1,0 +1,72 @@
+{
+  "movieID": "17997",
+  "requestedTitle": "Người Nhện: Khởi Đầu Mới",
+  "probe": "FFmpeg blackdetect + signalstats, null output",
+  "sourceContext": "Exact original server media URLs from the earlier authorized gateway exchange; this optional pass fetched media only, not fresh Core detail or gateway. Current iOS fresh Core17997 returned403 and remains a separate result.",
+  "filterThresholds": {
+    "pixelThresholdNormalized": 0.1,
+    "pictureBlackRatioThreshold": 0.98,
+    "minimumLoggedBlackIntervalSeconds": 0.1,
+    "firstNonblackDefinition": "First analyzed frame with less than98percent of pixels below the normalized10percent luma threshold."
+  },
+  "limitsPerServer": {
+    "passes": 1,
+    "outputSeconds": 20,
+    "networkBytes": 67108864,
+    "processTimeoutSeconds": 50,
+    "probeBytes": 2000000,
+    "analyzeMicroseconds": 3000000,
+    "networkReadTimeoutMicroseconds": 12000000
+  },
+  "mandatoryInheritedProxyPreserved": true,
+  "mediaBytesSaved": 0,
+  "results": [
+    {
+      "serverID": "34793",
+      "checkedAtUTC": "2026-11-02T11:26:26.566822+00:00",
+      "codec": "h264",
+      "videoWidth": 1920,
+      "videoHeight": 800,
+      "firstFrameBlackRatio": 1.0,
+      "firstNonblackMediaTimestampSeconds": 10.177,
+      "blackIntervals": [
+        {
+          "start": 0.0,
+          "end": 10.177,
+          "duration": 10.177
+        }
+      ],
+      "perFrameRatiosAnalyzed": 481,
+      "decodedOutputFrames": 480,
+      "decodedOutputSeconds": 20.02,
+      "totalUpstreamBytesRead": 15608798,
+      "exitCode": 0,
+      "timedOut": false,
+      "analysisProcessWallSeconds": 7.728
+    },
+    {
+      "serverID": "34794",
+      "checkedAtUTC": "2026-11-02T11:27:01.799104+00:00",
+      "codec": "hevc",
+      "videoWidth": 3832,
+      "videoHeight": 1600,
+      "firstFrameBlackRatio": 1.0,
+      "firstNonblackMediaTimestampSeconds": 10.093,
+      "blackIntervals": [
+        {
+          "start": 0.0,
+          "end": 10.093,
+          "duration": 10.093
+        }
+      ],
+      "perFrameRatiosAnalyzed": 481,
+      "decodedOutputFrames": 480,
+      "decodedOutputSeconds": 20.02,
+      "totalUpstreamBytesRead": 15608543,
+      "exitCode": 0,
+      "timedOut": false,
+      "analysisProcessWallSeconds": 24.432
+    }
+  ],
+  "interpretation": "Both encodes begin with about10seconds of decoded black content. Media timestamps are independent of network/decoder startup wall time. The extra image-analysis filter wall times are not player-performance measurements. No automatic skipping was added. This does not establish the cause of sustained phone lag."
+}

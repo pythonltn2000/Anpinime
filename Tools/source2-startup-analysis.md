@@ -116,3 +116,34 @@ requested media time. JSON, diagnostics and PNG filenames include the suffix.
 Safe evidence: [2026-11-02-source2-startup](evidence/2026-11-02-source2-startup/).
 Private Core responses, returned media URLs, original IPA/decompilation and raw
 network diagnostics remain outside the repository.
+
+
+## Decoded black intro, separate from network startup
+
+A final optional pass examined the first 20 seconds of the same exact original
+servers using FFmpeg `blackdetect` plus `signalstats`, with null output. Server
+**34793** starts with a black interval **0.000–10.177 seconds**; server **34794**
+starts with **0.000–10.093 seconds**. These ends are the first threshold-defined
+nonblack media timestamps, not network-wait or first-decoded-frame wall times.
+Both first analyzed frames were 100% black. The criterion classified a frame as
+black when at least **98% of pixels** fell below a normalized **10% luma** threshold;
+logged black intervals had a minimum duration of 0.1 seconds. Faint image content
+below that criterion can precede the reported nonblack timestamp.
+
+Each exact server received only one pass, capped at 20 seconds of output,
+64 MiB upstream bytes and a 50-second process deadline. Both exited 0 with
+480 output frames / 20.020 seconds, reading 15,608,798 and 15,608,543 upstream
+bytes respectively. No movie frames or files were saved; inherited remote proxy
+settings were preserved. The additional image-analysis filter wall times are
+not playback-performance measurements.
+
+This establishes about ten seconds of decoded black content in these two
+encodes. It can contribute to apparent delay after decoding begins, but does not
+measure the user's network wait or explain sustained phone lag. The optional
+passes reused the original media URLs resolved earlier; they did not fetch fresh
+Core metadata or exchange the gateway again. Current iOS CI's fresh Core request
+for 17997 returned 403 before media, while its separate Wakanda metadata replay
+observed first decoded video at 3.691 seconds; those outcomes remain separate.
+No automatic intro skipping or app change was added for this finding.
+
+Safe evidence: [black-intro.json](evidence/2026-11-02-source2-startup/black-intro.json).

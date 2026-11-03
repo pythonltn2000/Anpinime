@@ -1,0 +1,38 @@
+{
+  "runID": 41434497808,
+  "appCommit": "19e0354a85b7a91f534659739f96adb67150e49d",
+  "userSampleChecks": [
+    {
+      "coreMovieID": "17997",
+      "serverID": "34793",
+      "result": "BLOCKED_BEFORE_MEDIA",
+      "failureStage": "catalog-detail",
+      "httpStatus": 403,
+      "firstDecodedVideoElapsedSeconds": null,
+      "diagnosticSHA256": "e0799cd0ea6ef6a897696cb7c568fb277cc3e1165e8727daaff079b5fc1e5616"
+    },
+    {
+      "coreMovieID": "17997",
+      "serverID": "34794",
+      "result": "BLOCKED_BEFORE_MEDIA",
+      "failureStage": "catalog-detail",
+      "httpStatus": 403,
+      "firstDecodedVideoElapsedSeconds": null,
+      "diagnosticSHA256": "3184d23ed7da98df27e279cab9d637e5e39649f44a756b7167804d28d320d520"
+    }
+  ],
+  "separateWakandaGatewayWithReplayedMetadata": {
+    "selectedServerID": "31937",
+    "coreMetadataReplayed": true,
+    "liveGateway": true,
+    "advancingVideoVerified": true,
+    "time": 17.433999999999997,
+    "videoWidth": 1920,
+    "videoHeight": 1080,
+    "audioChoices": 2,
+    "subtitleChoices": 3,
+    "firstDecodedVideoElapsedSeconds": 3.6911640416666387,
+    "fileLoadedElapsedSeconds": 3.6911640416666387
+  },
+  "limits": "The user Spider-Man sample was not decoded on this iOS runner. The separate gateway result does not prove fresh Core catalog access or sustained playback on the user device."
+}

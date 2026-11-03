@@ -1,0 +1,69 @@
+{
+  "runID": 41558237765,
+  "appCommit": "93dd0487b65e0b5a040dfb0002f4c67774bf60de",
+  "scope": "Historical native check before subsequent short-feed accessibility and PiP restoration fixes; not a delivery candidate.",
+  "tests": [
+    {
+      "name": "CatalogPagingFiltersAndLibraryChoices",
+      "result": "PASS",
+      "seconds": 104.679
+    },
+    {
+      "name": "ShortFeedSwipeFullscreenAndFullPlaylist",
+      "result": "FAIL",
+      "seconds": 34.357,
+      "cause": "The root SwiftUI accessibility identifier propagated into all child controls, hiding the specific playback-state identifier from XCTest. The fixture received episode-5 media requests."
+    },
+    {
+      "name": "VerticalEpisodesPlaylistAndLifecycle",
+      "result": "PASS",
+      "seconds": 53.876
+    },
+    {
+      "name": "MovieSearchEachResultHitRegions",
+      "result": "PASS",
+      "seconds": 12.997
+    },
+    {
+      "name": "LivePineDramaPlaylistAndVideo",
+      "result": "PASS",
+      "seconds": 40.257
+    }
+  ],
+  "nativeLiveDecodedStates": [
+    {
+      "cancelledResolutions": 0,
+      "currentTime": 3.533333333333333,
+      "manuallyPaused": false,
+      "maximumOwnedPlayers": 1,
+      "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+      "ownedPlayers": 1,
+      "playerCreations": 1,
+      "resolving": false,
+      "selectedEpisodeID": "7696966464301026573"
+    },
+    {
+      "cancelledResolutions": 0,
+      "currentTime": 3.2,
+      "manuallyPaused": false,
+      "maximumOwnedPlayers": 1,
+      "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+      "ownedPlayers": 1,
+      "playerCreations": 2,
+      "resolving": false,
+      "selectedEpisodeID": "7696966469686529294"
+    },
+    {
+      "cancelledResolutions": 0,
+      "currentTime": 3.1333333333333333,
+      "manuallyPaused": false,
+      "maximumOwnedPlayers": 1,
+      "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+      "ownedPlayers": 1,
+      "playerCreations": 3,
+      "resolving": false,
+      "selectedEpisodeID": "7696966523524517133"
+    }
+  ],
+  "piPFixture": "FAIL — a video-output initialization error prevented the required MKV/PiP result JSON; not accepted as successful playback."
+}

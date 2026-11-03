@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "run": 41371349919,
+  "commit": "3c92a58c757abe365cdbc39a8d33ec574ce78fd2",
+  "workflowURL": "https://github.com/thuyan1510/AnPinime/actions/runs/41371349919",
+  "artifactID": 13109501958,
+  "artifactName": "AnPinime_AI_Drama_Verification",
+  "resultSource": "Actual XCTest case log, independent native panel oracle and per-episode decoded player state; adjusted workflow step status is not used as playback proof.",
+  "scope": "Baseline player verification before the independent library and expanded catalog changes.",
+  "test": {
+    "name": "AIDramaUITests.testLivePineDramaPlaylistAndVideo",
+    "result": "PASS",
+    "durationSeconds": 48.427,
+    "failures": 0
+  },
+  "oracle": {
+    "catalogLabel": "Thần Nhãn Đổ Thạch, 89 tập",
+    "episodeCount": 89,
+    "oracleRequestCount": 1,
+    "panelEpisodeCount": 89,
+    "selectionPolicy": "First actual fresh catalog card, fixed before the single panel request",
+    "seriesID": "7675007141384639509",
+    "targets": [
+      {
+        "id": "7675007536616967444",
+        "number": 1
+      },
+      {
+        "id": "7675007533047663893",
+        "number": 2
+      },
+      {
+        "id": "7675007689516240149",
+        "number": 89
+      }
+    ]
+  },
+  "decodedEpisodes": [
+    {
+      "episodeNumber": 1,
+      "selectedEpisodeID": "7675007536616967444",
+      "currentTimeSeconds": 3.6,
+      "decodedMediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+      "ownedPlayers": 1,
+      "maximumOwnedPlayers": 1,
+      "playerCreations": 1,
+      "resolving": false,
+      "manuallyPaused": false,
+      "artifactStateFilename": "2EFFF2F3-2C64-4FE7-B676-98BE1A428E26.txt"
+    },
+    {
+      "episodeNumber": 2,
+      "selectedEpisodeID": "7675007533047663893",
+      "currentTimeSeconds": 2.533333333333333,
+      "decodedMediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+      "ownedPlayers": 1,
+      "maximumOwnedPlayers": 1,
+      "playerCreations": 2,
+      "resolving": false,
+      "manuallyPaused": false,
+      "artifactStateFilename": "64A0474D-2596-4835-BB4B-325D00BADC56.txt"
+    },
+    {
+      "episodeNumber": 89,
+      "selectedEpisodeID": "7675007689516240149",
+      "currentTimeSeconds": 2.9,
+      "decodedMediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+      "ownedPlayers": 1,
+      "maximumOwnedPlayers": 1,
+      "playerCreations": 3,
+      "resolving": false,
+      "manuallyPaused": false,
+      "artifactStateFilename": "D2D4B304-A5B9-4B79-99F1-BD0B55E8C500.txt"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "live-pinedrama-episode-89-portrait-playing_0_A81B2105-F79B-4053-883E-F4511C00213D.png",
+      "artifactFilename": "6FE2D126-175E-45A2-B437-C972067776D6.png"
+    },
+    {
+      "name": "live-pinedrama-episode-02-after-vertical-swipe_0_7C479F38-D36A-4063-A5DA-3AE4B4588DAA.png",
+      "artifactFilename": "0434DED8-3738-4906-B63A-A3480B870822.png"
+    },
+    {
+      "name": "live-pinedrama-episode-01-portrait-playing_0_0470BEFA-0A5A-4C7D-91B9-23485DD225E3.png",
+      "artifactFilename": "8E12E0FD-121B-44DA-AD3E-2E38F64B1553.png"
+    }
+  ],
+  "retrieval": {
+    "method": "Connected GitHub artifact file reference with bounded HTTP byte ranges",
+    "archiveSizeBytes": 151797159,
+    "totalBytesTransferred": 572236,
+    "note": "Only central directory and bounded text/JSON members were retrieved; screenshots remain referenced in the original artifact."
+  }
+}
