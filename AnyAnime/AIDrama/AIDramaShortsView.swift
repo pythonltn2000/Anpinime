@@ -163,11 +163,7 @@ struct AIDramaShortsView: View {
             }
         }
         .foregroundColor(.white).preferredColorScheme(.dark)
-        .fullScreenCover(isPresented: $fullscreen) {
-            if let session = feed.session {
-                AIDramaShortsFullscreen(session: session, close: { fullscreen = false })
-            }
-        }
+        .background(AIDramaShortsFullscreenPresenter(session: feed.session, presented: $fullscreen).frame(width: 0, height: 0))
         .task(id: active) {
             feed.setActive(active, sceneActive: scenePhase == .active)
             if active, feed.videos.isEmpty { await feed.loadMore() }
@@ -273,33 +269,130 @@ private struct AIDramaShortsSurface: View {
     }
 }
 
+/// A native full-screen controller owns orientation and containment independently
+/// of SwiftUI's tab/page layout. It borrows the same player for this presentation.
 @MainActor
-private struct AIDramaShortsFullscreen: View {
-    @ObservedObject var session: AIDramaPlaybackSession
-    let close: () -> Void
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            AIDramaShortsSurface(session: session).ignoresSafeArea()
-            VStack {
-                HStack {
-                    Button(action: close) { Image(systemName: "arrow.down.right.and.arrow.up.left").frame(width: 48, height: 48).contentShape(Rectangle()) }
-                        .accessibilityLabel("Thoát toàn màn hình").accessibilityIdentifier("aidrama.shorts.fullscreen")
-                    Spacer()
-                    Button { session.togglePause() } label: {
-                        Image(systemName: session.manuallyPaused ? "play.fill" : "pause.fill").frame(width: 48, height: 48).contentShape(Rectangle())
-                    }.accessibilityLabel(session.manuallyPaused ? "Phát" : "Tạm dừng")
-                }.padding(.horizontal, 16).background(.black.opacity(0.25))
-                Spacer()
+private struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
+    let session: AIDramaPlaybackSession?
+    @Binding var presented: Bool
+    func makeUIViewController(context: Context) -> Anchor { Anchor() }
+    func updateUIViewController(_ anchor: Anchor, context: Context) {
+        anchor.session = session; anchor.wanted = presented
+        anchor.close = { presented = false }
+        anchor.synchronize()
+    }
+    static func dismantleUIViewController(_ anchor: Anchor, coordinator: ()) { anchor.finish(animated: false) }
+
+    final class Anchor: UIViewController {
+        var session: AIDramaPlaybackSession?
+        var wanted = false
+        var close: (() -> Void)?
+        var fullscreen: Fullscreen?
+        override func viewDidAppear(_ animated: Bool) { super.viewDidAppear(animated); synchronize() }
+        func synchronize() {
+            guard isViewLoaded, view.window != nil else { return }
+            if wanted, fullscreen == nil, presentedViewController == nil, let session {
+                let player = Fullscreen(session: session, close: { [weak self] in self?.close?() })
+                player.modalPresentationStyle = .fullScreen
+                fullscreen = player
+                AnPinimeAppDelegate.orientationMask = .landscape
+                present(player, animated: true)
+            } else if !wanted { finish(animated: true) }
+        }
+        func finish(animated: Bool) {
+            guard let fullscreen else { return }
+            self.fullscreen = nil
+            let scene = fullscreen.viewIfLoaded?.window?.windowScene ?? viewIfLoaded?.window?.windowScene
+            fullscreen.dismiss(animated: animated) {
+                fullscreen.unmount()
+                PlayerOrientation.setLandscape(false, scene: scene)
             }
+        }
+    }
+
+    final class Fullscreen: UIViewController {
+        let session: AIDramaPlaybackSession
+        let close: () -> Void
+        private var player: MPVPlaybackController?
+        private var observations = Set<AnyCancellable>()
+        private let exit = UIButton(type: .system)
+        private let pause = UIButton(type: .system)
+        #if DEBUG
+        private var debugHost: UIHostingController<AIDramaDebugStateView>?
+        #endif
+        init(session: AIDramaPlaybackSession, close: @escaping () -> Void) {
+            self.session = session; self.close = close
+            super.init(nibName: nil, bundle: nil)
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:)") }
+        override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscape }
+        override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .landscapeRight }
+        override var preferredStatusBarHidden: Bool { true }
+        override var prefersHomeIndicatorAutoHidden: Bool { true }
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            view.backgroundColor = .black; view.accessibilityViewIsModal = true
+            configure(exit, symbol: "arrow.down.right.and.arrow.up.left", label: "Thoát toàn màn hình", action: #selector(exitPressed))
+            exit.accessibilityIdentifier = "aidrama.shorts.fullscreen"
+            configure(pause, symbol: "pause.fill", label: "Tạm dừng", action: #selector(pausePressed))
+            session.$manuallyPaused.receive(on: RunLoop.main).sink { [weak self] value in
+                self?.pause.setImage(UIImage(systemName: value ? "play.fill" : "pause.fill"), for: .normal)
+                self?.pause.accessibilityLabel = value ? "Phát" : "Tạm dừng"
+            }.store(in: &observations)
+            session.$controller.receive(on: RunLoop.main).sink { [weak self] _ in self?.mountIfVisible() }.store(in: &observations)
             #if DEBUG
             if AIDramaDebugSupport.enabled {
-                AIDramaDebugStateView(session: session).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                let host = UIHostingController(rootView: AIDramaDebugStateView(session: session))
+                debugHost = host; addChild(host); host.view.backgroundColor = .clear
+                view.addSubview(host.view); host.didMove(toParent: self)
             }
             #endif
         }
-        .foregroundColor(.white).buttonStyle(.plain).statusBarHidden(true)
-        .background(LandscapePresentation().frame(width: 0, height: 0))
+        private func configure(_ button: UIButton, symbol: String, label: String, action: Selector) {
+            button.setImage(UIImage(systemName: symbol), for: .normal)
+            button.tintColor = .white; button.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+            button.layer.cornerRadius = 24; button.accessibilityLabel = label
+            button.addTarget(self, action: action, for: .touchUpInside); view.addSubview(button)
+        }
+        @objc private func exitPressed() { close() }
+        @objc private func pausePressed() { session.togglePause() }
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            PlayerOrientation.setLandscape(true, scene: view.window?.windowScene)
+            mountIfVisible()
+        }
+        private func mountIfVisible() {
+            guard viewIfLoaded?.window != nil, let current = session.controller, player !== current else { return }
+            unmount()
+            if let previous = current.parent as? AIDramaNativeSurface.Container { previous.unmount() }
+            else if current.parent != nil {
+                current.willMove(toParent: nil); current.view.removeFromSuperview(); current.removeFromParent()
+            }
+            player = current; addChild(current)
+            current.view.frame = view.bounds; current.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            current.view.isAccessibilityElement = true; current.view.accessibilityIdentifier = "aidrama.shorts.video"
+            view.insertSubview(current.view, at: 0); current.didMove(toParent: self)
+            session.didAttach(current)
+            view.setNeedsLayout()
+        }
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            player?.view.transform = .identity; player?.view.frame = view.bounds
+            player?.view.setNeedsLayout(); player?.view.layoutIfNeeded()
+            exit.frame = CGRect(x: view.safeAreaInsets.left + 12, y: 8, width: 48, height: 48)
+            pause.frame = CGRect(x: view.bounds.width - view.safeAreaInsets.right - 60, y: 8, width: 48, height: 48)
+            #if DEBUG
+            debugHost?.view.frame = CGRect(x: view.safeAreaInsets.left, y: 0, width: 48, height: 120)
+            #endif
+        }
+        func unmount() {
+            guard let player else { return }
+            if player.parent === self {
+                session.didDetach(player); player.willMove(toParent: nil)
+                player.view.removeFromSuperview(); player.removeFromParent()
+            }
+            self.player = nil
+        }
     }
 }
 
