@@ -32,6 +32,9 @@ final class AIDramaPlaybackSession: ObservableObject {
     private var resumeSeekRequestedAt: Date?
     private var positions: [String: Double]
     private var lastSavedTime = 0.0
+    private var currentStream: AIDramaStream?
+    private var streamResolvedAt = Date.distantPast
+    private var pendingViewport: CGSize?
     private var previousIdleTimer: Bool?
     private var ownsAudioSession = false
     private let defaults: UserDefaults
@@ -198,14 +201,31 @@ final class AIDramaPlaybackSession: ObservableObject {
         }
     }
 
+    private func rebuildForViewport(_ size: CGSize) {
+        guard !preloading, presented, sceneActive, !transitioning,
+              let episode = selectedEpisode, let stream = currentStream else { return }
+        let fresh = Date().timeIntervalSince(streamResolvedAt) < 45
+        pendingViewport = size
+        invalidateCurrent()
+        if fresh { install(stream, episode: episode, token: generation) }
+        else { error = nil; reconcile() }
+    }
+
     private func install(_ stream: AIDramaStream, episode: AIDramaEpisode, token: UUID) {
+        currentStream = stream
+        streamResolvedAt = Date()
         // A new state prevents old EOF counts, callbacks and timers crossing episode boundaries.
         let state = PlaybackState()
         let rememberSpeed = defaults.object(forKey: "AnPinime.rememberSpeed") as? Bool ?? true
         let rate = rememberSpeed ? (defaults.object(forKey: "AnPinime.playbackRate") as? Double ?? 1) : 1
         state.rate = rate.isFinite ? min(3, max(0.25, rate)) : 1
         state.userPaused = true
-        let player = MPVPlaybackController(url: stream.url, headers: stream.headers, playback: state, preloading: preloading, resizesEmbeddedSurface: true)
+        let player = MPVPlaybackController(url: stream.url, headers: stream.headers, playback: state, preloading: preloading, resizesEmbeddedSurface: true, initialViewport: pendingViewport)
+        pendingViewport = nil
+        player.onViewportChange = { [weak self, weak player] size in
+            guard let self, self.generation == token, self.controller === player else { return }
+            self.rebuildForViewport(size)
+        }
         player.onFailure = { [weak self] message in
             // mpv can report failure while its polling loop still holds the native handle.
             // Leave that stack before teardown, and recheck ownership after the hop.
@@ -325,6 +345,7 @@ final class AIDramaPlaybackSession: ObservableObject {
     }
 
     private func invalidateCurrent() {
+        currentStream = nil
         generation = UUID()
         cancelResolution()
         savePosition()
@@ -344,6 +365,7 @@ final class AIDramaPlaybackSession: ObservableObject {
         controller?.perform("pause", value: 0)
         controller?.perform("volume", value: 0)
         controller?.onFailure = nil
+        controller?.onViewportChange = nil
         controller?.shutdown()
         #if DEBUG
         if AIDramaDebugSupport.enabled, let player = controller { AIDramaDebugSupport.shared.stopped(player) }

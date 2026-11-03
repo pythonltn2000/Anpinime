@@ -18,7 +18,8 @@ final class MPVPlaybackController: UIViewController {
     private let resizesEmbeddedSurface: Bool
     private var rendererSize = CGSize.zero
     private var resizeTask: Task<Void, Never>?
-    private var reconfiguringGPU = false
+    private var initialViewport: CGSize?
+    var onViewportChange: ((CGSize) -> Void)?
     private var automaticPiPPrepared = false
     private var snapshotPending = false
     private var snapshotReady = false
@@ -48,7 +49,8 @@ final class MPVPlaybackController: UIViewController {
     #endif
     var onFailure: ((String) -> Void)?
 
-    init(url: URL, headers: [String: String], playback: PlaybackState, preloading: Bool = false, resizesEmbeddedSurface: Bool = false) {
+    init(url: URL, headers: [String: String], playback: PlaybackState, preloading: Bool = false, resizesEmbeddedSurface: Bool = false, initialViewport: CGSize? = nil) {
+        self.initialViewport = initialViewport
         self.resizesEmbeddedSurface = resizesEmbeddedSurface
         self.preloading = preloading
         self.url = url; self.headers = headers; self.playback = playback; self.userPaused = playback.userPaused
@@ -56,12 +58,19 @@ final class MPVPlaybackController: UIViewController {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    override func loadView() {
+        if let initialViewport { view = UIView(frame: CGRect(origin: .zero, size: initialViewport)) }
+        else { super.loadView() }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
         surface.device = MTLCreateSystemDefaultDevice()
         surface.contentsScale = UIScreen.main.nativeScale
         surface.framebufferOnly = true
+        surface.frame = view.bounds
+        surface.drawableSize = CGSize(width: view.bounds.width * surface.contentsScale, height: view.bounds.height * surface.contentsScale)
         view.layer.addSublayer(surface)
         guard let context = mpv_create() else { fail("Không khởi tạo được bộ giải mã video."); return }
         handle = context
@@ -118,38 +127,22 @@ final class MPVPlaybackController: UIViewController {
     }
 
     private func resizeEmbeddedRendererIfNeeded() {
-        let size = surface.drawableSize
+        let size = view.bounds.size
         guard size.width > 1, size.height > 1, size != rendererSize else { return }
-        let hadSize = rendererSize != .zero
+        let previous = rendererSize
         rendererSize = size
-        guard resizesEmbeddedSurface, hadSize, loaded, !reconfiguringGPU else { return }
+        guard resizesEmbeddedSurface, !preloading, previous != .zero, loaded,
+              (previous.width > previous.height) != (size.width > size.height) else { return }
         resizeTask?.cancel()
         resizeTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 200_000_000)
             guard !Task.isCancelled, let self, self.handle != nil, self.rendererSize == size,
                   UIApplication.shared.applicationState == .active,
                   self.string("current-vo") == "gpu-next" else { return }
-            // This MPVKit context reads layer size only during reconfig() and emits
-            // no resize event. Let null output commit before restoring gpu-next, so
-            // option caching cannot coalesce an equivalent driver list. Audio, file,
-            // decoder ownership and playback position continue in the same player.
-            self.reconfiguringGPU = true
-            // Null output must not consume a silent/video-only clip at full speed.
-            // This internal pause leaves the user's pause intent unchanged.
-            self.set("pause", "yes")
-            self.set("vo", "null")
-            for _ in 0..<20 {
-                guard self.handle != nil, !Task.isCancelled else { self.reconfiguringGPU = false; return }
-                if self.string("current-vo") == "null" { break }
-                try? await Task.sleep(nanoseconds: 25_000_000)
-            }
-            if self.handle != nil, !Task.isCancelled {
-                if UIApplication.shared.applicationState == .active, self.string("current-vo") != "libmpv" {
-                    self.set("vo", "gpu-next")
-                }
-                self.set("pause", self.userPaused ? "yes" : "no")
-            }
-            self.reconfiguringGPU = false
+            // A live MoltenVK layer retains its old presentation geometry after moving
+            // between portrait and landscape hosts. The session replaces that surface
+            // with a fresh player at the retained position, using its in-memory stream.
+            self.onViewportChange?(size)
         }
     }
 
