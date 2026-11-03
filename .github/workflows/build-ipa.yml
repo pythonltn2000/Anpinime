@@ -146,7 +146,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AnPinime_UNSIGNED
+          name: AnPinime_Candidate_UNSIGNED
           path: AnPinime_UNSIGNED.ipa
           retention-days: 14
 
@@ -295,11 +295,26 @@ jobs:
         run: bash Tests/ai-drama-smoke.sh
       - name: Verify live PineDrama catalog, full playlist and first, second and last episodes
         if: ${{ !inputs.shorts_only && !cancelled() && steps.ai_prepare.outcome == 'success' }}
-        continue-on-error: true
         run: bash Tests/ai-drama-live-smoke.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: AnPinime_AI_Drama_Verification
           path: previews/**
+          retention-days: 14
+
+  deliver-ios:
+    name: Publish verified unsigned IPA
+    needs: [build-ios, ai-drama]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: AnPinime_Candidate_UNSIGNED
+          path: candidate
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnPinime_UNSIGNED
+          path: candidate/AnPinime_UNSIGNED.ipa
+          if-no-files-found: error
           retention-days: 14
