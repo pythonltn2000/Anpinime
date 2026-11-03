@@ -18,14 +18,17 @@ final class ArtworkLoader: ObservableObject {
     private var lastURL: URL?
     private var requestID = UUID()
 
-    func load(_ source: URL?, baseURL: URL, revision: Int) async {
+    func load(_ source: URL?, baseURL: URL, revision: Int, keepSharperImage: Bool = false) async {
         let token = UUID()
         requestID = token
         guard let source else { image = nil; return }
         let url = Self.currentURL(source, baseURL: baseURL)
         let cacheKey = "\(url.absoluteString)|\(revision)" as NSString
-        if let cached = Self.cache.object(forKey: cacheKey) { image = cached; lastURL = url; return }
-        if lastURL?.path != url.path { image = nil }
+        if let cached = Self.cache.object(forKey: cacheKey) {
+            if !keepSharperImage || sharper(cached) { image = cached }
+            lastURL = url; return
+        }
+        if !keepSharperImage, lastURL?.path != url.path { image = nil }
         lastURL = url
         loading = true
         defer { if requestID == token { loading = false } }
@@ -40,8 +43,17 @@ final class ArtworkLoader: ObservableObject {
                   (200..<300).contains(http.statusCode), let decoded = UIImage(data: data) else { return }
             Self.cache.setObject(decoded, forKey: cacheKey,
                                  cost: Int(decoded.size.width * decoded.size.height * 4))
-            image = decoded
+            if !keepSharperImage || sharper(decoded) { image = decoded }
         } catch { /* Keep the last successful image during connection refresh. */ }
+    }
+
+    private func sharper(_ candidate: UIImage) -> Bool {
+        guard let image else { return true }
+        // Compare effective resolution when filling the portrait home hero.
+        func score(_ value: UIImage) -> CGFloat {
+            min(value.size.width * value.scale / 390, value.size.height * value.scale / 465)
+        }
+        return score(candidate) >= score(image)
     }
 
     private static func currentURL(_ url: URL, baseURL: URL) -> URL {

@@ -102,6 +102,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private var preparing = false
     private var timeoutStarted = false
     var onSystemStart: (() -> Void)?
+    var onEvent: ((String) -> Void)?
     var possible: Bool { controller?.isPictureInPicturePossible == true }
     private let command: (String, Double) -> Void
     private let restoreVideo: () -> Void
@@ -132,7 +133,10 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
             controller = AVPictureInPictureController(contentSource: content)
             controller?.delegate = self
             possibility = controller?.observe(\.isPictureInPicturePossible, options: [.new]) { [weak self] _, _ in
-                Task { @MainActor [weak self] in self?.startIfPossible() }
+                Task { @MainActor [weak self] in
+                    self?.onEvent?("possibilityChanged")
+                    self?.startIfPossible()
+                }
             }
         }
         setAutomatic(automatic)
@@ -241,6 +245,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     }
 
     private func fail(_ message: String) {
+        onEvent?("failed")
         playback.pictureInPictureError = message
         stop(restore: true) { [weak self] in self?.finished() }
     }
@@ -248,14 +253,17 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         starting = true
         playback.pictureInPicturePending = true
         onSystemStart?()
+        onEvent?("willStart")
     }
     func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         playback.pictureInPictureActive = true; playback.pictureInPicturePending = false; playback.pictureInPictureError = nil
+        onEvent?("didStart")
     }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
         fail("Chưa mở được PiP: " + error.localizedDescription)
     }
     func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        onEvent?("didStop")
         stop(restore: true) { [weak self] in self?.finished() }
     }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,

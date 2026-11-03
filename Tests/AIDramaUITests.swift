@@ -20,6 +20,10 @@ final class AIDramaUITests: XCTestCase {
         let playerCreations: Int
         let cancelledResolutions: Int
         let subtitleTrack: String?
+        let piPPrepared: Bool?
+        let piPPossible: Bool?
+        let piPActive: Bool?
+        let automaticPiPRequests: Int?
     }
 
     private enum HarnessError: Error { case failed(String) }
@@ -64,6 +68,28 @@ final class AIDramaUITests: XCTestCase {
             attachTelemetry()
             app.terminate()
         }
+    }
+
+    func testAutomaticPiPPreparationAndBackgroundTransition() throws {
+        try assertAITabs()
+        let series = app.buttons["aidrama.series." + seriesID]
+        try waitFor("The fixture series appears") { series.isHittable }
+        series.tap()
+        try waitForPlaying(episode: 1)
+        try waitFor("PiP is prepared during foreground playback", timeout: 10) { self.playerState()?.piPPrepared == true }
+        let prepared = try requirePlayerState()
+        let readiness = XCTAttachment(string: "Foreground AVKit possible: \(prepared.piPPossible == true)")
+        readiness.name = "automatic-pip-foreground-readiness"; readiness.lifetime = .keepAlways; add(readiness)
+        XCUIDevice.shared.press(.home)
+        try waitFor("The playing app enters background") {
+            self.app.state == .runningBackground || self.app.state == .runningBackgroundSuspended
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(3))
+        capture("automatic-pip-after-home")
+        app.activate()
+        try waitFor("The same episode returns to foreground", timeout: 15) { self.playerState()?.selectedEpisodeID == self.episodeID(1) }
+        capture("automatic-pip-after-reactivation")
+        app.buttons["aidrama.close"].tap()
     }
 
     func testVerticalEpisodesPlaylistAndLifecycle() throws {

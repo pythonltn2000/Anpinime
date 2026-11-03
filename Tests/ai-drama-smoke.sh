@@ -39,6 +39,12 @@ PY
   if [ -n "$ANPINIME_SIMULATOR_ID" ]; then
     xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot "$ANPINIME_ARTIFACTS/final-simulator.png" >/dev/null 2>&1 || true
   fi
+  if [ -n "$ANPINIME_SIMULATOR_ID" ]; then
+    ANPINIME_APP_DATA=$(xcrun simctl get_app_container "$ANPINIME_SIMULATOR_ID" com.xemphim.aipinime data 2>/dev/null || true)
+    if [ -f "$ANPINIME_APP_DATA/Documents/automatic-pip-events.json" ]; then
+      cp "$ANPINIME_APP_DATA/Documents/automatic-pip-events.json" "$ANPINIME_ARTIFACTS/automatic-pip-events.json"
+    fi
+  fi
   if [ -d "$ANPINIME_ARTIFACTS/ui.xcresult" ]; then
     xcrun xcresulttool export attachments --path "$ANPINIME_ARTIFACTS/ui.xcresult" \
       --output-path "$ANPINIME_ARTIFACTS/attachments" > "$ANPINIME_ARTIFACTS/attachment-export.log" 2>&1 || true
@@ -148,6 +154,7 @@ fi
 
 ANPINIME_UI_FILTERS=(
   -only-testing:AnyAnimeUI/AIDramaUITests/testShortFeedSwipeFullscreenAndFullPlaylist
+  -only-testing:AnyAnimeUI/AIDramaUITests/testAutomaticPiPPreparationAndBackgroundTransition
   -only-testing:AnyAnimeUI/MovieSearchUITests
   -only-testing:AnyAnimeUI/AIDramaUITests/testCatalogPagingFiltersAndLibraryChoices
   -only-testing:AnyAnimeUI/AIDramaUITests/testVerticalEpisodesPlaylistAndLifecycle

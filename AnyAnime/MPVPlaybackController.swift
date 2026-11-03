@@ -18,6 +18,7 @@ final class MPVPlaybackController: UIViewController {
     private var automaticPiPPrepared = false
     #if DEBUG
     private(set) var automaticPiPRequests = 0
+    private let diagnosticID = UUID().uuidString
     var piPPrepared: Bool { pictureInPicture != nil }
     var piPPossible: Bool { pictureInPicture?.possible == true }
     #endif
@@ -158,7 +159,14 @@ final class MPVPlaybackController: UIViewController {
         pip.layer.frame = view.bounds
         view.layer.insertSublayer(pip.layer, below: surface)
         pip.onSystemStart = { [weak self] in self?.preparePictureInPicture(start: false) }
-        pip.arm(snapshot: decodedSnapshot(handle), automatic: automaticPiPEnabled && !userPaused)
+        #if DEBUG
+        pip.onEvent = { [weak self] event in self?.recordAutomaticPiP(event) }
+        #endif
+        let snapshot = decodedSnapshot(handle)
+        pip.arm(snapshot: snapshot, automatic: automaticPiPEnabled && !userPaused)
+        #if DEBUG
+        recordAutomaticPiP(snapshot == nil ? "armedWithoutSnapshot" : "armedWithDecodedFrame")
+        #endif
     }
 
     func preparePictureInPicture(start: Bool = true) {
@@ -173,6 +181,7 @@ final class MPVPlaybackController: UIViewController {
         if automaticPiPPrepared, !userPaused {
             #if DEBUG
             automaticPiPRequests += 1
+            recordAutomaticPiP("automaticBackgroundRequest")
             #endif
             pictureInPicture?.requestStart()
         }
@@ -192,7 +201,8 @@ final class MPVPlaybackController: UIViewController {
     /// mpv's own decoded frame arms sample-buffer PiP before iOS suspends the app.
     /// The native screenshot node is copied into one small buffer, then freed immediately.
     private func decodedSnapshot(_ handle: OpaquePointer) -> CVPixelBuffer? {
-        let strings = ["screenshot-raw", "video"].map { strdup($0) }
+        let screenshotCommand: [String] = ["screenshot-raw", "video"]
+        let strings = screenshotCommand.map { strdup($0) }
         defer { strings.forEach { free($0) } }
         var arguments: [UnsafePointer<CChar>?] = strings.map { $0.map { UnsafePointer<CChar>($0) } } + [nil]
         var node = mpv_node()
@@ -395,6 +405,22 @@ final class MPVPlaybackController: UIViewController {
         defer { mpv_free(pointer) }
         return String(cString: pointer)
     }
+    #if DEBUG
+    private func recordAutomaticPiP(_ event: String) {
+        guard AIDramaDebugSupport.enabled || PlaybackSmokeTest.mpvFixture else { return }
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("automatic-pip-events.json")
+        var events = (try? Data(contentsOf: url)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [[String: Any]] } ?? []
+        events.append(["event": event, "player": diagnosticID, "timestamp": Date().timeIntervalSince1970,
+                       "applicationState": UIApplication.shared.applicationState.rawValue,
+                       "possible": pictureInPicture?.possible == true, "active": playback.pictureInPictureActive,
+                       "pending": playback.pictureInPicturePending, "paused": userPaused,
+                       "automatic": automaticPiPEnabled, "time": playback.currentTime, "videoOutput": string("current-vo")])
+        if let data = try? JSONSerialization.data(withJSONObject: Array(events.suffix(100)), options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+    #endif
+
     private func number(_ name: String) -> Double {
         guard let handle else { return 0 }
         var value = 0.0

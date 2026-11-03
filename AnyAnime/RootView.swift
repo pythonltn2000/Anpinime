@@ -319,7 +319,7 @@ struct FeaturedCarouselView: View {
             TabView(selection: $selection) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, anime in
                     NavigationLink(destination: AnimeDetailView(anime: anime)) {
-                        FeaturedHeroCard(anime: anime).contentShape(Rectangle())
+                        FeaturedHeroCard(anime: anime, visible: selection == index).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .tag(index)
@@ -354,7 +354,11 @@ struct FeaturedCarouselView: View {
 }
 
 struct FeaturedHeroCard: View {
+    @EnvironmentObject private var service: AnimeService
+    @State private var detailedArtwork: URL?
+    @State private var metadataRevision = -1
     let anime: Anime
+    var visible = true
 
     private var yearTag: String {
         if let match = anime.info.range(of: #"\b(19|20)\d{2}\b"#, options: .regularExpression) {
@@ -396,7 +400,7 @@ struct FeaturedHeroCard: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            RemoteImage(url: anime.bannerURL ?? anime.imageURL)
+            RemoteImage(url: detailedArtwork ?? anime.bannerURL ?? anime.imageURL, keepSharperImage: true)
                 .frame(maxWidth: .infinity)
                 .frame(height: 465)
 
@@ -474,6 +478,21 @@ struct FeaturedHeroCard: View {
         .frame(maxWidth: .infinity)
         .frame(height: 465)
         .clipped()
+        .task(id: "\(visible)|\(service.imageGeneration)") {
+            guard visible, anime.source == .anime, metadataRevision != service.imageGeneration else { return }
+            let revision = service.imageGeneration
+            // Only the visible banner requests metadata; list posters and episode loading
+            // keep their existing paths. Use only artwork actually supplied by the source.
+            do {
+                let metadata = try await service.detailMetadata(for: anime)
+                try Task.checkCancellation()
+                guard service.source == anime.source, service.imageGeneration == revision else { return }
+                detailedArtwork = metadata.bannerURL ?? metadata.posterURL
+                metadataRevision = revision
+            } catch {
+                if !Task.isCancelled { metadataRevision = revision }
+            }
+        }
     }
 }
 
@@ -674,12 +693,13 @@ struct RemoteImage: View {
     @EnvironmentObject private var service: AnimeService
     @StateObject private var loader = ArtworkLoader()
     let url: URL?
+    var keepSharperImage = false
 
     var body: some View {
         Color.clear
             .overlay {
                 if let image = loader.image {
-                    Image(uiImage: image).resizable().scaledToFill()
+                    Image(uiImage: image).resizable().interpolation(.high).scaledToFill()
                 } else {
                     ZStack { placeholder; if loader.loading { ProgressView() } }
                 }
@@ -688,7 +708,7 @@ struct RemoteImage: View {
             .contentShape(Rectangle())
             .allowsHitTesting(false)
             .task(id: "\(url?.absoluteString ?? "")|\(service.baseURL)|\(service.imageGeneration)") {
-                await loader.load(url, baseURL: service.baseURL, revision: service.imageGeneration)
+                await loader.load(url, baseURL: service.baseURL, revision: service.imageGeneration, keepSharperImage: keepSharperImage)
             }
     }
 
