@@ -134,14 +134,21 @@ final class MPVPlaybackController: UIViewController {
             // option caching cannot coalesce an equivalent driver list. Audio, file,
             // decoder ownership and playback position continue in the same player.
             self.reconfiguringGPU = true
+            // Null output must not consume a silent/video-only clip at full speed.
+            // This internal pause leaves the user's pause intent unchanged.
+            self.set("pause", "yes")
             self.set("vo", "null")
             for _ in 0..<20 {
                 guard self.handle != nil, !Task.isCancelled else { self.reconfiguringGPU = false; return }
                 if self.string("current-vo") == "null" { break }
                 try? await Task.sleep(nanoseconds: 25_000_000)
             }
-            if self.handle != nil, !Task.isCancelled, UIApplication.shared.applicationState == .active,
-               self.string("current-vo") == "null" { self.set("vo", "gpu-next") }
+            if self.handle != nil, !Task.isCancelled {
+                if UIApplication.shared.applicationState == .active, self.string("current-vo") != "libmpv" {
+                    self.set("vo", "gpu-next")
+                }
+                self.set("pause", self.userPaused ? "yes" : "no")
+            }
             self.reconfiguringGPU = false
         }
     }
