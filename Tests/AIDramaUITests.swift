@@ -20,6 +20,7 @@ final class AIDramaUITests: XCTestCase {
         let playerCreations: Int
         let cancelledResolutions: Int
         let subtitleTrack: String?
+        let piPSupported: Bool?
         let piPPrepared: Bool?
         let piPPossible: Bool?
         let piPActive: Bool?
@@ -76,6 +77,9 @@ final class AIDramaUITests: XCTestCase {
         try waitFor("The fixture series appears") { series.isHittable }
         series.tap()
         try waitForPlaying(episode: 1)
+        guard try requirePlayerState().piPSupported == true else {
+            throw XCTSkip("AVKit system PiP is unsupported on this simulator. Software-frame and restore checks run separately; physical iPhone automatic PiP still needs confirmation.")
+        }
         try waitFor("PiP is prepared during foreground playback", timeout: 10) { self.playerState()?.piPPrepared == true }
         let prepared = try requirePlayerState()
         let readiness = XCTAttachment(string: "Foreground AVKit possible: \(prepared.piPPossible == true)")

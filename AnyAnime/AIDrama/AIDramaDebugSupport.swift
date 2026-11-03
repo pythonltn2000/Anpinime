@@ -63,6 +63,7 @@ struct AIDramaDebugStateView: View {
             "selectedEpisodeID": session.selectedEpisodeID as Any? ?? NSNull(),
             "resolving": session.resolving, "manuallyPaused": session.manuallyPaused,
             "subtitleTrack": session.playback?.subtitleTrack ?? "",
+            "piPSupported": session.playback?.pictureInPictureSupported == true,
             "piPPrepared": session.controller?.piPPrepared == true,
             "piPPossible": session.controller?.piPPossible == true,
             "piPActive": session.playback?.pictureInPictureActive == true,

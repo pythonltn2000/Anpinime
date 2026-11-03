@@ -16,6 +16,10 @@ final class MPVPlaybackController: UIViewController {
     private var pictureInPicture: MPVPictureInPicture?
     private var preloading: Bool
     private var automaticPiPPrepared = false
+    private var snapshotPending = false
+    private var snapshotReady = false
+    private var snapshotAttempts = 0
+    private let snapshotReplyID: UInt64 = 0x504950
     #if DEBUG
     private(set) var automaticPiPRequests = 0
     private let diagnosticID = UUID().uuidString
@@ -139,7 +143,9 @@ final class MPVPlaybackController: UIViewController {
     }
 
     private func armPictureInPicture() {
-        guard pictureInPicture == nil, loaded, !preloading, let handle else { return }
+        guard loaded, !preloading, handle != nil else { return }
+        if pictureInPicture != nil { requestPiPSnapshot(); return }
+        snapshotReady = false; snapshotPending = false; snapshotAttempts = 0
         playback.pictureInPictureError = nil
         let pip = MPVPictureInPicture(playback: playback, command: { [weak self] name, value in
             guard let self else { return }
@@ -162,11 +168,18 @@ final class MPVPlaybackController: UIViewController {
         #if DEBUG
         pip.onEvent = { [weak self] event in self?.recordAutomaticPiP(event) }
         #endif
-        let snapshot = decodedSnapshot(handle)
-        pip.arm(snapshot: snapshot, automatic: automaticPiPEnabled && !userPaused)
-        #if DEBUG
-        recordAutomaticPiP(snapshot == nil ? "armedWithoutSnapshot" : "armedWithDecodedFrame")
-        #endif
+        pip.arm(snapshot: nil, automatic: automaticPiPEnabled && !userPaused)
+        requestPiPSnapshot()
+    }
+
+    private func requestPiPSnapshot() {
+        guard !snapshotPending, !snapshotReady, snapshotAttempts < 3, let handle else { return }
+        let screenshotCommand: [String] = ["screenshot-raw", "video"]
+        let strings = screenshotCommand.map { strdup($0) }
+        defer { strings.forEach { free($0) } }
+        var arguments: [UnsafePointer<CChar>?] = strings.map { $0.map { UnsafePointer<CChar>($0) } } + [nil]
+        snapshotAttempts += 1
+        snapshotPending = mpv_command_async(handle, snapshotReplyID, &arguments) >= 0
     }
 
     func preparePictureInPicture(start: Bool = true) {
@@ -190,7 +203,7 @@ final class MPVPlaybackController: UIViewController {
         set("pause", "yes")
     }
     @objc private func foreground() {
-        if automaticPiPPrepared, !playback.pictureInPictureActive, let pip = pictureInPicture {
+        if automaticPiPPrepared, let pip = pictureInPicture {
             automaticPiPPrepared = false
             pip.stop(restore: true) { [weak self] in self?.pictureInPicture = nil }
         }
@@ -199,15 +212,9 @@ final class MPVPlaybackController: UIViewController {
     }
 
     /// mpv's own decoded frame arms sample-buffer PiP before iOS suspends the app.
-    /// The native screenshot node is copied into one small buffer, then freed immediately.
-    private func decodedSnapshot(_ handle: OpaquePointer) -> CVPixelBuffer? {
-        let screenshotCommand: [String] = ["screenshot-raw", "video"]
-        let strings = screenshotCommand.map { strdup($0) }
-        defer { strings.forEach { free($0) } }
-        var arguments: [UnsafePointer<CChar>?] = strings.map { $0.map { UnsafePointer<CChar>($0) } } + [nil]
-        var node = mpv_node()
-        guard mpv_command_ret(handle, &arguments, &node) >= 0 else { return nil }
-        defer { mpv_free_node_contents(&node) }
+    /// The asynchronous reply is copied into one small buffer before the next event.
+    /// Never block the main/render thread with mpv_command_ret while GPU output is live.
+    private func decodedSnapshot(_ node: mpv_node) -> CVPixelBuffer? {
         guard node.format == MPV_FORMAT_NODE_MAP, let list = node.u.list?.pointee,
               list.num > 0, list.num <= 32, let keys = list.keys, let values = list.values else { return nil }
         var fields: [String: mpv_node] = [:]
@@ -292,6 +299,16 @@ final class MPVPlaybackController: UIViewController {
                         "message": String(cString: log.pointee.text)])
                 }
             #endif
+            case MPV_EVENT_COMMAND_REPLY where event.pointee.reply_userdata == snapshotReplyID:
+                snapshotPending = false
+                if event.pointee.error >= 0, let result = event.pointee.data?.assumingMemoryBound(to: mpv_event_command.self),
+                   let buffer = decodedSnapshot(result.pointee.result) {
+                    snapshotReady = true
+                    pictureInPicture?.arm(snapshot: buffer, automatic: automaticPiPEnabled && !userPaused)
+                    #if DEBUG
+                    recordAutomaticPiP("armedWithDecodedFrame")
+                    #endif
+                }
             case MPV_EVENT_FILE_LOADED:
                 loaded = true
                 let pending = pendingImports; pendingImports = []

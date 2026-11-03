@@ -46,6 +46,21 @@ cp "$RUNNER_TEMP/anpinime-media-server.log" previews/mpv-fixture-server.log
 if [ -f "$ANPINIME_APP_DATA/Documents/playback-mpv-diagnostics.json" ]; then
   cp "$ANPINIME_APP_DATA/Documents/playback-mpv-diagnostics.json" previews/playback-mpv-diagnostics.json
 fi
+if [ -f "$ANPINIME_APP_DATA/Documents/automatic-pip-events.json" ]; then
+  cp "$ANPINIME_APP_DATA/Documents/automatic-pip-events.json" previews/automatic-pip-events.json
+fi
+if [ ! -f "$ANPINIME_APP_DATA/Documents/playback-mpv.json" ]; then
+  mkdir -p previews/mpv-crashes
+  xcrun simctl spawn "$ANPINIME_SIMULATOR_ID" log show --last 3m --style compact --predicate 'process == "anpinime"' > previews/mpv-system.log 2>&1 || true
+  python3 - <<'PY_DIAG'
+from pathlib import Path
+import shutil
+for root in [Path.home() / 'Library/Logs/DiagnosticReports']:
+    if root.exists():
+        for path in root.rglob('anpinime*.ips'):
+            shutil.copy2(path, Path('previews/mpv-crashes') / path.name)
+PY_DIAG
+fi
 cp "$ANPINIME_APP_DATA/Documents/playback-mpv.json" previews/playback-mpv.json
 python3 - <<'PY'
 import json
