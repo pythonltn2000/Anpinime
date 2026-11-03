@@ -53,6 +53,7 @@ final class AIDramaShortsStore: ObservableObject {
                 warmSession = nil; warmID = nil
                 session = prepared
                 prepared.promotePreloadedVideo()
+                if prepared.error != nil { prepared.retry() }
             } else {
                 discardWarmVideo()
                 session = makeSession(video, preloading: false)
@@ -242,10 +243,12 @@ private struct AIDramaShortsPage: View {
         ZStack {
             Color.black
             if feed.selectedID == item.id, let session = feed.session {
-                if !fullscreen { AIDramaShortsSurface(session: session) }
-                AIDramaShortsControls(session: session, item: item, fullscreen: showFullscreen) { openAll(item) }
+                if !fullscreen {
+                    AIDramaShortsSurface(session: session)
+                    AIDramaShortsControls(session: session, item: item, fullscreen: showFullscreen) { openAll(item) }
+                }
                 #if DEBUG
-                if AIDramaDebugSupport.enabled {
+                if AIDramaDebugSupport.enabled, !fullscreen {
                     AIDramaDebugStateView(session: session).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
                 #endif
@@ -350,6 +353,7 @@ private struct AIDramaShortsPager: UIViewControllerRepresentable {
             let scroll = owner.scroll, size = scroll.bounds.size
             guard size.height > 0, size.width > 0,
                   let index = config.feed.videos.firstIndex(where: { $0.id == config.feed.selectedID }) else { return }
+            owner.view.accessibilityElementsHidden = config.fullscreen
             scroll.isScrollEnabled = !config.fullscreen
             scroll.contentSize = CGSize(width: size.width, height: size.height * CGFloat(config.feed.videos.count))
             let nearby = Set(max(0, index - 1)...min(config.feed.videos.count - 1, index + 1))

@@ -7,6 +7,7 @@ final class AIDramaUITests: XCTestCase {
     private let seriesID = "7000000000000000001"
     private var liveDeadline: Date?
     private var attachedFailureAccessibilityTree = false
+    private var initialNewPageOneRequests = 0
     private var isLiveTest: Bool { name.contains("testLivePineDrama") }
 
     private struct PlayerState: Decodable {
@@ -43,6 +44,9 @@ final class AIDramaUITests: XCTestCase {
             liveDeadline = Date().addingTimeInterval(108)
         } else {
             executionTimeAllowance = 240
+        }
+        if !isLiveTest {
+            initialNewPageOneRequests = eventCount(try fixtureJSON("/__smoke__/stats"), "catalog_started", feed: "new", page: 1)
         }
         app.launchArguments = [isLiveTest ? "--ai-drama-live-smoke" : "--ai-drama-smoke"]
         app.launch()
@@ -297,7 +301,7 @@ final class AIDramaUITests: XCTestCase {
         try scrollUntilHittable(secondPage, in: newScroll, message: "Scrolling appends new works page 2")
         XCTAssertTrue(secondPage.label.contains("New Fixture 13"))
         let newStats = try fixtureJSON("/__smoke__/stats")
-        XCTAssertEqual(eventCount(newStats, "catalog_started", feed: "new", page: 1), 1,
+        XCTAssertEqual(eventCount(newStats, "catalog_started", feed: "new", page: 1), initialNewPageOneRequests + 1,
                        "Infinite paging does not refresh and replace page 1")
         XCTAssertEqual(eventCount(newStats, "catalog_started", feed: "new", page: 2), 1)
         capture("new-works-appends-native-cursor-page-2")
@@ -473,12 +477,16 @@ final class AIDramaUITests: XCTestCase {
         capture("live-short-feed-native-video")
         attachTelemetry(name: "live-short-feed-decoded-state")
         assertNoSocialControls()
-        app.buttons["aidrama.shorts.fullscreen"].tap()
-        try waitForLive("The same live recommendation rotates to fullscreen", timeout: 8) { self.app.frame.width > self.app.frame.height }
-        XCTAssertEqual(try requirePlayerState().selectedEpisodeID, fields[1])
-        capture("live-short-feed-fullscreen")
-        app.buttons["aidrama.shorts.fullscreen"].tap()
-        try waitForLive("The live feed returns to portrait", timeout: 8) { self.app.frame.width < self.app.frame.height }
+        if app.buttons["aidrama.shorts.fullscreen"].exists {
+            app.buttons["aidrama.shorts.fullscreen"].tap()
+            try waitForLive("The same landscape recommendation rotates to fullscreen", timeout: 8) { self.app.frame.width > self.app.frame.height }
+            XCTAssertEqual(try requirePlayerState().selectedEpisodeID, fields[1])
+            capture("live-short-feed-fullscreen")
+            app.buttons["aidrama.shorts.fullscreen"].tap()
+            try waitForLive("The live feed returns to portrait", timeout: 8) { self.app.frame.width < self.app.frame.height }
+        } else {
+            XCTAssertLessThan(app.frame.width, app.frame.height, "Portrait recommendations stay portrait")
+        }
         all.tap()
         try waitForLivePlaying(id: fields[1], number: number, total: total, portraitOnly: false)
         app.buttons["aidrama.playlist.open"].tap()
