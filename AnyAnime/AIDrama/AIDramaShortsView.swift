@@ -315,6 +315,7 @@ private struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
         let close: () -> Void
         private var player: MPVPlaybackController?
         private var observations = Set<AnyCancellable>()
+        private var appeared = false
         private let exit = UIButton(type: .system)
         private let pause = UIButton(type: .system)
         #if DEBUG
@@ -327,7 +328,7 @@ private struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
         required init?(coder: NSCoder) { fatalError("init(coder:)") }
         override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscape }
         override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .landscapeRight }
-        override var preferredStatusBarHidden: Bool { true }
+        override var prefersStatusBarHidden: Bool { true }
         override var prefersHomeIndicatorAutoHidden: Bool { true }
         override func viewDidLoad() {
             super.viewDidLoad()
@@ -358,11 +359,12 @@ private struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
         @objc private func pausePressed() { session.togglePause() }
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
+            appeared = true
             PlayerOrientation.setLandscape(true, scene: view.window?.windowScene)
             mountIfVisible()
         }
         private func mountIfVisible() {
-            guard viewIfLoaded?.window != nil, let current = session.controller, player !== current else { return }
+            guard appeared, viewIfLoaded?.window != nil, let current = session.controller, player !== current else { return }
             unmount()
             if let previous = current.parent as? AIDramaNativeSurface.Container { previous.unmount() }
             else if current.parent != nil {
