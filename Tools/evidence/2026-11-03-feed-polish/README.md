@@ -31,14 +31,14 @@ cache size or device latency, and the original IPA was not executed here.
   muted, with 3 seconds/12 MiB demux limits. Promotion reuses that decoder.
   Warming cannot acquire viewing history, the idle timer, audio-session ownership
   or PiP. Leaving, backgrounding, a memory warning, or 45 seconds discards it.
-- Landscape recommendations open a real fullscreen cover containing the same
-  native controller. Tabs, library controls and playlist footer stay outside the
-  presentation. The pinned MPVKit MoltenVK patch reads layer size only during
-  renderer reconfiguration; updating UIKit/Metal bounds alone leaves a stale
-  viewport. AI players request that reconfiguration after a size change, while
-  retaining the same decoder owner, file, time and audio. Portrait recommendations
-  have no rotate button. Returning moves
-  the same controller back without resolving the media again.
+- Landscape recommendations open a native fullscreen UIViewController with its
+  own orientation policy and controls. Tabs, library controls and playlist footer
+  stay outside the presentation. Portrait recommendations have no rotate button.
+  The existing native player is reparented into that controller and returned on
+  dismissal, retaining its decoder, stream, selected episode, track choices and
+  position. An explicit test checks that entering/exiting creates no new player.
+  Player recreation/output-reset experiments were removed after the app-element
+  screenshot was found unsuitable for validating forced-landscape coordinates.
 - PiP creates its AVKit content source and enqueues an actual mpv decoded frame
   during foreground playback. The async snapshot requires mpv `screenshot-sw=yes`,
   so it uses software conversion of a decoded frame and avoids a GPU screenshot
@@ -54,6 +54,9 @@ The release must pass the complete provider/store checks, actual native UI
 checks, and MKV/PiP output/seek/pause/GPU restoration checks. Fullscreen UI checks
 must include its video surface dimensions and covered tab bar. Feed checks must
 observe next-media requests before the swipe and no second delayed resolution.
-System PiP delegate success is separate from software-frame success. No physical
+Pixel checks capture XCUIScreen (the physical display), alongside the application
+snapshot and native layer/renderer dimensions. App-element captures alone can
+misrepresent forced-landscape window coordinates. System PiP delegate success
+is separate from software-frame success. No physical
 iPhone is connected to this execution environment; that limit must remain
 explicit even if simulator system PiP succeeds.

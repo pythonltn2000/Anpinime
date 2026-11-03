@@ -37,7 +37,7 @@
     "catalogPagingFilters": "PASS",
     "verticalPlaylistLifecycle": "PASS",
     "posterSearchHitRegions": "PASS",
-    "shortFullscreenPixels": "FAIL: central visible fraction 0.0026041667, required >0.8",
+    "shortFullscreenPixels": "FAIL in original app-element capture: central fraction 0.0026041667, required >0.8. This measurement alone is not reliable evidence of the physical display during forced rotation.",
     "systemAutomaticPiP": "SKIP: AVKit system PiP unsupported by simulator",
     "liveCatalogPlaylist": "PASS",
     "liveShortFeedPlaylist": "PASS"
@@ -55,5 +55,6 @@
     "ownedPlayers": 1,
     "playerCreations": 1
   },
-  "conclusion": "UIKit and CAMetalLayer bounds updated correctly, but the actual video viewport remained stale. A successful build and valid container geometry were not accepted as a fullscreen fix."
+  "conclusion": "The build was not accepted as a delivery. Native view/Metal geometry was correct. The original pixel harness used an app-element screenshot; physical-screen captures were subsequently added to distinguish capture-coordinate errors from an actual viewport fault.",
+  "measurementCorrection": "Use XCUIScreen.main.screenshot() for the physical display. Preserve the app snapshot and native geometry for comparison. Do not infer a stale renderer from the original cropped image alone."
 }
