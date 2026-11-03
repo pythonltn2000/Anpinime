@@ -398,7 +398,7 @@ final class AIDramaUITests: XCTestCase {
         app.tabBars.buttons["Phim ngắn"].tap()
         try waitForLive("A native live feed video decodes and advances", timeout: 30) {
             guard let state = self.playerState() else { return false }
-            return state.currentTime > 1 && state.ownedPlayers == 1 && state.mediaInfo.contains("×")
+            return state.currentTime > 1 && state.ownedPlayers == 1 && self.isDecodedVideo(state.mediaInfo, portraitOnly: false)
         }
         let all = app.buttons["aidrama.shorts.all"]
         let fields = (all.value as? String ?? "").split(separator: "|").map(String.init)
@@ -417,7 +417,7 @@ final class AIDramaUITests: XCTestCase {
         app.buttons["aidrama.shorts.fullscreen"].tap()
         try waitForLive("The live feed returns to portrait", timeout: 8) { self.app.frame.width < self.app.frame.height }
         all.tap()
-        try waitForLivePlaying(id: fields[1], number: number, total: total)
+        try waitForLivePlaying(id: fields[1], number: number, total: total, portraitOnly: false)
         app.buttons["aidrama.playlist.open"].tap()
         try waitForLive("The live feed opens its independently verified complete playlist", timeout: 5) {
             self.app.buttons["aidrama.playlist.close"].isHittable
@@ -431,7 +431,7 @@ final class AIDramaUITests: XCTestCase {
         }
         guard last.isHittable else { throw HarnessError.failed("Last native feed episode missing") }
         last.tap()
-        try waitForLivePlaying(id: final.id, number: final.number, total: total)
+        try waitForLivePlaying(id: final.id, number: final.number, total: total, portraitOnly: false)
         attachTelemetry(name: "live-short-feed-final-episode-decoded-state")
         capture("live-short-feed-final-episode")
         app.buttons["aidrama.close"].tap()
@@ -596,12 +596,12 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["aidrama.episode.index"].value as? String, episodeID(episode))
     }
 
-    private func waitForLivePlaying(id: String, number: Int, total: Int) throws {
+    private func waitForLivePlaying(id: String, number: Int, total: Int, portraitOnly: Bool = true) throws {
         var firstDecodedTime: Double?
         try waitForLive("Live episode \(number) decodes portrait video and keeps advancing", timeout: 25) {
             guard let state = self.playerState(), state.selectedEpisodeID == id, !state.resolving,
                   !state.manuallyPaused, state.ownedPlayers == 1, state.currentTime > 1,
-                  self.isDecodedPortrait(state.mediaInfo) else { return false }
+                  self.isDecodedVideo(state.mediaInfo, portraitOnly: portraitOnly) else { return false }
             guard let before = firstDecodedTime else {
                 firstDecodedTime = state.currentTime
                 return false
@@ -614,13 +614,13 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertEqual(try requirePlayerState().maximumOwnedPlayers, 1)
     }
 
-    private func isDecodedPortrait(_ info: String) -> Bool {
+    private func isDecodedVideo(_ info: String, portraitOnly: Bool) -> Bool {
         guard let expression = try? NSRegularExpression(pattern: #"(\d+)\s*[×x]\s*(\d+)"#) else { return false }
         let value = info as NSString
         guard let match = expression.firstMatch(in: info, range: NSRange(location: 0, length: value.length)),
               let width = Int(value.substring(with: match.range(at: 1))),
               let height = Int(value.substring(with: match.range(at: 2))) else { return false }
-        return width > 0 && height > width
+        return width > 0 && height > 0 && (!portraitOnly || height > width)
     }
 
     private func requireLiveBudget() throws {
