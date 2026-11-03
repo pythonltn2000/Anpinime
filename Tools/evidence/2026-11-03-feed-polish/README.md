@@ -34,11 +34,13 @@ cache size or device latency, and the original IPA was not executed here.
 - Landscape recommendations open a native fullscreen UIViewController with its
   own orientation policy and controls. Tabs, library controls and playlist footer
   stay outside the presentation. Portrait recommendations have no rotate button.
-  The existing native player is reparented into that controller and returned on
-  dismissal, retaining its decoder, stream, selected episode, track choices and
-  position. An explicit test checks that entering/exiting creates no new player.
-  Player recreation/output-reset experiments were removed after the app-element
-  screenshot was found unsuitable for validating forced-landscape coordinates.
+  Physical-screen A/B checks distinguish two faults: app-element captures can
+  crop forced-landscape coordinates, and reparenting the old live Metal surface
+  still fails the physical-screen pixel check. A fresh surface passes that check.
+  The session therefore replaces the native player at the saved episode/time on
+  portrait/landscape changes, relinquishing the previous player before installing
+  its successor. A stream less than 45 seconds old is reused only in memory; older
+  streams resolve again. The original stream timestamp survives replacements.
 - PiP creates its AVKit content source and enqueues an actual mpv decoded frame
   during foreground playback. The async snapshot requires mpv `screenshot-sw=yes`,
   so it uses software conversion of a decoded frame and avoids a GPU screenshot

@@ -247,7 +247,6 @@ final class AIDramaUITests: XCTestCase {
                 && events.contains { $0["event"] as? String == "media" && $0["episode"] as? Int == 3 }
         }
         let before = try requirePlayerState().currentTime
-        let creationsBeforeFullscreen = try requirePlayerState().playerCreations
         app.buttons["aidrama.shorts.fullscreen"].tap()
         try waitFor("Fullscreen rotates the same short video") { self.app.frame.width > self.app.frame.height }
         XCTAssertEqual(try requirePlayerState().selectedEpisodeID, episodeID(5))
@@ -268,7 +267,7 @@ final class AIDramaUITests: XCTestCase {
         capture("short-feed-fullscreen-landscape")
         app.buttons["aidrama.shorts.fullscreen"].tap()
         try waitFor("Exiting fullscreen returns to portrait") { self.app.frame.width < self.app.frame.height }
-        XCTAssertEqual(try requirePlayerState().playerCreations, creationsBeforeFullscreen, "Fullscreen borrows the same decoder and stream")
+        XCTAssertEqual(try requirePlayerState().maximumOwnedPlayers, 1, "Surface replacement retains one playback owner")
         let swipeStarted = Date()
         dragToNextEpisode()
         try waitFor("A vertical swipe plays the next actual recommendation", timeout: 25) {

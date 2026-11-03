@@ -15,6 +15,11 @@ final class MPVPlaybackController: UIViewController {
     private let surface = MPVSurface()
     private var pictureInPicture: MPVPictureInPicture?
     private var preloading: Bool
+    private let resizesEmbeddedSurface: Bool
+    private var rendererSize = CGSize.zero
+    private var resizeTask: Task<Void, Never>?
+    private var initialViewport: CGSize?
+    var onViewportChange: ((CGSize) -> Void)?
     private var automaticPiPPrepared = false
     private var snapshotPending = false
     private var snapshotReady = false
@@ -44,12 +49,19 @@ final class MPVPlaybackController: UIViewController {
     #endif
     var onFailure: ((String) -> Void)?
 
-    init(url: URL, headers: [String: String], playback: PlaybackState, preloading: Bool = false) {
+    init(url: URL, headers: [String: String], playback: PlaybackState, preloading: Bool = false, resizesEmbeddedSurface: Bool = false, initialViewport: CGSize? = nil) {
+        self.initialViewport = initialViewport
+        self.resizesEmbeddedSurface = resizesEmbeddedSurface
         self.preloading = preloading
         self.url = url; self.headers = headers; self.playback = playback; self.userPaused = playback.userPaused
         super.init(nibName: nil, bundle: nil)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func loadView() {
+        if let initialViewport { view = UIView(frame: CGRect(origin: .zero, size: initialViewport)) }
+        else { super.loadView() }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -111,9 +123,31 @@ final class MPVPlaybackController: UIViewController {
         surface.drawableSize = CGSize(width: view.bounds.width * surface.contentsScale, height: view.bounds.height * surface.contentsScale)
         pictureInPicture?.layer.frame = view.bounds
         CATransaction.commit()
+        resizeEmbeddedRendererIfNeeded()
+    }
+
+    private func resizeEmbeddedRendererIfNeeded() {
+        let size = view.bounds.size
+        guard size.width > 1, size.height > 1, size != rendererSize else { return }
+        let previous = rendererSize
+        rendererSize = size
+        guard resizesEmbeddedSurface, !preloading, previous != .zero, loaded,
+              (previous.width > previous.height) != (size.width > size.height) else { return }
+        resizeTask?.cancel()
+        resizeTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled, let self, self.handle != nil, self.rendererSize == size,
+                  UIApplication.shared.applicationState == .active,
+                  self.string("current-vo") == "gpu-next" else { return }
+            // A live MoltenVK layer retains its old presentation geometry after moving
+            // between portrait and landscape hosts. The session replaces that surface
+            // with a fresh player at the retained position, using its in-memory stream.
+            self.onViewportChange?(size)
+        }
     }
 
     func shutdown() {
+        resizeTask?.cancel(); resizeTask = nil
         timer?.invalidate(); timer = nil
         NotificationCenter.default.removeObserver(self)
         guard let context = handle else { return }
