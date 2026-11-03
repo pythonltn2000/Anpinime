@@ -66,6 +66,56 @@ actor PineDramaProvider: AIDramaProviding {
 
     deinit { session.invalidateAndCancel() }
 
+    private let feedEnteredAt = String(Int64(Date().timeIntervalSince1970 * 1000))
+
+    func shortFeed(loadedVideoIDs: [String]) async throws -> AIDramaShortFeedPage {
+        guard loadedVideoIDs.allSatisfy({ Self.identifier($0) != nil }),
+              Set(loadedVideoIDs).count == loadedVideoIDs.count else { throw AIDramaError.invalidResponse }
+        // Original TTKFeedShortDramaDataController.bizParams: no catalog scene/cursor.
+        let (data, _) = try await request("mini_drama/feed/v1/", parameters: [
+            "count": "6", "need_load_skylight": "0", "first_enter_tab_time": feedEnteredAt,
+            "drama_request_type": loadedVideoIDs.isEmpty ? "init_fetch" : "load_more",
+            "drama_current_items": loadedVideoIDs.suffix(20).joined(separator: ","),
+            "item_count_in_session": String(loadedVideoIDs.count), "cached_count": "0",
+            "force_insert_last_watch": "0"
+        ])
+        return try Self.decodeShortFeed(data)
+    }
+
+    static func decodeShortFeed(_ data: Data) throws -> AIDramaShortFeedPage {
+        let response = try PineDramaPBMessage(data)
+        let status = try response.uint(1) ?? 0
+        guard status == 0 else { throw serviceError(status) }
+        var videos: [AIDramaShortVideo] = []
+        var seen = Set<String>()
+        for aweme in try response.messages(4) {
+            // Non-series entries (including advertisements) have no paid-content collection.
+            guard let paid = try aweme.message(317), let seriesID = try paid.identifier(1),
+                  let videoID = try aweme.string(1), identifier(videoID) != nil,
+                  let title = try paid.string(13), !title.isEmpty,
+                  let rawNumber = try paid.uint(3), rawNumber > 0, rawNumber <= UInt64(Int.max) else { continue }
+            guard seen.insert(videoID).inserted else { continue }
+            if let paidID = try paid.identifier(6), paidID != videoID { throw AIDramaError.invalidResponse }
+            // Intro/highlight clips cannot be presented as numbered full episodes.
+            if try paid.uint(5) ?? 0 != 0 { continue }
+            var total: Int?
+            if let info = try paid.string(31), let bytes = info.data(using: .utf8),
+               let object = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] {
+                total = integer(object["video_total_nums"]).flatMap { $0 > 0 ? $0 : nil }
+            }
+            let coverURL = try paid.message(27)?.strings(2).compactMap { mediaURL($0, allowLoopbackHTTP: false) }.first
+            let locked = try (paid.uint(7) ?? 0 != 0) || (paid.uint(8) ?? 0 != 0) || (paid.uint(17) ?? 0 != 0)
+            let series = AIDramaSeries(id: seriesID, title: title, coverURL: coverURL,
+                                      episodeCount: total, genreText: try paid.strings(26).joined(separator: ", "))
+            let episode = AIDramaEpisode(id: videoID, seriesID: seriesID, number: Int(rawNumber),
+                                        coverURL: coverURL, isLocked: locked)
+            let media = try aweme.message(7)
+            videos.append(AIDramaShortVideo(series: series, episode: episode,
+                isLandscape: try (media?.uint(4) ?? 0) > (media?.uint(3) ?? 0)))
+        }
+        return AIDramaShortFeedPage(videos: videos, hasMore: try response.uint(3) ?? 0 != 0)
+    }
+
     func discover(cursor: String?) async throws -> AIDramaCatalogPage {
         try await catalog(query: .home, cursor: cursor, loadedSeriesIDs: [])
     }

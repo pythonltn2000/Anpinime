@@ -420,7 +420,25 @@ struct AIDramaProviderTests {
               "All new library routes preserve account-free transport isolation")
     }
 
+    static func testShortFeed() throws {
+        let paid = uint(1, 7_000_000_000_000_000_001) + uint(3, 3)
+            + bytes(13, Data("Phim ngắn thật".utf8)) + bytes(26, Data("Kỳ ảo".utf8))
+            + bytes(31, Data("{\"video_total_nums\":40}".utf8))
+        let aweme = bytes(1, Data(episode.id.utf8)) + bytes(317, paid) + bytes(7, uint(4, 1280) + uint(3, 720))
+        let page = try PineDramaProvider.decodeShortFeed(uint(1, 0) + uint(3, 1) + bytes(4, aweme) + bytes(4, aweme) + bytes(4, bytes(1, Data("999".utf8))))
+        check(page.videos.count == 1 && page.hasMore, "Native feed skips non-series rows and duplicate video IDs")
+        check(page.videos[0].series.id == series.id && page.videos[0].series.episodeCount == 40 && page.videos[0].episode.id == episode.id,
+              "Feed keeps exact series/video identities and native total independently of ranking catalogs")
+        check(page.videos[0].episode.number == 3 && page.videos[0].isLandscape, "Landscape recommendation keeps the actual episode number")
+        let intro = bytes(1, Data(episode.id.utf8)) + bytes(317, paid + uint(5, 1))
+        check(try PineDramaProvider.decodeShortFeed(uint(1, 0) + uint(3, 0) + bytes(4, intro)).videos.isEmpty,
+              "Feed introduction is not substituted for a numbered episode")
+        rejects("feed service refusal", kind: .unavailable) { _ = try PineDramaProvider.decodeShortFeed(uint(1, 9)) }
+        rejects("truncated feed protobuf", kind: .invalid) { _ = try PineDramaProvider.decodeShortFeed(Data([0x22, 0xff])) }
+    }
+
     static func main() async throws {
+        try testShortFeed()
         try testCatalog()
         try testLibraryContracts()
         try testPlaylist()

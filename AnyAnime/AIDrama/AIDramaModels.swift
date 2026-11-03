@@ -100,7 +100,20 @@ struct AIDramaStream: Sendable {
     var headers: [String: String] = [:]
 }
 
+struct AIDramaShortVideo: Identifiable, Sendable {
+    let series: AIDramaSeries
+    let episode: AIDramaEpisode
+    let isLandscape: Bool
+    var id: String { episode.id }
+}
+
+struct AIDramaShortFeedPage: Sendable {
+    let videos: [AIDramaShortVideo]
+    let hasMore: Bool
+}
+
 protocol AIDramaProviding: Sendable {
+    func shortFeed(loadedVideoIDs: [String]) async throws -> AIDramaShortFeedPage
     func discover(cursor: String?) async throws -> AIDramaCatalogPage
     func catalog(query: AIDramaCatalogQuery, cursor: String?, loadedSeriesIDs: [String]) async throws -> AIDramaCatalogPage
     func catalogMetadata() async throws -> AIDramaCatalogMetadata
@@ -109,6 +122,10 @@ protocol AIDramaProviding: Sendable {
 }
 
 extension AIDramaProviding {
+    func shortFeed(loadedVideoIDs: [String]) async throws -> AIDramaShortFeedPage {
+        throw AIDramaError.unavailable("Nguồn phim chưa trả luồng Phim ngắn.")
+    }
+
     func catalog(query: AIDramaCatalogQuery, cursor: String?, loadedSeriesIDs: [String] = []) async throws -> AIDramaCatalogPage {
         guard query == .home else { throw AIDramaError.unavailable("Nguồn Phim AI chưa cung cấp mục này.") }
         return try await discover(cursor: cursor)

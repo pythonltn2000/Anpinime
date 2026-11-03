@@ -1,5 +1,6 @@
 import UIKit
 import Metal
+import AVKit
 import Libmpv
 
 /// libmpv handles Matroska, embedded audio/subtitle tracks and two subtitle lanes.
@@ -12,6 +13,7 @@ final class MPVPlaybackController: UIViewController {
     private var handle: OpaquePointer?
     private var timer: Timer?
     private let surface = MPVSurface()
+    private var pictureInPicture: MPVPictureInPicture?
     private var loaded = false
     private var userPaused = false
     private var backgroundPaused = false
@@ -57,6 +59,7 @@ final class MPVPlaybackController: UIViewController {
         if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke { mpv_request_log_messages(context, "warn") }
         #endif
         mpv_observe_property(context, 1, "track-list", MPV_FORMAT_NONE)
+        playback.pictureInPictureSupported = AVPictureInPictureController.isPictureInPictureSupported()
         playback.engine = "mpv"
         playback.supportsAdvancedSubtitles = true
         set("speed", String(playback.rate)); set("volume", String(playback.volume * 100))
@@ -66,6 +69,7 @@ final class MPVPlaybackController: UIViewController {
         timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(prepareForBackground), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(background), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(foreground), name: UIApplication.willEnterForegroundNotification, object: nil)
     }
@@ -74,6 +78,7 @@ final class MPVPlaybackController: UIViewController {
         CATransaction.begin(); CATransaction.setDisableActions(true)
         surface.frame = view.bounds
         surface.drawableSize = CGSize(width: view.bounds.width * surface.contentsScale, height: view.bounds.height * surface.contentsScale)
+        pictureInPicture?.layer.frame = view.bounds
         CATransaction.commit()
     }
     func shutdown() {
@@ -83,12 +88,45 @@ final class MPVPlaybackController: UIViewController {
         handle = nil
         // Network demuxers can take time to close. Keep the render surface alive until teardown finishes.
         let retainedSurface = surface
-        DispatchQueue.global(qos: .utility).async {
-            mpv_terminate_destroy(context)
-            withExtendedLifetime(retainedSurface) {}
+        let destroy = {
+            DispatchQueue.global(qos: .utility).async {
+                mpv_terminate_destroy(context)
+                withExtendedLifetime(retainedSurface) {}
+            }
         }
+        if let pictureInPicture { pictureInPicture.stop(restore: false, completion: destroy) }
+        else { destroy() }
+        pictureInPicture = nil
     }
+
+    @objc private func prepareForBackground() {
+        if UserDefaults.standard.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true { preparePictureInPicture() }
+    }
+
+    func preparePictureInPicture(start: Bool = true) {
+        guard loaded, !userPaused, handle != nil, pictureInPicture == nil else { return }
+        guard playback.pictureInPictureSupported || !start else { return }
+        playback.pictureInPictureError = nil
+        let pip = MPVPictureInPicture(playback: playback, command: { [weak self] name, value in
+            guard let self else { return }
+            if name == "pipOutput" { self.set("hwdec", "videotoolbox-copy"); self.set("vo", "libmpv") }
+            else { self.playback.send(name, value) }
+        }, restoreVideo: { [weak self] in
+            self?.set("vo", "gpu-next"); self?.set("hwdec", "videotoolbox")
+        }, finished: { [weak self] in
+            guard let self else { return }
+            self.pictureInPicture = nil
+            if UIApplication.shared.applicationState == .background { self.background() }
+        })
+        pictureInPicture = pip
+        pip.layer.frame = view.bounds
+        view.layer.addSublayer(pip.layer)
+        let width = number("video-params/w"), height = number("video-params/h")
+        pip.prepare(handle: handle!, size: CGSize(width: max(1, width), height: max(1, height)), start: start)
+    }
+
     @objc private func background() {
+        guard !playback.pictureInPictureActive, !playback.pictureInPicturePending else { return }
         backgroundPaused = !userPaused
         set("pause", "yes")
     }
@@ -96,6 +134,7 @@ final class MPVPlaybackController: UIViewController {
 
     func perform(_ name: String, value: Double) {
         switch name {
+        case "pip": preparePictureInPicture()
         case "play": userPaused = false; set("pause", "no")
         case "pause": userPaused = true; set("pause", "yes")
         case "seek": command(["seek", String(max(0, min(value, playback.duration))), "absolute+exact"])
@@ -166,6 +205,7 @@ final class MPVPlaybackController: UIViewController {
         playback.playing = loaded && string("pause") == "no" && !playback.buffering && string("idle-active") != "yes"
         if loaded && (playback.currentTime > 0 || number("video-params/w") > 0) { playback.loading = false; playback.error = nil }
         if !loaded && Date().timeIntervalSince(startedAt) > 40 { fail("Máy chủ chưa trả dữ liệu video. Hãy thử lại hoặc chọn máy chủ khác.") }
+        pictureInPicture?.invalidatePlaybackState()
         playback.mediaInfo = [string("file-format"), string("video-codec"), "\(Int(number("video-params/w"))) × \(Int(number("video-params/h")))", string("audio-codec")].filter { !$0.isEmpty }.joined(separator: " · ")
         #if DEBUG
         if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke {

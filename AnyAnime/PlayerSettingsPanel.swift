@@ -12,6 +12,7 @@ struct PlayerSettingsPanel: View {
     @State private var importing = false
     @State private var importSlot = "subtitles"
     @State private var importError: String?
+    @AppStorage("AnPinime.automaticPiP") private var automaticPiP = true
     @AppStorage("AnPinime.autoNext") private var autoNext = true
     @AppStorage("AnPinime.rememberSpeed") private var rememberSpeed = true
     @AppStorage("AnPinime.playbackRate") private var savedRate = 1.0
@@ -23,35 +24,32 @@ struct PlayerSettingsPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Cài đặt phát").font(.headline)
+                Text("Cài đặt").font(.headline)
                 Spacer()
                 Button(action: close) { Image(systemName: "xmark").frame(width: 40, height: 40) }.accessibilityLabel("Đóng cài đặt")
             }.padding(.horizontal, 18)
             Divider()
-            HStack(alignment: .top, spacing: 0) {
-                ScrollView {
-                    VStack(spacing: 5) {
-                        ForEach(tabs, id: \.0) { item in
-                            Button { tab = item.0 } label: {
-                                VStack(spacing: 5) {
-                                    Image(systemName: item.2).font(.system(size: 18))
-                                    Text(item.1).font(.system(size: 12, weight: .semibold))
-                                }.frame(maxWidth: .infinity).padding(.vertical, 11)
-                                    .background(tab == item.0 ? Color.anpinimeAccent.opacity(0.25) : .clear, in: RoundedRectangle(cornerRadius: 10))
-                                    .foregroundColor(tab == item.0 ? .anpinimeAccent : .white.opacity(0.7))
-                            }.buttonStyle(.plain)
-                        }
-                    }.padding(7)
-                }.frame(width: 88)
-                Divider()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) { content }
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(18)
-                }.id(tab)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(tabs, id: \.0) { item in
+                        Button { tab = item.0 } label: {
+                            Text(item.1).font(.system(size: 13, weight: .semibold))
+                                .padding(.horizontal, 16).padding(.vertical, 11)
+                                .background(tab == item.0 ? Color.white : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                                .foregroundColor(tab == item.0 ? .black : .white.opacity(0.75))
+                        }.buttonStyle(.plain).accessibilityIdentifier("player.settings." + item.0)
+                    }
+                }.padding(.horizontal, 18).padding(.vertical, 12)
             }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) { content }
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(18)
+            }.id(tab)
         }
+
         .foregroundColor(.white).tint(.anpinimeAccent)
-        .background(Color(white: 0.06).opacity(0.97), in: RoundedRectangle(cornerRadius: 22))
+        .background(Color(white: 0.075).opacity(0.98), in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
         .onAppear { tab = tabs.contains(where: { $0.0 == initialTab }) ? initialTab : "audio" }
         .onChange(of: playback.subtitleStyle) { style in style.save(); playback.send("subtitleStyle") }
         .fileImporter(isPresented: $importing, allowedContentTypes: ["srt", "ass", "ssa", "vtt"].compactMap { UTType(filenameExtension: $0) } + [.data]) { result in
@@ -122,6 +120,12 @@ struct PlayerSettingsPanel: View {
             heading("Chung")
             Toggle("Lấp đầy màn hình", isOn: $playback.fill).onChange(of: playback.fill) { playback.send("fit", $0 ? 1 : 0) }
             Toggle("Tự phát tập tiếp theo", isOn: $autoNext)
+            Toggle("PiP khi rời ứng dụng", isOn: $automaticPiP)
+            if playback.pictureInPictureSupported {
+                Button { playback.send("pip"); close() } label: { Label("Mở cửa sổ nổi", systemImage: "pip.enter") }
+                    .buttonStyle(.bordered)
+            }
+            if let message = playback.pictureInPictureError { Text(message).font(.footnote).foregroundColor(.orange) }
             Picker("Bước tua", selection: $skipSeconds) { ForEach([5, 10, 15, 30], id: \.self) { Text("\($0) giây").tag($0) } }.pickerStyle(.menu)
             Button(action: reload) { Label("Tải lại video", systemImage: "arrow.clockwise") }.buttonStyle(.bordered)
         default:
@@ -151,7 +155,9 @@ struct PlayerSettingsPanel: View {
                         Image(systemName: selected == track.id ? "checkmark.circle.fill" : "circle").foregroundColor(selected == track.id ? .anpinimeAccent : .gray)
                         Text(ContentDisplayText.sourceLabels(track.title)).font(.subheadline).multilineTextAlignment(.leading)
                         Spacer(minLength: 0)
-                    }.frame(minHeight: 38).padding(.vertical, 3)
+                    }.frame(minHeight: 44).padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(selected == track.id ? Color.white.opacity(0.12) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 9))
+                        .contentShape(Rectangle())
                 }.buttonStyle(.plain)
             }
         }

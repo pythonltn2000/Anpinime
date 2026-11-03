@@ -6,42 +6,29 @@ struct AIDramaLibraryView: View {
     @ObservedObject var store: AIDramaCatalogStore
     let onChooseLibrary: () -> Void
     @State private var selectedTab = 0
+    @State private var exploreSection = AIDramaExploreSection.trending
     @State private var presentation: PlaylistPresentation?
     @State private var openingTask: Task<Void, Never>?
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            NavigationView {
-                AIDramaTabView(store: store, selectTab: { selectedTab = $0 }, open: open)
-                    .modifier(AIDramaLibraryNavigation(title: "Phim AI", onChooseLibrary: onChooseLibrary))
-            }
-            .navigationViewStyle(.stack)
-            .tabItem { Label("Trang chủ", systemImage: "house.fill") }
-            .tag(0)
+            AIDramaTabView(store: store, explore: { section in
+                exploreSection = section; selectedTab = 2
+            }, open: open)
+            .overlay(alignment: .topLeading) { libraryButton.padding(.leading, 16).padding(.top, 4) }
+            .tabItem { Label("Trang chủ", systemImage: "house.fill") }.tag(0)
+
+            AIDramaShortsView(provider: store.provider, active: selectedTab == 1 && presentation == nil,
+                              openAll: { series, episode in open(series, episode) })
+                .overlay(alignment: .topLeading) { libraryButton.padding(.leading, 16).padding(.top, 4) }
+                .tabItem { Label("Phim ngắn", systemImage: "play.rectangle.fill") }.tag(1)
 
             NavigationView {
-                AIDramaTrendingView(store: store, open: { open($0, nil) })
-                    .modifier(AIDramaLibraryNavigation(title: "Thịnh hành", onChooseLibrary: onChooseLibrary))
+                AIDramaExploreView(store: store, selection: $exploreSection, open: { open($0, nil) })
+                    .modifier(AIDramaLibraryNavigation(title: "Khám phá", onChooseLibrary: onChooseLibrary))
             }
             .navigationViewStyle(.stack)
-            .tabItem { Label("Thịnh hành", systemImage: "chart.line.uptrend.xyaxis") }
-            .tag(1)
-
-            NavigationView {
-                AIDramaCategoriesView(store: store, open: { open($0, nil) })
-                    .modifier(AIDramaLibraryNavigation(title: "Danh mục", onChooseLibrary: onChooseLibrary))
-            }
-            .navigationViewStyle(.stack)
-            .tabItem { Label("Danh mục", systemImage: "square.grid.2x2.fill") }
-            .tag(2)
-
-            NavigationView {
-                AIDramaNewWorksView(store: store, open: { open($0, nil) })
-                    .modifier(AIDramaLibraryNavigation(title: "Mới", onChooseLibrary: onChooseLibrary))
-            }
-            .navigationViewStyle(.stack)
-            .tabItem { Label("Mới", systemImage: "sparkles") }
-            .tag(3)
+            .tabItem { Label("Khám phá", systemImage: "square.grid.2x2.fill") }.tag(2)
 
             NavigationView {
                 AIDramaSettingsView(store: store, onChooseLibrary: onChooseLibrary)
@@ -49,7 +36,7 @@ struct AIDramaLibraryView: View {
             }
             .navigationViewStyle(.stack)
             .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
-            .tag(4)
+            .tag(3)
         }
         .tint(.anpinimeAccent)
         .onChange(of: selectedTab) { _ in cancelOpening() }
@@ -60,6 +47,15 @@ struct AIDramaLibraryView: View {
         .fullScreenCover(item: $presentation) { item in
             AIDramaPlayerView(playlist: item.playlist, provider: store.provider, initialEpisodeID: item.initialEpisodeID)
         }
+    }
+
+    private var libraryButton: some View {
+        Button(action: onChooseLibrary) {
+            Label("Thư viện", systemImage: "chevron.left").font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 13).padding(.vertical, 11)
+                .foregroundColor(.white).background(.ultraThinMaterial, in: Capsule())
+        }
+        .accessibilityLabel("Đổi thư viện").accessibilityIdentifier("aidrama.library.choose")
     }
 
     private func open(_ series: AIDramaSeries, _ episodeID: String?) {

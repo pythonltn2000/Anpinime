@@ -271,10 +271,10 @@ struct HomeView: View {
                 .refreshable { await service.loadHome(forceDomainRefresh: true) }
             }
         }
-        .navigationTitle(service.source.isMovie ? "Phim" : "Anime")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+        .ignoresSafeArea(edges: .top)
+        .navigationBarHidden(true)
+        .overlay(alignment: .top) {
+            HStack {
                 HStack(spacing: 10) {
                     Button { onChooseLibrary?() } label: {
                         Image(service.source.isMovie ? "MovieLogo" : "AppLogo").resizable().scaledToFit().frame(width: 34, height: 34)
@@ -296,17 +296,14 @@ struct HomeView: View {
                         .accessibilityValue(service.source.title)
                     }
                 }
-            }
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Spacer()
                 if !service.source.isMovie {
-                    NavigationLink(destination: AnimeScheduleView()) { Image(systemName: "calendar") }
+                    NavigationLink(destination: AnimeScheduleView()) { Image(systemName: "calendar").frame(width: 42, height: 42) }
                         .accessibilityLabel("Lịch chiếu anime")
                 }
-                Button { Task { await service.loadHome(forceDomainRefresh: true) } } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .disabled(service.homeLoading)
             }
+            .padding(.horizontal, 16).padding(.top, 6)
+            .background(LinearGradient(colors: [.black.opacity(0.6), .clear], startPoint: .top, endPoint: .bottom).padding(.bottom, -25))
         }
         .task(id: service.source) {
             if service.homeSections.isEmpty { await service.loadHome() }
@@ -323,7 +320,7 @@ struct FeaturedCarouselView: View {
             TabView(selection: $selection) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, anime in
                     NavigationLink(destination: AnimeDetailView(anime: anime)) {
-                        FeaturedHeroCard(anime: anime)
+                        FeaturedHeroCard(anime: anime).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .tag(index)
@@ -548,6 +545,7 @@ struct AnimeCard: View {
             }
         }
         .frame(width: 132, alignment: .topLeading)
+        .contentShape(Rectangle())
     }
 }
 

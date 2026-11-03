@@ -5,7 +5,7 @@ import SwiftUI
 struct AIDramaTabView: View {
     @ObservedObject var store: AIDramaCatalogStore
     @ObservedObject private var history = AIDramaHistoryStore.shared
-    let selectTab: (Int) -> Void
+    let explore: (AIDramaExploreSection) -> Void
     let open: (AIDramaSeries, String?) -> Void
 
     private var home: AIDramaCatalogState { store.snapshot(for: .home) }
@@ -27,7 +27,7 @@ struct AIDramaTabView: View {
                     }
                     if !hot.series.isEmpty {
                         AIDramaHorizontalRow(title: "Thịnh hành", series: hot.series, loadingID: store.loadingPlaylistID,
-                                             identifierPrefix: "aidrama.home.trending.", more: { selectTab(1) },
+                                             identifierPrefix: "aidrama.home.trending.", more: { explore(.trending) },
                                              canLoadMore: hot.canLoadMore, loadingMore: hot.isLoadingMore, error: hot.error,
                                              loadMore: { await store.loadMore(query: .trending(.hot)) }, open: { open($0, nil) })
                     } else if hot.error != nil {
@@ -35,7 +35,7 @@ struct AIDramaTabView: View {
                     }
                     if !newWorks.series.isEmpty {
                         AIDramaHorizontalRow(title: "Mới ra mắt", series: newWorks.series, loadingID: store.loadingPlaylistID,
-                                             identifierPrefix: "aidrama.home.new.", more: { selectTab(3) },
+                                             identifierPrefix: "aidrama.home.new.", more: { explore(.newWorks) },
                                              canLoadMore: newWorks.canLoadMore, loadingMore: newWorks.isLoadingMore, error: newWorks.error,
                                              loadMore: { await store.loadMore(query: .newWorks) }, open: { open($0, nil) })
                     } else if newWorks.error != nil {
@@ -49,13 +49,7 @@ struct AIDramaTabView: View {
         }
         .background(AIDramaTheme.background.ignoresSafeArea())
         .task { await load() }
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { Task { await refresh() } } label: { Image(systemName: "arrow.clockwise") }
-                    .disabled(home.isLoading)
-                    .accessibilityLabel("Làm mới Phim AI")
-            }
-        }
+        .ignoresSafeArea(edges: .top)
     }
 
     private var historyRow: some View {

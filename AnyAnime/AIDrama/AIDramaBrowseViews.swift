@@ -173,3 +173,29 @@ struct AIDramaCategoriesView: View {
         }
     }
 }
+
+
+enum AIDramaExploreSection: String, CaseIterable {
+    case trending = "Thịnh hành", categories = "Danh mục", newWorks = "Mới"
+}
+
+@MainActor
+struct AIDramaExploreView: View {
+    @ObservedObject var store: AIDramaCatalogStore
+    @Binding var selection: AIDramaExploreSection
+    let open: (AIDramaSeries) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Khám phá", selection: $selection) {
+                ForEach(AIDramaExploreSection.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }.pickerStyle(.segmented).padding(12).accessibilityIdentifier("aidrama.explore.mode")
+            switch selection {
+            case .trending: AIDramaTrendingView(store: store, open: open)
+            case .categories: AIDramaCategoriesView(store: store, open: open)
+            case .newWorks: AIDramaNewWorksView(store: store, open: open)
+            }
+        }
+        .background(AIDramaTheme.background.ignoresSafeArea())
+    }
+}

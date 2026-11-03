@@ -44,3 +44,24 @@ struct LandscapePresentation: UIViewControllerRepresentable {
         PlayerOrientation.setLandscape(false, scene: scene)
     }
 }
+
+/// Rotation keeps the same native player and its playback position attached.
+struct VideoOrientationPresentation: UIViewControllerRepresentable {
+    let landscape: Bool
+    final class Controller: UIViewController {
+        var landscape = false
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            PlayerOrientation.setLandscape(landscape, scene: view.window?.windowScene)
+        }
+    }
+    func makeUIViewController(context: Context) -> Controller { let c = Controller(); c.landscape = landscape; return c }
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        guard controller.landscape != landscape else { return }
+        controller.landscape = landscape
+        PlayerOrientation.setLandscape(landscape, scene: controller.view.window?.windowScene)
+    }
+    static func dismantleUIViewController(_ controller: Controller, coordinator: ()) {
+        if controller.landscape { PlayerOrientation.setLandscape(false, scene: controller.view.window?.windowScene) }
+    }
+}

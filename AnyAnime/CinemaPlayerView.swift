@@ -7,6 +7,10 @@ final class PlaybackState: ObservableObject {
     @Published var loading = true
     @Published var buffering = false
     @Published var playing = false
+    @Published var pictureInPictureSupported = false
+    @Published var pictureInPictureActive = false
+    @Published var pictureInPictureError: String?
+    var pictureInPicturePending = false
     var userPaused = false
     @Published var currentTime = 0.0
     @Published var duration = 0.0
@@ -40,6 +44,7 @@ final class PlaybackState: ObservableObject {
     }
     func reset() {
         loading = true; buffering = false; playing = false; userPaused = false
+        pictureInPictureSupported = false; pictureInPictureActive = false; pictureInPicturePending = false; pictureInPictureError = nil
         currentTime = 0; duration = 0; error = nil; verification = false
         audioTracks = []; subtitleTracks = []; audioTrack = ""; subtitleTrack = "off"
         qualities = [.automatic]; quality = "auto"
@@ -209,6 +214,7 @@ struct PlayerView: View {
                         Text(ContentDisplayText.sourceLabels(current.source.isMovie ? "\(current.season) · \(current.title)" : current.title)).font(.caption).foregroundColor(.white.opacity(0.65)).lineLimit(1)
                     }
                     Spacer(minLength: 0)
+                    if playback.pictureInPictureSupported { controlButton("pip.enter", "Mở cửa sổ nổi") { playback.send("pip") } }
                     controlButton("gearshape", "Cài đặt phát") { openPanel("settings") }
                 }
                 Spacer(minLength: 0)

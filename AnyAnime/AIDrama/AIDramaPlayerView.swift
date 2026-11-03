@@ -223,7 +223,7 @@ private struct AIDramaEpisodePage: View {
 /// Only the selected page may contain this surface. The session owns shutdown, including
 /// when SwiftUI retains the old surface for the outgoing page transition.
 @MainActor
-private struct AIDramaNativeSurface: UIViewControllerRepresentable {
+struct AIDramaNativeSurface: UIViewControllerRepresentable {
     let player: MPVPlaybackController
     let session: AIDramaPlaybackSession
 

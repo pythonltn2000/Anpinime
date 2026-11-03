@@ -55,7 +55,7 @@ final class AIDramaPlaybackSession: ObservableObject {
 
     var selectedIndex: Int? { playlist.episodes.firstIndex { $0.id == selectedEpisodeID } }
     var selectedEpisode: AIDramaEpisode? { selectedIndex.map { playlist.episodes[$0] } }
-    private var mayPlay: Bool { presented && sceneActive && !transitioning && attached && !manuallyPaused }
+    private var mayPlay: Bool { presented && (sceneActive || playback?.pictureInPictureActive == true || playback?.pictureInPicturePending == true) && !transitioning && attached && !manuallyPaused }
     private var mayResolve: Bool { presented && sceneActive && !transitioning }
 
     func setPresented(_ value: Bool, sceneActive: Bool) {
@@ -66,6 +66,8 @@ final class AIDramaPlaybackSession: ObservableObject {
     }
 
     func setSceneActive(_ value: Bool) {
+        if !value, presented, !manuallyPaused,
+           defaults.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true { controller?.preparePictureInPicture() }
         sceneActive = value
         if !value { transitioning = false; transitionGeneration = nil }
         reconcile()
@@ -150,6 +152,9 @@ final class AIDramaPlaybackSession: ObservableObject {
 
     private func reconcile() {
         guard mayResolve else {
+            if presented, playback?.pictureInPictureActive == true || playback?.pictureInPicturePending == true {
+                savePosition(); applyPlaybackIntent(); return
+            }
             invalidateCurrent()
             releaseActivity()
             return
@@ -217,6 +222,12 @@ final class AIDramaPlaybackSession: ObservableObject {
         // Logical session ownership only; asynchronous native teardown is not counted.
         maximumOwnedPlayers = max(maximumOwnedPlayers, controller == nil ? 0 : 1)
         #endif
+        state.$pictureInPictureActive.dropFirst().sink { [weak self] active in
+            Task { @MainActor [weak self] in
+                guard let self, self.generation == token else { return }
+                if !active, !self.sceneActive { self.reconcile() }
+            }
+        }.store(in: &observations)
         state.$duration.sink { [weak self, weak state, weak player] duration in
             guard duration > 0, self?.pendingResume != nil else { return }
             // @Published emits before assignment; MPV's seek clamps to state.duration.

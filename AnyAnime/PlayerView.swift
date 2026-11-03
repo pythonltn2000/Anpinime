@@ -336,6 +336,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         configuration.allowsInlineMediaPlayback = true
+        configuration.allowsPictureInPictureMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
         ["videoFound", "iframeFound", "playerReady", "playerError", "mediaState"].forEach {
             configuration.userContentController.add(self, name: $0)
@@ -420,6 +421,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         let controller = AVPlayerViewController()
         controller.player = player
         controller.showsPlaybackControls = false
+        controller.allowsPictureInPicturePlayback = true
+        controller.canStartPictureInPictureAutomaticallyFromInline = UserDefaults.standard.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true
         controller.videoGravity = playback.fill ? .resizeAspectFill : .resizeAspect
         player.volume = Float(playback.volume)
         addChild(controller)

@@ -39,6 +39,7 @@ struct AnimeDetailView: View {
                 }
             }
         }
+        .navigationBarHidden(false)
         .navigationTitle(detail?.title ?? anime.title)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { startLoading(forceRefresh: false) }
