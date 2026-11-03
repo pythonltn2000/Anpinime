@@ -81,6 +81,7 @@ for episode, color, tone in [(1, '0x1e40af', 440), (3, '0x047857', 660), (40, '0
                     '-movflags', '+faststart', str(root / f'episode-{episode:02d}.mp4')], check=True)
 PY
 
+ffmpeg -hide_banner -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=24 -f lavfi -i sine=frequency=530 -t 30 -c:v libx264 -preset ultrafast -pix_fmt yuv420p -c:a aac "$ANPINIME_TEMP/media/episode-05.mp4"
 python3 -u Tests/serve_ai_drama.py --media-root "$ANPINIME_TEMP/media" --port 8768 \
   --identity "$ANPINIME_IDENTITY" --ready-file "$ANPINIME_TEMP/ready.json" \
   > "$ANPINIME_ARTIFACTS/server.log" 2>&1 &
@@ -150,6 +151,7 @@ xcodebuild test -project AnyAnime.xcodeproj -scheme AnyAnime -configuration Debu
   -destination "platform=iOS Simulator,id=$ANPINIME_SIMULATOR_ID" \
   -derivedDataPath "${ANPINIME_AI_DERIVED_DATA:-$ANPINIME_TEMP/DerivedData}" \
   -resultBundlePath "$ANPINIME_ARTIFACTS/ui.xcresult" \
+  -only-testing:AnyAnimeUI/AIDramaUITests/testShortFeedSwipeFullscreenAndFullPlaylist \
   -only-testing:AnyAnimeUI/MovieSearchUITests \
   -only-testing:AnyAnimeUI/AIDramaUITests/testCatalogPagingFiltersAndLibraryChoices \
   -only-testing:AnyAnimeUI/AIDramaUITests/testVerticalEpisodesPlaylistAndLifecycle -parallel-testing-enabled NO \

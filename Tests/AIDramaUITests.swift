@@ -69,7 +69,7 @@ final class AIDramaUITests: XCTestCase {
         let health = try fixtureJSON("/__smoke__/health")
         XCTAssertEqual(health["service"] as? String, "anpinime-ai-drama-fixture")
         XCTAssertEqual(health["episodeCount"] as? Int, 40)
-        try assertFiveTabs()
+        try assertAITabs()
 
         let series = app.buttons["aidrama.series." + seriesID]
         try waitFor("The local AI drama catalog appears") { series.exists && series.isHittable }
@@ -150,7 +150,7 @@ final class AIDramaUITests: XCTestCase {
         capture("episode-40-manual-pause-after-reactivation")
 
         app.buttons["aidrama.close"].tap()
-        try assertFiveTabs()
+        try assertAITabs()
         try waitFor("Closing releases the native player") {
             let owner = self.app.descendants(matching: .any).matching(identifier: "aidrama.debug.ownedPlayers").firstMatch
             guard owner.exists else { return false }
@@ -158,7 +158,7 @@ final class AIDramaUITests: XCTestCase {
             return Int(raw) == 0
         }
         XCTAssertFalse(app.buttons["aidrama.close"].exists)
-        capture("five-native-tabs-after-player-close")
+        capture("four-ai-tabs-after-player-close")
 
         // History is a user-visible route back to the exact episode, including its pause state.
         let history = app.buttons["aidrama.history." + seriesID]
@@ -178,14 +178,57 @@ final class AIDramaUITests: XCTestCase {
         app.buttons["aidrama.close"].tap()
     }
 
+    func testShortFeedSwipeFullscreenAndFullPlaylist() throws {
+        try assertAITabs()
+        XCTAssertFalse(app.buttons["Làm mới Phim AI"].exists)
+        app.tabBars.buttons["Phim ngắn"].tap()
+        try waitFor("Native short feed decodes its landscape recommendation", timeout: 25) {
+            guard let state = self.playerState() else { return false }
+            return state.selectedEpisodeID == self.episodeID(5) && state.currentTime > 1 && state.mediaInfo.contains("640 × 360")
+        }
+        XCTAssertEqual(app.staticTexts["aidrama.shorts.title"].label, "Short Feed Fixture 1")
+        assertNoSocialControls()
+        capture("short-feed-landscape-in-portrait")
+        let before = try requirePlayerState().currentTime
+        app.buttons["aidrama.shorts.fullscreen"].tap()
+        try waitFor("Fullscreen rotates the same short video") { self.app.frame.width > self.app.frame.height }
+        XCTAssertEqual(try requirePlayerState().selectedEpisodeID, episodeID(5))
+        try waitFor("Fullscreen retains advancing playback") { (self.playerState()?.currentTime ?? 0) > before + 0.5 }
+        capture("short-feed-fullscreen-landscape")
+        app.buttons["aidrama.shorts.fullscreen"].tap()
+        try waitFor("Exiting fullscreen returns to portrait") { self.app.frame.width < self.app.frame.height }
+        dragToNextEpisode()
+        let secondID = String(Int64(7_000_000_000_000_000_100) + 100 + 3)
+        try waitFor("A vertical swipe plays the next actual recommendation", timeout: 25) {
+            self.playerState()?.selectedEpisodeID == secondID && (self.playerState()?.currentTime ?? 0) > 1
+        }
+        try waitFor("Near the feed end loads the next native page") {
+            guard let stats = try? self.fixtureJSON("/__smoke__/stats"), let events = stats["events"] as? [[String: Any]] else { return false }
+            return events.contains { $0["event"] as? String == "short_feed" && $0["page"] as? Int == 2 }
+        }
+        capture("short-feed-next-recommendation")
+        app.buttons["aidrama.shorts.all"].tap()
+        try waitFor("Play all opens the exact recommendation episode in its full playlist", timeout: 25) {
+            self.app.buttons["aidrama.playlist.open"].exists && self.playerState()?.selectedEpisodeID == secondID
+        }
+        XCTAssertTrue(app.buttons["aidrama.playlist.open"].label.contains("40"))
+        app.buttons["aidrama.close"].tap()
+        app.tabBars.buttons["Trang chủ"].tap()
+        try waitFor("Leaving the short feed releases its player") {
+            let owner = self.app.buttons["aidrama.debug.ownedPlayers"]
+            return owner.exists && (owner.value as? String) == "0"
+        }
+    }
+
     func testCatalogPagingFiltersAndLibraryChoices() throws {
-        try assertFiveTabs()
+        try assertAITabs()
         try waitFor("The AI home has a real catalog card") {
             self.app.buttons["aidrama.series." + self.seriesID].isHittable
         }
 
         // The second page must append from scrolling, without the refresh action.
-        app.tabBars.buttons["Mới"].tap()
+        app.tabBars.buttons["Khám phá"].tap()
+        app.segmentedControls["aidrama.explore.mode"].buttons["Mới"].tap()
         let newScroll = app.scrollViews["aidrama.new.results"]
         let secondPage = app.buttons["aidrama.series." + fixtureSeriesID(3012)]
         try scrollUntilHittable(secondPage, in: newScroll, message: "Scrolling appends new works page 2")
@@ -196,19 +239,17 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertEqual(eventCount(newStats, "catalog_started", feed: "new", page: 2), 1)
         capture("new-works-appends-native-cursor-page-2")
 
-        app.tabBars.buttons["Thịnh hành"].tap()
+        app.segmentedControls["aidrama.explore.mode"].buttons["Thịnh hành"].tap()
         let hot = app.buttons["aidrama.series." + fixtureSeriesID(1000)]
         try waitFor("The hot ranking finishes loading") { hot.isHittable }
         let previousHotRequests = eventCount(try fixtureJSON("/__smoke__/stats"), "catalog_started", feed: "hot", page: 1)
-        let rankings = app.scrollViews["aidrama.ranking.results"]
-        let refreshStart = rankings.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.30))
-        let refreshEnd = rankings.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
-        refreshStart.press(forDuration: 0.05, thenDragTo: refreshEnd,
-                           withVelocity: .slow, thenHoldForDuration: 0.3)
+        app.tabBars.buttons["Cài đặt"].tap()
+        app.buttons["Làm mới danh sách phim"].tap()
         try waitFor("Refreshing starts a delayed hot ranking request") {
             guard let stats = try? self.fixtureJSON("/__smoke__/stats") else { return false }
             return self.eventCount(stats, "catalog_started", feed: "hot", page: 1) > previousHotRequests
         }
+        app.tabBars.buttons["Khám phá"].tap()
         let latestSegment = app.segmentedControls["aidrama.ranking.mode"].buttons["Mới nhất"]
         XCTAssertTrue(latestSegment.isHittable)
         latestSegment.tap()
@@ -223,7 +264,7 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertTrue(latestSegment.isSelected)
         capture("latest-ranking-survives-delayed-hot-response")
 
-        app.tabBars.buttons["Danh mục"].tap()
+        app.segmentedControls["aidrama.explore.mode"].buttons["Danh mục"].tap()
         let fantasy = app.buttons["aidrama.filter.background.7628991192537158672"]
         let revenge = app.buttons["aidrama.filter.character.7628991193891820560"]
         let story = app.buttons["aidrama.filter.story.7628991193543840769"]
@@ -268,7 +309,7 @@ final class AIDramaUITests: XCTestCase {
         try waitFor("The selected movie source is Premium") { sourceMenu.value as? String == "Anpinime Premium" }
         try openLibraryChooserFromSettings()
         app.buttons["library.choice.aiDrama"].tap()
-        try assertFiveTabs()
+        try assertAITabs()
         app.buttons["aidrama.library.choose"].tap()
         app.buttons["library.choice.movie"].tap()
         try assertTabs(["Trang chủ", "Tìm kiếm", "Thể loại", "Cài đặt"])
@@ -280,12 +321,12 @@ final class AIDramaUITests: XCTestCase {
         try assertTabs(["Trang chủ", "Tìm kiếm", "Thể loại", "Lịch chiếu", "Cài đặt"])
         try openLibraryChooserFromSettings()
         app.buttons["library.choice.aiDrama"].tap()
-        try assertFiveTabs()
+        try assertAITabs()
         capture("independent-ai-library-after-movie-and-anime")
     }
 
     func testLivePineDramaPlaylistAndVideo() throws {
-        try assertFiveTabs()
+        try assertAITabs()
         let catalogCards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "aidrama.series."))
         try waitForLive("The fresh PineDrama catalog loads", timeout: 15) { catalogCards.count > 0 }
         // Commit the objective before requesting its panel; never try another series.
@@ -435,8 +476,8 @@ final class AIDramaUITests: XCTestCase {
 
     private func episodeID(_ number: Int) -> String { String(Int64(7_000_000_000_000_000_100) + Int64(number)) }
 
-    private func assertFiveTabs() throws {
-        try assertTabs(["Trang chủ", "Thịnh hành", "Danh mục", "Mới", "Cài đặt"])
+    private func assertAITabs() throws {
+        try assertTabs(["Trang chủ", "Phim ngắn", "Khám phá", "Cài đặt"])
     }
 
     private func assertTabs(_ titles: [String]) throws {

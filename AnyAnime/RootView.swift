@@ -269,9 +269,9 @@ struct HomeView: View {
                     .padding(.bottom, 16)
                 }
                 .refreshable { await service.loadHome(forceDomainRefresh: true) }
+                .ignoresSafeArea(edges: .top)
             }
         }
-        .ignoresSafeArea(edges: .top)
         .navigationBarHidden(true)
         .overlay(alignment: .top) {
             HStack {

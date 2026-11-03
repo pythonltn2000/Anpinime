@@ -47,6 +47,7 @@ cp "$ANPINIME_APP_DATA/Documents/playback-mpv.json" previews/playback-mpv.json
 python3 - <<'PY'
 import json
 r=json.load(open('previews/playback-mpv.json'))
+assert r['pipSoftwareVisibleFrames'] >= 8 and r['pipSeekPauseRestoreVerified'], r
 assert r['mkvAudioAndDualSubtitlesVerified'] and r['autoplayVerified'] and r['time'] > 1, r
 print(r)
 PY

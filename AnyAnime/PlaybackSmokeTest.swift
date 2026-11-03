@@ -117,6 +117,10 @@ enum PlaybackSmokeTest {
                 playback.chooseOption?("secondarySubtitles", subtitles[1].id)
                 guard playback.audioTrack == audio.id, playback.subtitleTrack == subtitles[0].id,
                       playback.secondarySubtitleTrack == subtitles[1].id else { return }
+                guard playback.pipSmokeFrames >= 8, playback.pipSmokeSeekPauseRestored else { return }
+                result["pipSoftwareVisibleFrames"] = playback.pipSmokeFrames
+                result["pipSeekPauseRestoreVerified"] = playback.pipSmokeSeekPauseRestored
+                result["pipSystemWindowOnDeviceVerified"] = false
                 result["mkvAudioAndDualSubtitlesVerified"] = true
                 result["autoplayVerified"] = true
             }

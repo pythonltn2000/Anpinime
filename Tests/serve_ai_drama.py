@@ -48,6 +48,23 @@ def catalog_row(offset, title):
             "categories": "Kỳ ảo, Cơ hội thứ hai"}
 
 
+def pb_varint(value):
+    result = bytearray()
+    while value > 127:
+        result.append((value & 127) | 128)
+        value >>= 7
+    result.append(value)
+    return bytes(result)
+
+
+def pb_field(number, value):
+    if isinstance(value, int):
+        return pb_varint(number << 3) + pb_varint(value)
+    if isinstance(value, str):
+        value = value.encode("utf-8")
+    return pb_varint(number << 3 | 2) + pb_varint(len(value)) + value
+
+
 class FixtureState:
     def __init__(self, media_root, identity):
         self.media_root = media_root
@@ -155,6 +172,9 @@ class Handler(BaseHTTPRequestHandler):
         if head and not path.startswith("/media/"):
             self.send_json({"error": "GET required"}, 405, head=True)
             return
+        if path == "/tiktok/md/mini_drama/feed/v1":
+            self.send_short_feed(query)
+            return
         if path == "/tiktok/md/mini_drama_center/v1":
             self.send_catalog(query)
             return
@@ -220,6 +240,31 @@ class Handler(BaseHTTPRequestHandler):
     def bad_catalog_request(self):
         self.fixture.record("invalid_catalog_request", method=self.command)
         self.send_json({"status_code": 1, "error": "invalid native catalog contract"}, 400)
+
+    def send_short_feed(self, query):
+        loaded = query.get("drama_current_items", [""])[0]
+        first_ids = [str(EPISODE_BASE + number + index * 100) for index, number in enumerate((5, 3, 40))]
+        page = 1 if not loaded else 2
+        if (query.get("count") != ["6"] or loaded not in ("", ",".join(first_ids))
+                or query.get("drama_request_type") != ["init_fetch" if page == 1 else "load_more"]
+                or query.get("item_count_in_session") != ["0" if page == 1 else "3"]):
+            self.bad_catalog_request()
+            return
+        self.fixture.record("short_feed", page=page)
+        rows = []
+        for index, number in (list(enumerate((5, 3, 40))) if page == 1 else [(3, 1)]):
+            series = SERIES_ID + index
+            video = EPISODE_BASE + index * 100 + number
+            paid = (pb_field(1, series) + pb_field(3, number) + pb_field(13, f"Short Feed Fixture {index + 1}")
+                    + pb_field(25, 1) + pb_field(31, json.dumps({"video_total_nums": EPISODE_COUNT})))
+            media = pb_field(4, 640 if number == 5 else 360) + pb_field(3, 360 if number == 5 else 640)
+            rows.append(pb_field(4, pb_field(1, str(video)) + pb_field(317, paid) + pb_field(7, media)))
+        body = pb_field(1, 0) + pb_field(3, int(page == 1)) + b"".join(rows)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-protobuf")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def send_catalog(self, query):
         scene = query.get("scene", [""])[0]
@@ -308,7 +353,7 @@ class Handler(BaseHTTPRequestHandler):
             self.fixture.record("catalog_finished", feed="category", page=page, mask=mask, days=days)
 
     def send_media(self, episode, head):
-        clip = episode if episode in (3, 40) else 1
+        clip = episode if episode in (3, 5, 40) else 1
         media = self.fixture.media_root / f"episode-{clip:02d}.mp4"
         size = media.stat().st_size
         start, end = 0, size - 1

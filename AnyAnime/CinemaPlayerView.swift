@@ -11,6 +11,10 @@ final class PlaybackState: ObservableObject {
     @Published var pictureInPictureActive = false
     @Published var pictureInPictureError: String?
     var pictureInPicturePending = false
+    #if DEBUG
+    var pipSmokeFrames = 0
+    var pipSmokeSeekPauseRestored = false
+    #endif
     var userPaused = false
     @Published var currentTime = 0.0
     @Published var duration = 0.0

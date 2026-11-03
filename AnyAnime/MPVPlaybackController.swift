@@ -19,6 +19,11 @@ final class MPVPlaybackController: UIViewController {
     private var backgroundPaused = false
     private var pendingImports: [(URL, String)] = []
     private var startedAt = Date()
+    #if DEBUG
+    private var pipSmokeStage = 0
+    private var pipSmokeStageAt = Date()
+    private var pipSmokePausedAt = 0.0
+    #endif
     var onFailure: ((String) -> Void)?
 
     init(url: URL, headers: [String: String], playback: PlaybackState) {
@@ -213,10 +218,41 @@ final class MPVPlaybackController: UIViewController {
                 "videoWidth": number("video-params/w"), "videoHeight": number("video-params/h"),
                 "playing": playback.playing, "buffering": playback.buffering])
         }
+        verifyPiPFixtureIfNeeded()
         PlaybackSmokeTest.record(time: playback.currentTime, backend: "mpv", size: view.bounds.size, playback: playback,
                                  videoSize: CGSize(width: number("video-params/w"), height: number("video-params/h")))
         #endif
     }
+    #if DEBUG
+    private func verifyPiPFixtureIfNeeded() {
+        guard PlaybackSmokeTest.mpvFixture, loaded else { return }
+        switch pipSmokeStage {
+        case 0 where playback.currentTime > 2:
+            pipSmokeStage = 1; preparePictureInPicture(start: false)
+        case 1:
+            guard let pip = pictureInPicture, pip.frameCount >= 8, pip.visibleFrameCount >= 6 else { return }
+            playback.pipSmokeFrames = pip.frameCount
+            playback.send("pause")
+            pipSmokeStage = 2; pipSmokeStageAt = Date(); pipSmokePausedAt = playback.currentTime
+        case 2 where Date().timeIntervalSince(pipSmokeStageAt) > 1:
+            guard abs(playback.currentTime - pipSmokePausedAt) < 0.5 else { return }
+            playback.send("seek", 6); playback.send("play")
+            pipSmokeStage = 3
+        case 3 where playback.currentTime > 6.8:
+            guard let pip = pictureInPicture else { return }
+            pipSmokeStage = 4
+            pip.stop(restore: true) { [weak self] in
+                guard let self else { return }
+                self.pictureInPicture = nil; self.pipSmokeStageAt = Date(); self.pipSmokeStage = 5
+            }
+        case 5 where Date().timeIntervalSince(pipSmokeStageAt) > 0.7:
+            guard playback.playing, number("video-params/w") > 0, string("vo") == "gpu-next" else { return }
+            playback.pipSmokeSeekPauseRestored = true; pipSmokeStage = 6
+        default: break
+        }
+    }
+    #endif
+
     private func refreshTracks() {
         guard handle != nil else { return }
         var audio: [PlaybackChoice] = [], subtitles: [PlaybackChoice] = [.init(id: "off", title: "Tắt")]

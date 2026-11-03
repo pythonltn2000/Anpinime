@@ -75,10 +75,11 @@ struct AIDramaShortsView: View {
     @State private var landscape = false
     let active: Bool
     let openAll: (AIDramaSeries, String) -> Void
+    let fullscreenChanged: (Bool) -> Void
 
-    init(provider: AIDramaProviding, active: Bool, openAll: @escaping (AIDramaSeries, String) -> Void) {
+    init(provider: AIDramaProviding, active: Bool, openAll: @escaping (AIDramaSeries, String) -> Void, fullscreenChanged: @escaping (Bool) -> Void) {
         _feed = StateObject(wrappedValue: AIDramaShortsStore(provider: provider))
-        self.active = active; self.openAll = openAll
+        self.active = active; self.openAll = openAll; self.fullscreenChanged = fullscreenChanged
     }
 
     var body: some View {
@@ -91,6 +92,11 @@ struct AIDramaShortsView: View {
                 AIDramaShortsControls(session: session, item: item, landscape: $landscape) {
                     openAll(item.series, item.episode.id)
                 }
+                #if DEBUG
+                if AIDramaDebugSupport.enabled {
+                    AIDramaDebugStateView(session: session).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+                #endif
             }
             if feed.videos.isEmpty {
                 VStack(spacing: 16) {
@@ -111,6 +117,7 @@ struct AIDramaShortsView: View {
             if active, feed.videos.isEmpty { await feed.loadMore() }
         }
         .onChange(of: scenePhase) { feed.setSceneActive($0 == .active) }
+        .onChange(of: landscape) { fullscreenChanged($0) }
         .onChange(of: active) { value in if !value { landscape = false } }
         .onDisappear { feed.setActive(false, sceneActive: false); landscape = false }
         .accessibilityIdentifier("aidrama.shorts")

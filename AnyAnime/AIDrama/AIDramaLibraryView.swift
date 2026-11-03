@@ -6,6 +6,7 @@ struct AIDramaLibraryView: View {
     @ObservedObject var store: AIDramaCatalogStore
     let onChooseLibrary: () -> Void
     @State private var selectedTab = 0
+    @State private var shortsFullscreen = false
     @State private var exploreSection = AIDramaExploreSection.trending
     @State private var presentation: PlaylistPresentation?
     @State private var openingTask: Task<Void, Never>?
@@ -19,8 +20,8 @@ struct AIDramaLibraryView: View {
             .tabItem { Label("Trang chủ", systemImage: "house.fill") }.tag(0)
 
             AIDramaShortsView(provider: store.provider, active: selectedTab == 1 && presentation == nil,
-                              openAll: { series, episode in open(series, episode) })
-                .overlay(alignment: .topLeading) { libraryButton.padding(.leading, 16).padding(.top, 4) }
+                              openAll: { series, episode in open(series, episode) }, fullscreenChanged: { shortsFullscreen = $0 })
+                .overlay(alignment: .topLeading) { if !shortsFullscreen { libraryButton.padding(.leading, 16).padding(.top, 4) } }
                 .tabItem { Label("Phim ngắn", systemImage: "play.rectangle.fill") }.tag(1)
 
             NavigationView {
@@ -38,6 +39,7 @@ struct AIDramaLibraryView: View {
             .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
             .tag(3)
         }
+        .modifier(AIDramaTabBarVisibility(hidden: shortsFullscreen))
         .tint(.anpinimeAccent)
         .onChange(of: selectedTab) { _ in cancelOpening() }
         .onDisappear { cancelOpening() }
@@ -151,4 +153,21 @@ private struct AIDramaSettingsView: View {
             Button("Hủy", role: .cancel) { }
         }
     }
+}
+
+
+private struct AIDramaTabBarVisibility: ViewModifier {
+    let hidden: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 16, *) { content.toolbar(hidden ? .hidden : .visible, for: .tabBar) }
+        else { content.background(AIDramaLegacyTabBarVisibility(hidden: hidden).frame(width: 0, height: 0)) }
+    }
+}
+private struct AIDramaLegacyTabBarVisibility: UIViewControllerRepresentable {
+    let hidden: Bool
+    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
+    func updateUIViewController(_ controller: UIViewController, context: Context) {
+        DispatchQueue.main.async { controller.tabBarController?.tabBar.isHidden = hidden }
+    }
+    static func dismantleUIViewController(_ controller: UIViewController, coordinator: ()) { controller.tabBarController?.tabBar.isHidden = false }
 }

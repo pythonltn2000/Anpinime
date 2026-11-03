@@ -91,6 +91,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private let output = MPVSoftwareVideoOutput()
     private let playback: PlaybackState
     private var controller: AVPictureInPictureController?
+    private var timebase: CMTimebase?
     private var possibility: NSKeyValueObservation?
     private var wantsStart = false
     private var starting = false
@@ -103,12 +104,17 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private let finished: () -> Void
     #if DEBUG
     private(set) var frameCount = 0
+    private(set) var visibleFrameCount = 0
     #endif
 
     init(playback: PlaybackState, command: @escaping (String, Double) -> Void,
          restoreVideo: @escaping () -> Void, finished: @escaping () -> Void) {
         self.playback = playback; self.command = command; self.restoreVideo = restoreVideo; self.finished = finished
         super.init()
+        var clock: CMTimebase?
+        if CMTimebaseCreateWithSourceClock(allocator: kCFAllocatorDefault, sourceClock: CMClockGetHostTimeClock(), timebaseOut: &clock) == noErr {
+            timebase = clock; layer.controlTimebase = clock
+        }
         layer.videoGravity = .resizeAspect; layer.backgroundColor = UIColor.black.cgColor; layer.isOpaque = true
         output.frame = { [weak self] pixelBuffer in self?.enqueue(pixelBuffer) }
     }
@@ -130,6 +136,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
             self.prepared = true
             // Copy-back hardware decoding gives the software renderer readable video frames.
             self.command("pipOutput", 1)
+            self.invalidatePlaybackState()
             self.output.start()
         }
         if start {
@@ -149,13 +156,25 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
                                                           formatDescriptionOut: &description) == noErr, let description else { return }
         var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 30),
-                                        presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()), decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: timebase.map(CMTimebaseGetTime) ?? CMTime(seconds: playback.currentTime, preferredTimescale: 600), decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
         guard CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
             formatDescription: description, sampleTiming: &timing, sampleBufferOut: &sample) == noErr, let sample else { return }
         layer.enqueue(sample)
         #if DEBUG
         frameCount += 1
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        if let bytes = CVPixelBufferGetBaseAddress(buffer)?.assumingMemoryBound(to: UInt8.self) {
+            let width = CVPixelBufferGetWidth(buffer), height = CVPixelBufferGetHeight(buffer), stride = CVPixelBufferGetBytesPerRow(buffer)
+            var values: [UInt8] = []
+            for y in [height / 4, height / 2, 3 * height / 4] {
+                for x in [width / 4, width / 2, 3 * width / 4] {
+                    for channel in 0..<3 { values.append(bytes[y * stride + x * 4 + channel]) }
+                }
+            }
+            if Int(values.max() ?? 0) - Int(values.min() ?? 0) > 30 { visibleFrameCount += 1 }
+        }
+        CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
         #endif
         startIfPossible()
     }
@@ -165,7 +184,13 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         starting = true; controller?.startPictureInPicture()
     }
 
-    func invalidatePlaybackState() { controller?.invalidatePlaybackState() }
+    func invalidatePlaybackState() {
+        if let timebase {
+            CMTimebaseSetTime(timebase, time: CMTime(seconds: playback.currentTime, preferredTimescale: 600))
+            CMTimebaseSetRate(timebase, rate: playback.userPaused ? 0 : playback.rate)
+        }
+        controller?.invalidatePlaybackState()
+    }
 
     func stop(restore: Bool, completion: @escaping () -> Void = {}) {
         if cleanupComplete { completion(); return }
@@ -216,7 +241,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool { playback.userPaused }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, didTransitionToRenderSize newRenderSize: CMVideoDimensions) { }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, skipByInterval skipInterval: CMTime,
-                                    completionHandler: @escaping () -> Void) {
-        command("seek", min(playback.duration, max(0, playback.currentTime + skipInterval.seconds))); completionHandler()
+                                    completion: @escaping () -> Void) {
+        command("seek", min(playback.duration, max(0, playback.currentTime + skipInterval.seconds))); completion()
     }
 }
