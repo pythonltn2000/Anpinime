@@ -32,5 +32,5 @@
     "vo_thread",
     "_pthread_start"
   ],
-  "correction": "Do not request gpu-next/libplacebo screenshot readback under targetEnvironment(simulator). Device foreground bootstrap stays asynchronous. Simulator real SW-frame PiP checks remain required."
+  "correction": "Require mpv screenshot-sw=yes before asynchronously requesting a decoded bootstrap frame. This bypasses GPU texture download on both simulator and device. If the option is unavailable, skip the snapshot without falling back to GPU readback; actual SW-render PiP checks remain required."
 }

@@ -24,8 +24,8 @@ final class MPVPlaybackController: UIViewController {
     private(set) var automaticPiPRequests = 0
     private let diagnosticID = UUID().uuidString
     var nativeGeometry: [String: Any] {
-        ["view": NSStringFromCGRect(view.frame), "bounds": NSStringFromCGRect(view.bounds),
-         "surface": NSStringFromCGRect(surface.frame), "drawableWidth": surface.drawableSize.width,
+        ["view": String(describing: view.frame), "bounds": String(describing: view.bounds),
+         "surface": String(describing: surface.frame), "drawableWidth": surface.drawableSize.width,
          "drawableHeight": surface.drawableSize.height, "videoOutput": string("current-vo")]
     }
     var piPPrepared: Bool { pictureInPicture != nil }
@@ -178,20 +178,17 @@ final class MPVPlaybackController: UIViewController {
     }
 
     private func requestPiPSnapshot() {
-        // Metal's simulator readback crashes inside MTLSimDevice/XPC when libplacebo
-        // downloads the GPU texture. Device builds can use the decoded-frame bootstrap;
-        // simulator PiP tests get their real buffers from the existing software renderer.
-        #if targetEnvironment(simulator)
-        return
-        #else
         guard !snapshotPending, !snapshotReady, snapshotAttempts < 3, let handle else { return }
+        // Bootstrap from the decoder through mpv's software scaler. GPU screenshots
+        // reinitialize the renderer, interrupt playback and crash Metal simulation's
+        // shared-buffer readback. Never fall back to that path if the option is absent.
+        guard mpv_set_property_string(handle, "screenshot-sw", "yes") >= 0 else { return }
         let screenshotCommand: [String] = ["screenshot-raw", "video"]
         let strings = screenshotCommand.map { strdup($0) }
         defer { strings.forEach { free($0) } }
         var arguments: [UnsafePointer<CChar>?] = strings.map { $0.map { UnsafePointer<CChar>($0) } } + [nil]
         snapshotAttempts += 1
         snapshotPending = mpv_command_async(handle, snapshotReplyID, &arguments) >= 0
-        #endif
     }
 
     func preparePictureInPicture(start: Bool = true) {

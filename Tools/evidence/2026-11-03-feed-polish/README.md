@@ -36,7 +36,10 @@ cache size or device latency, and the original IPA was not executed here.
   presentation. Portrait recommendations have no rotate button. Returning moves
   the same controller back without resolving the media again.
 - PiP creates its AVKit content source and enqueues an actual mpv decoded frame
-  during foreground playback. Ordinary playback keeps GPU output. Resign-active
+  during foreground playback. The async snapshot requires mpv `screenshot-sw=yes`,
+  so it uses software conversion of a decoded frame and avoids a GPU screenshot
+  (which reinitializes the renderer and crashed Metal simulator readback).
+  Ordinary playback keeps GPU output. Resign-active
   prepares small software frames; actual background entry requests PiP using the
   prepared content source. Manual PiP uses the same path. Debug-only events record
   readiness, background requests and real AVKit delegate success/failure.
