@@ -267,6 +267,15 @@ struct AIDramaNativeSurface: UIViewControllerRepresentable {
             session.didAttach(player)
         }
 
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            guard let player, player.parent === self else { return }
+            player.view.transform = .identity
+            player.view.frame = view.bounds
+            player.view.setNeedsLayout()
+            player.view.layoutIfNeeded()
+        }
+
         func unmount() {
             guard let player else { return }
             if player.parent === self {

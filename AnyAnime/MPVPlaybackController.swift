@@ -23,6 +23,11 @@ final class MPVPlaybackController: UIViewController {
     #if DEBUG
     private(set) var automaticPiPRequests = 0
     private let diagnosticID = UUID().uuidString
+    var nativeGeometry: [String: Any] {
+        ["view": NSStringFromCGRect(view.frame), "bounds": NSStringFromCGRect(view.bounds),
+         "surface": NSStringFromCGRect(surface.frame), "drawableWidth": surface.drawableSize.width,
+         "drawableHeight": surface.drawableSize.height, "videoOutput": string("current-vo")]
+    }
     var piPPrepared: Bool { pictureInPicture != nil }
     var piPPossible: Bool { pictureInPicture?.possible == true }
     #endif

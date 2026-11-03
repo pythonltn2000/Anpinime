@@ -256,6 +256,8 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertTrue(surface.exists)
         XCTAssertGreaterThan(surface.frame.width, app.frame.width * 0.90)
         XCTAssertGreaterThan(surface.frame.height, app.frame.height * 0.90)
+        try assertFullscreenVideoPixels()
+        attachTelemetry(name: "short-feed-fullscreen-native-geometry")
         capture("short-feed-fullscreen-landscape")
         app.buttons["aidrama.shorts.fullscreen"].tap()
         try waitFor("Exiting fullscreen returns to portrait") { self.app.frame.width < self.app.frame.height }
@@ -802,6 +804,31 @@ final class AIDramaUITests: XCTestCase {
             $0["event"] as? String == event && $0["feed"] as? String == "category"
                 && $0["mask"] as? Int == mask && $0["days"] as? Int == days
         }.count
+    }
+
+    private func assertFullscreenVideoPixels() throws {
+        // A full-sized accessibility container can still contain an incorrectly sized
+        // CAMetalLayer. Check the actual fixture image in its center, not just its frame.
+        guard let image = app.screenshot().image.cgImage else { throw HarnessError.failed("Missing fullscreen screenshot") }
+        let width = 64, height = 32
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let rendered = pixels.withUnsafeMutableBytes { data -> Bool in
+            guard let context = CGContext(data: data.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        XCTAssertTrue(rendered)
+        var visible = 0, total = 0
+        for y in 8..<24 {
+            for x in 20..<44 {
+                let offset = (y * width + x) * 4
+                if pixels[offset..<(offset + 3)].max() ?? 0 > 45 { visible += 1 }
+                total += 1
+            }
+        }
+        XCTAssertGreaterThan(Double(visible) / Double(total), 0.8, "The landscape fixture fills the actual center of the fullscreen player")
     }
 
     private func capture(_ name: String) {
