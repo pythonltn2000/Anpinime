@@ -124,7 +124,6 @@ struct AIDramaShortsView: View {
         .onChange(of: landscape) { fullscreenChanged($0) }
         .onChange(of: active) { value in if !value { landscape = false } }
         .onDisappear { feed.setActive(false, sceneActive: false); landscape = false }
-        .accessibilityIdentifier("aidrama.shorts")
     }
 }
 
