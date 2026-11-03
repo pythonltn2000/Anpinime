@@ -54,7 +54,7 @@ enum PlaybackSmokeTest {
     @MainActor private static var firstDecodedVideoElapsed: TimeInterval?
     @MainActor private static var fileLoadedElapsed: TimeInterval?
     @MainActor static func diagnostic(_ event: String, fields: [String: Any]) {
-        guard source2Diagnostic || animeSmoke else { return }
+        guard source2Diagnostic || animeSmoke || mpvFixture else { return }
         var entry = fields
         // libmpv warnings may contain upstream or loopback URLs. Never retain
         // signed queries, cookies, tickets or the relay's per-playback IDs.
@@ -92,7 +92,7 @@ enum PlaybackSmokeTest {
         if event == "mpv-state", events.last?["event"] as? String == event { events.removeLast() }
         events.append(entry)
         if events.count > 120 { events.removeFirst(events.count - 120) }
-        write(["events": events], name: "\(resultName!)-diagnostics")
+        write(["events": events], name: "\(resultName ?? "mpv")-diagnostics")
     }
     @MainActor private static func write(_ result: [String: Any], name: String) {
         if let data = try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]),

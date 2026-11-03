@@ -92,6 +92,7 @@ struct AIDramaShortsView: View {
                 AIDramaShortsControls(session: session, item: item, landscape: $landscape) {
                     openAll(item.series, item.episode.id) {
                         // Stop preview ownership before the full playlist creates its player.
+                        feed.session?.setPaused(false)
                         feed.setActive(false, sceneActive: false)
                     }
                 }

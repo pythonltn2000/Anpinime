@@ -202,10 +202,12 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         playback.pictureInPicturePending = false
         // Do not synchronously publish during representable destruction.
         Task { @MainActor [weak playback] in playback?.pictureInPictureActive = false }
+        // A render context freed while libmpv still owns the VO calls kill_video_async.
+        // Switch back while the render queue is still serving frames, then free it.
+        if restore { restoreVideo() }
         output.frame = nil
         output.stop { [self] in
             layer.flushAndRemoveImage(); layer.removeFromSuperlayer()
-            if restore { restoreVideo() }
             cleanupComplete = true
             let callbacks = stopCompletions; stopCompletions = []
             callbacks.forEach { $0() }

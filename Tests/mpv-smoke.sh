@@ -43,6 +43,9 @@ for attempt in $(seq 1 55); do
 done
 xcrun simctl io "$ANPINIME_SIMULATOR_ID" screenshot previews/playback-mpv.png
 cp "$RUNNER_TEMP/anpinime-media-server.log" previews/mpv-fixture-server.log
+if [ -f "$ANPINIME_APP_DATA/Documents/playback-mpv-diagnostics.json" ]; then
+  cp "$ANPINIME_APP_DATA/Documents/playback-mpv-diagnostics.json" previews/playback-mpv-diagnostics.json
+fi
 cp "$ANPINIME_APP_DATA/Documents/playback-mpv.json" previews/playback-mpv.json
 python3 - <<'PY'
 import json

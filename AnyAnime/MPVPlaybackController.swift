@@ -61,7 +61,7 @@ final class MPVPlaybackController: UIViewController {
         let status = mpv_initialize(context)
         guard status >= 0 else { fail("Không khởi tạo được mpv: " + String(cString: mpv_error_string(status))); return }
         #if DEBUG
-        if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke { mpv_request_log_messages(context, "warn") }
+        if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke || PlaybackSmokeTest.mpvFixture { mpv_request_log_messages(context, "warn") }
         #endif
         mpv_observe_property(context, 1, "track-list", MPV_FORMAT_NONE)
         playback.pictureInPictureSupported = AVPictureInPictureController.isPictureInPictureSupported()
@@ -181,7 +181,7 @@ final class MPVPlaybackController: UIViewController {
             switch event.pointee.event_id {
             #if DEBUG
             case MPV_EVENT_LOG_MESSAGE:
-                if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke, let log = event.pointee.data?.assumingMemoryBound(to: mpv_event_log_message.self) {
+                if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke || PlaybackSmokeTest.mpvFixture, let log = event.pointee.data?.assumingMemoryBound(to: mpv_event_log_message.self) {
                     PlaybackSmokeTest.diagnostic("mpv-log", fields: ["component": String(cString: log.pointee.prefix),
                         "message": String(cString: log.pointee.text)])
                 }
@@ -213,10 +213,13 @@ final class MPVPlaybackController: UIViewController {
         pictureInPicture?.invalidatePlaybackState()
         playback.mediaInfo = [string("file-format"), string("video-codec"), "\(Int(number("video-params/w"))) × \(Int(number("video-params/h")))", string("audio-codec")].filter { !$0.isEmpty }.joined(separator: " · ")
         #if DEBUG
-        if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke {
+        if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke || PlaybackSmokeTest.mpvFixture {
             PlaybackSmokeTest.diagnostic("mpv-state", fields: ["loaded": loaded, "time": playback.currentTime,
                 "videoWidth": number("video-params/w"), "videoHeight": number("video-params/h"),
-                "playing": playback.playing, "buffering": playback.buffering])
+                "playing": playback.playing, "buffering": playback.buffering,
+                "pipStage": pipSmokeStage, "pipFrames": pictureInPicture?.frameCount ?? 0,
+                "pipVisibleFrames": pictureInPicture?.visibleFrameCount ?? 0,
+                "currentVideoOutput": string("current-vo")])
         }
         verifyPiPFixtureIfNeeded()
         PlaybackSmokeTest.record(time: playback.currentTime, backend: "mpv", size: view.bounds.size, playback: playback,
@@ -307,7 +310,7 @@ final class MPVPlaybackController: UIViewController {
     }
     private func fail(_ message: String) {
         #if DEBUG
-        if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke { PlaybackSmokeTest.diagnostic("failure", fields: ["message": message]) }
+        if PlaybackSmokeTest.source2Diagnostic || PlaybackSmokeTest.animeSmoke || PlaybackSmokeTest.mpvFixture { PlaybackSmokeTest.diagnostic("failure", fields: ["message": message]) }
         #endif
         playback.loading = false; playback.buffering = false; playback.playing = false; playback.error = message
         timer?.invalidate(); timer = nil
