@@ -257,6 +257,9 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertTrue(surface.exists)
         XCTAssertGreaterThan(surface.frame.width, app.frame.width * 0.90)
         XCTAssertGreaterThan(surface.frame.height, app.frame.height * 0.90)
+        let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screen.name = "short-feed-fullscreen-physical-screen"; screen.lifetime = .keepAlways; add(screen)
+        attachTelemetry(name: "short-feed-fullscreen-before-pixel-check")
         try waitFor("The actual fullscreen video fills its center after renderer resize", timeout: 12) {
             (try? self.fullscreenVideoCenterFraction()) ?? 0 > 0.8
         }
@@ -812,7 +815,9 @@ final class AIDramaUITests: XCTestCase {
     private func fullscreenVideoCenterFraction() throws -> Double {
         // A full-sized accessibility container can still contain an incorrectly sized
         // CAMetalLayer. Check the actual fixture image in its center, not just its frame.
-        guard let image = app.screenshot().image.cgImage else { throw HarnessError.failed("Missing fullscreen screenshot") }
+        // Capture the physical screen: element screenshots may crop a forced-landscape
+        // window using the device's portrait coordinate space before encoding rotation.
+        guard let image = XCUIScreen.main.screenshot().image.cgImage else { throw HarnessError.failed("Missing fullscreen screenshot") }
         let width = 64, height = 32
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         let rendered = pixels.withUnsafeMutableBytes { data -> Bool in

@@ -204,11 +204,14 @@ final class AIDramaPlaybackSession: ObservableObject {
     private func rebuildForViewport(_ size: CGSize) {
         guard !preloading, presented, sceneActive, !transitioning,
               let episode = selectedEpisode, let stream = currentStream else { return }
-        let fresh = Date().timeIntervalSince(streamResolvedAt) < 45
+        let resolvedAt = streamResolvedAt
+        let fresh = Date().timeIntervalSince(resolvedAt) < 45
         pendingViewport = size
         invalidateCurrent()
-        if fresh { install(stream, episode: episode, token: generation) }
-        else { error = nil; reconcile() }
+        if fresh {
+            install(stream, episode: episode, token: generation)
+            streamResolvedAt = resolvedAt
+        } else { error = nil; reconcile() }
     }
 
     private func install(_ stream: AIDramaStream, episode: AIDramaEpisode, token: UUID) {
