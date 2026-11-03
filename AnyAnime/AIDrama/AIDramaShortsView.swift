@@ -144,8 +144,8 @@ private struct AIDramaShortsControls: View {
             Spacer()
             VStack(alignment: .leading, spacing: 14) {
                 Text(item.series.title).font(.title3.bold()).lineLimit(2)
-                    .accessibilityIdentifier("aidrama.shorts.title")
-                Text("Tập \(item.episode.number)").font(.subheadline).foregroundColor(.white.opacity(0.8))
+                    .accessibilityIdentifier("aidrama.shorts.title").allowsHitTesting(false)
+                Text("Tập \(item.episode.number)").font(.subheadline).foregroundColor(.white.opacity(0.8)).allowsHitTesting(false)
                 HStack(spacing: 16) {
                     Button { session.togglePause() } label: {
                         Image(systemName: session.manuallyPaused ? "play.fill" : "pause.fill").frame(width: 44, height: 44)
@@ -166,7 +166,7 @@ private struct AIDramaShortsControls: View {
                 }
             }
             .padding(20).padding(.top, 30)
-            .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom))
+            .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom).allowsHitTesting(false))
         }
         .buttonStyle(.plain)
     }
