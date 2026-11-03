@@ -62,6 +62,7 @@ struct AIDramaDebugStateView: View {
         let fields: [String: Any] = [
             "selectedEpisodeID": session.selectedEpisodeID as Any? ?? NSNull(),
             "resolving": session.resolving, "manuallyPaused": session.manuallyPaused,
+            "subtitleTrack": session.playback?.subtitleTrack ?? "",
             "currentTime": time, "mediaInfo": info, "ownedPlayers": session.controller == nil ? 0 : 1,
             "maximumOwnedPlayers": session.maximumOwnedPlayers,
             "playerCreations": session.playerCreations, "cancelledResolutions": session.cancelledResolutions

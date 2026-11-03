@@ -189,6 +189,9 @@ final class AIDramaPlaybackSession: ObservableObject {
     private func install(_ stream: AIDramaStream, episode: AIDramaEpisode, token: UUID) {
         // A new state prevents old EOF counts, callbacks and timers crossing episode boundaries.
         let state = PlaybackState()
+        let rememberSpeed = defaults.object(forKey: "AnPinime.rememberSpeed") as? Bool ?? true
+        let rate = rememberSpeed ? (defaults.object(forKey: "AnPinime.playbackRate") as? Double ?? 1) : 1
+        state.rate = rate.isFinite ? min(3, max(0.25, rate)) : 1
         state.userPaused = true
         let player = MPVPlaybackController(url: stream.url, headers: stream.headers, playback: state)
         player.onFailure = { [weak self] message in
@@ -208,6 +211,14 @@ final class AIDramaPlaybackSession: ObservableObject {
             case "seek": self.seek(value)
             default: player?.perform(command, value: value)
             }
+        }
+        state.chooseOption = { [weak self, weak player] kind, id in
+            guard let self, self.generation == token, self.controller === player else { return }
+            player?.choose(kind, id: id)
+        }
+        state.importSubtitle = { [weak self, weak player] url, slot in
+            guard let self, self.generation == token, self.controller === player else { return }
+            player?.addSubtitle(url, slot: slot)
         }
         pendingResume = positions[episode.id].flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
         resumeSeekRequestedAt = nil
@@ -279,7 +290,9 @@ final class AIDramaPlaybackSession: ObservableObject {
     @discardableResult
     private func advanceCompletedEpisode() -> Bool {
         guard completedEpisode, mayResolve, !manuallyPaused, let index = selectedIndex else { return false }
-        if playlist.episodes.indices.contains(index + 1) {
+        if !(defaults.object(forKey: "AnPinime.autoNext") as? Bool ?? true) {
+            setPaused(true)
+        } else if playlist.episodes.indices.contains(index + 1) {
             selectEpisode(playlist.episodes[index + 1].id)
         } else {
             setPaused(true)

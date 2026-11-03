@@ -167,6 +167,7 @@ struct PlayerSettingsPanel: View {
                         .background(selected == track.id ? Color.white.opacity(0.12) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 9))
                         .contentShape(Rectangle())
                 }.buttonStyle(.plain)
+                    .accessibilityIdentifier("player.track." + kind + "." + track.id)
             }
         }
     }

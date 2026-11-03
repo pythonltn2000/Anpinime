@@ -19,6 +19,7 @@ final class AIDramaUITests: XCTestCase {
         let maximumOwnedPlayers: Int
         let playerCreations: Int
         let cancelledResolutions: Int
+        let subtitleTrack: String?
     }
 
     private enum HarnessError: Error { case failed(String) }
@@ -77,6 +78,21 @@ final class AIDramaUITests: XCTestCase {
         try waitForPlaying(episode: 1)
         assertNoSocialControls()
         capture("episode-01-portrait-playing")
+
+        let initialSubtitle = try requirePlayerState().subtitleTrack ?? ""
+        XCTAssertFalse(initialSubtitle.isEmpty || initialSubtitle == "off", "Fixture has an active embedded subtitle")
+        for id in ["off", initialSubtitle] {
+            app.buttons["Cài đặt phát"].tap()
+            let subtitles = app.buttons["player.settings.subtitles"]
+            XCTAssertTrue(subtitles.waitForExistence(timeout: 5))
+            subtitles.tap()
+            let choice = app.buttons["player.track.subtitles." + id]
+            XCTAssertTrue(choice.waitForExistence(timeout: 5))
+            choice.tap()
+            app.buttons["Đóng cài đặt"].tap()
+            try waitFor("AI settings select the actual native subtitle track") { self.playerState()?.subtitleTrack == id }
+        }
+        capture("episode-01-native-subtitle-menu-selection")
 
         // A native drag commits episode 2, whose API response takes four seconds.
         dragToNextEpisode()
