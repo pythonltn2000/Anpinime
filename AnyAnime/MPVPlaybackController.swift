@@ -15,6 +15,10 @@ final class MPVPlaybackController: UIViewController {
     private let surface = MPVSurface()
     private var pictureInPicture: MPVPictureInPicture?
     private var preloading: Bool
+    private let resizesEmbeddedSurface: Bool
+    private var rendererSize = CGSize.zero
+    private var resizeTask: Task<Void, Never>?
+    private var alternateGPUConfiguration = false
     private var automaticPiPPrepared = false
     private var snapshotPending = false
     private var snapshotReady = false
@@ -43,7 +47,8 @@ final class MPVPlaybackController: UIViewController {
     #endif
     var onFailure: ((String) -> Void)?
 
-    init(url: URL, headers: [String: String], playback: PlaybackState, preloading: Bool = false) {
+    init(url: URL, headers: [String: String], playback: PlaybackState, preloading: Bool = false, resizesEmbeddedSurface: Bool = false) {
+        self.resizesEmbeddedSurface = resizesEmbeddedSurface
         self.preloading = preloading
         self.url = url; self.headers = headers; self.playback = playback; self.userPaused = playback.userPaused
         super.init(nibName: nil, bundle: nil)
@@ -108,8 +113,31 @@ final class MPVPlaybackController: UIViewController {
         surface.drawableSize = CGSize(width: view.bounds.width * surface.contentsScale, height: view.bounds.height * surface.contentsScale)
         pictureInPicture?.layer.frame = view.bounds
         CATransaction.commit()
+        resizeEmbeddedRendererIfNeeded()
     }
+
+    private func resizeEmbeddedRendererIfNeeded() {
+        let size = surface.drawableSize
+        guard size.width > 1, size.height > 1, size != rendererSize else { return }
+        let hadSize = rendererSize != .zero
+        rendererSize = size
+        guard resizesEmbeddedSurface, hadSize, loaded else { return }
+        resizeTask?.cancel()
+        resizeTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled, let self, self.handle != nil, self.rendererSize == size,
+                  self.string("current-vo") == "gpu-next" else { return }
+            // The pinned MPVKit MoltenVK context reads CAMetalLayer.drawableSize only
+            // in reconfig(), and its control() emits no VO_EVENT_RESIZE. Updating the
+            // layer alone leaves the old viewport. Reconfigure that same output using
+            // equivalent driver lists; no second player, file reload or resolve occurs.
+            self.alternateGPUConfiguration.toggle()
+            self.set("vo", self.alternateGPUConfiguration ? "gpu-next,gpu-next" : "gpu-next")
+        }
+    }
+
     func shutdown() {
+        resizeTask?.cancel(); resizeTask = nil
         timer?.invalidate(); timer = nil
         NotificationCenter.default.removeObserver(self)
         guard let context = handle else { return }

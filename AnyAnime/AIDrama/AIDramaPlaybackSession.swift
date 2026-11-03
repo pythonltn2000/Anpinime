@@ -205,7 +205,7 @@ final class AIDramaPlaybackSession: ObservableObject {
         let rate = rememberSpeed ? (defaults.object(forKey: "AnPinime.playbackRate") as? Double ?? 1) : 1
         state.rate = rate.isFinite ? min(3, max(0.25, rate)) : 1
         state.userPaused = true
-        let player = MPVPlaybackController(url: stream.url, headers: stream.headers, playback: state, preloading: preloading)
+        let player = MPVPlaybackController(url: stream.url, headers: stream.headers, playback: state, preloading: preloading, resizesEmbeddedSurface: true)
         player.onFailure = { [weak self] message in
             // mpv can report failure while its polling loop still holds the native handle.
             // Leave that stack before teardown, and recheck ownership after the hop.
