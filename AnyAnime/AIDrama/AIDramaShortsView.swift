@@ -290,14 +290,15 @@ private struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
         var fullscreen: Fullscreen?
         override func viewDidAppear(_ animated: Bool) { super.viewDidAppear(animated); synchronize() }
         func synchronize() {
+            if !wanted { finish(animated: true); return }
             guard isViewLoaded, view.window != nil else { return }
-            if wanted, fullscreen == nil, presentedViewController == nil, let session {
+            if fullscreen == nil, presentedViewController == nil, let session {
                 let player = Fullscreen(session: session, close: { [weak self] in self?.close?() })
                 player.modalPresentationStyle = .fullScreen
                 fullscreen = player
                 AnPinimeAppDelegate.orientationMask = .landscape
                 present(player, animated: true)
-            } else if !wanted { finish(animated: true) }
+            }
         }
         func finish(animated: Bool) {
             guard let fullscreen else { return }
