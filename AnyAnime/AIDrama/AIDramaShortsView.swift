@@ -73,6 +73,7 @@ struct AIDramaShortsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var feed: AIDramaShortsStore
     @State private var landscape = false
+    @State private var dragging = false
     let active: Bool
     let openAll: (AIDramaSeries, String, @escaping () -> Void) -> Void
     let fullscreenChanged: (Bool) -> Void
@@ -86,7 +87,7 @@ struct AIDramaShortsView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if !feed.videos.isEmpty {
-                AIDramaShortsPager(feed: feed, pagingEnabled: !landscape).ignoresSafeArea()
+                AIDramaShortsPager(feed: feed).ignoresSafeArea()
             }
             if let session = feed.session, let item = feed.selected {
                 AIDramaShortsControls(session: session, item: item, landscape: $landscape) {
@@ -114,6 +115,25 @@ struct AIDramaShortsView: View {
                 VStack { Spacer(); Button("Tải tiếp · " + error) { Task { await feed.loadMore() } }.font(.caption).padding(12) }
             }
         }
+        .contentShape(Rectangle())
+        .simultaneousGesture(DragGesture(minimumDistance: 24).onChanged { value in
+            guard active, !landscape, !dragging,
+                  abs(value.translation.height) > abs(value.translation.width) * 1.2 else { return }
+            dragging = true
+            feed.session?.beginPageTransition()
+        }.onEnded { value in
+            guard dragging else { return }
+            dragging = false
+            let vertical = value.translation.height
+            if active, !landscape, abs(vertical) > 80,
+               abs(vertical) > abs(value.translation.width) * 1.2,
+               let index = feed.videos.firstIndex(where: { $0.id == feed.selectedID }),
+               feed.videos.indices.contains(index + (vertical < 0 ? 1 : -1)) {
+                feed.select(feed.videos[index + (vertical < 0 ? 1 : -1)].id)
+            } else {
+                feed.session?.finishPageTransition(episodeID: nil, completed: false)
+            }
+        })
         .foregroundColor(.white).preferredColorScheme(.dark)
         .background(VideoOrientationPresentation(landscape: landscape).frame(width: 0, height: 0))
         .task(id: active) {
@@ -144,11 +164,11 @@ private struct AIDramaShortsControls: View {
             Spacer()
             VStack(alignment: .leading, spacing: 14) {
                 Text(item.series.title).font(.title3.bold()).lineLimit(2)
-                    .accessibilityIdentifier("aidrama.shorts.title").allowsHitTesting(false)
-                Text("Tập \(item.episode.number)").font(.subheadline).foregroundColor(.white.opacity(0.8)).allowsHitTesting(false)
+                    .accessibilityIdentifier("aidrama.shorts.title")
+                Text("Tập \(item.episode.number)").font(.subheadline).foregroundColor(.white.opacity(0.8))
                 HStack(spacing: 16) {
                     Button { session.togglePause() } label: {
-                        Image(systemName: session.manuallyPaused ? "play.fill" : "pause.fill").frame(width: 44, height: 44)
+                        Image(systemName: session.manuallyPaused ? "play.fill" : "pause.fill").frame(width: 44, height: 44).contentShape(Rectangle())
                     }.accessibilityLabel(session.manuallyPaused ? "Phát" : "Tạm dừng")
                     Button(action: openAll) {
                         Label("Phát tất cả" + (item.series.episodeCount.map { " · \($0) tập" } ?? ""), systemImage: "list.bullet.rectangle")
@@ -160,13 +180,13 @@ private struct AIDramaShortsControls: View {
                     Spacer(minLength: 0)
                     Button { landscape.toggle() } label: {
                         Image(systemName: landscape ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                            .frame(width: 44, height: 44)
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
                     }.accessibilityLabel(landscape ? "Thoát toàn màn hình" : "Xem toàn màn hình")
                         .accessibilityIdentifier("aidrama.shorts.fullscreen")
                 }
             }
             .padding(20).padding(.top, 30)
-            .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom).allowsHitTesting(false))
+            .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom))
         }
         .buttonStyle(.plain)
     }
@@ -202,19 +222,18 @@ private struct AIDramaShortsSurface: View {
 @MainActor
 private struct AIDramaShortsPager: UIViewControllerRepresentable {
     @ObservedObject var feed: AIDramaShortsStore
-    let pagingEnabled: Bool
     func makeCoordinator() -> Coordinator { Coordinator(feed: feed) }
     func makeUIViewController(context: Context) -> UIPageViewController {
         let pager = UIPageViewController(transitionStyle: .scroll, navigationOrientation: .vertical)
         pager.view.backgroundColor = .black
-        pager.dataSource = context.coordinator; pager.delegate = context.coordinator
         context.coordinator.showSelection(in: pager)
         return pager
     }
     func updateUIViewController(_ pager: UIPageViewController, context: Context) {
-        pager.dataSource = pagingEnabled ? context.coordinator : nil
-        for scroll in pager.view.subviews.compactMap({ $0 as? UIScrollView }) { scroll.isScrollEnabled = pagingEnabled }
-        if !context.coordinator.transitioning { context.coordinator.showSelection(in: pager) }
+        // The parent recognizes drags across both the video and the controls.
+        // A second UIKit recognizer would compete with it and could advance twice.
+        for scroll in pager.view.subviews.compactMap({ $0 as? UIScrollView }) { scroll.isScrollEnabled = false }
+        context.coordinator.showSelection(in: pager)
     }
     static func dismantleUIViewController(_ pager: UIPageViewController, coordinator: Coordinator) {
         pager.delegate = nil; pager.dataSource = nil
@@ -226,28 +245,24 @@ private struct AIDramaShortsPager: UIViewControllerRepresentable {
         }
         @MainActor required dynamic init?(coder: NSCoder) { fatalError("init(coder:)") }
     }
-    final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
+    final class Coordinator: NSObject {
         let feed: AIDramaShortsStore
-        var transitioning = false
+        private var transitioning = false
         init(feed: AIDramaShortsStore) { self.feed = feed }
         func showSelection(in pager: UIPageViewController) {
-            guard let item = feed.selected, (pager.viewControllers?.first as? Page)?.videoID != item.id else { return }
-            pager.setViewControllers([Page(item: item, feed: feed)], direction: .forward, animated: false)
-        }
-        func neighbor(_ page: UIViewController, offset: Int) -> UIViewController? {
-            guard let page = page as? Page, let index = feed.videos.firstIndex(where: { $0.id == page.videoID }),
-                  feed.videos.indices.contains(index + offset) else { return nil }
-            return Page(item: feed.videos[index + offset], feed: feed)
-        }
-        func pageViewController(_ pageViewController: UIPageViewController, viewControllerBefore viewController: UIViewController) -> UIViewController? { neighbor(viewController, offset: -1) }
-        func pageViewController(_ pageViewController: UIPageViewController, viewControllerAfter viewController: UIViewController) -> UIViewController? { neighbor(viewController, offset: 1) }
-        func pageViewController(_ pageViewController: UIPageViewController, willTransitionTo pendingViewControllers: [UIViewController]) {
-            transitioning = true; feed.session?.beginPageTransition()
-        }
-        func pageViewController(_ pager: UIPageViewController, didFinishAnimating finished: Bool, previousViewControllers: [UIViewController], transitionCompleted completed: Bool) {
-            transitioning = false
-            if completed, let page = pager.viewControllers?.first as? Page { feed.select(page.videoID) }
-            else { feed.session?.finishPageTransition(episodeID: nil, completed: false) }
+            guard !transitioning, let item = feed.selected,
+                  (pager.viewControllers?.first as? Page)?.videoID != item.id else { return }
+            let previous = (pager.viewControllers?.first as? Page)?.videoID
+            let previousIndex = feed.videos.firstIndex { $0.id == previous } ?? 0
+            let nextIndex = feed.videos.firstIndex { $0.id == item.id } ?? 0
+            transitioning = true
+            pager.setViewControllers([Page(item: item, feed: feed)],
+                direction: nextIndex >= previousIndex ? .forward : .reverse, animated: previous != nil) { [weak self, weak pager] _ in
+                    guard let self, let pager else { return }
+                    self.transitioning = false
+                    // A fast second swipe may have selected another item during the animation.
+                    self.showSelection(in: pager)
+                }
         }
     }
 }

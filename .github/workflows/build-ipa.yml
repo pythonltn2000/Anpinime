@@ -15,12 +15,16 @@ on:
         description: 'Verify the independent Phim AI provider and vertical episode UI'
         type: boolean
         default: false
+      shorts_only:
+        description: 'Verify only short-feed gestures, fullscreen and complete-playlist handoff'
+        type: boolean
+        default: false
   push:
     branches: [main]
 
 jobs:
   build-ios:
-    if: ${{ !inputs.gateway_frame_only && !inputs.ai_drama_only }}
+    if: ${{ !inputs.gateway_frame_only && !inputs.ai_drama_only && !inputs.shorts_only && !inputs.shorts_only }}
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -147,7 +151,7 @@ jobs:
           retention-days: 14
 
   preview:
-    if: github.event_name == 'workflow_dispatch' && inputs.preview && !inputs.gateway_frame_only && !inputs.ai_drama_only
+    if: github.event_name == 'workflow_dispatch' && inputs.preview && !inputs.gateway_frame_only && !inputs.ai_drama_only && !inputs.shorts_only && !inputs.shorts_only
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -238,7 +242,7 @@ jobs:
           retention-days: 14
 
   gateway-video:
-    if: github.event_name == 'workflow_dispatch' && inputs.gateway_frame_only && !inputs.ai_drama_only
+    if: github.event_name == 'workflow_dispatch' && inputs.gateway_frame_only && !inputs.ai_drama_only && !inputs.shorts_only
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -273,6 +277,7 @@ jobs:
     timeout-minutes: 25
     env:
       ANPINIME_AI_DERIVED_DATA: ${{ github.workspace }}/build-ai-simulator
+      ANPINIME_AI_SHORTS_ONLY: ${{ inputs.shorts_only }}
     steps:
       - uses: actions/checkout@v4
       - name: Verify PineDrama data and complete-playlist contracts
@@ -289,7 +294,7 @@ jobs:
       - name: Verify actual portrait swipes, full playlist and player lifetime
         run: bash Tests/ai-drama-smoke.sh
       - name: Verify live PineDrama catalog, full playlist and first, second and last episodes
-        if: ${{ !cancelled() && steps.ai_prepare.outcome == 'success' }}
+        if: ${{ !inputs.shorts_only && !cancelled() && steps.ai_prepare.outcome == 'success' }}
         continue-on-error: true
         run: bash Tests/ai-drama-live-smoke.sh
       - uses: actions/upload-artifact@v4
