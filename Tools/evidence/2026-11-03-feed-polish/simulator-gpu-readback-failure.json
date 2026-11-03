@@ -1,0 +1,36 @@
+{
+  "run": 41574056989,
+  "failedAppCommit": "a8310aa4f74f01a5df3723c37c53aada3ef1245f",
+  "platform": "iOS Simulator (Metal simulation)",
+  "exception": {
+    "codes": "0x0000000000000001, 0x00000001800f5980",
+    "rawCodes": [
+      1,
+      6443456896
+    ],
+    "type": "EXC_BREAKPOINT",
+    "signal": "SIGTRAP"
+  },
+  "faultingThread": "vo",
+  "frames": [
+    "_xpc_api_misuse",
+    "_xpc_shmem_create_with_prot.cold.1",
+    "_xpc_shmem_create_with_prot",
+    "-[MTLSimDevice newBufferWithLength:options:pointer:copyBytes:deallocator:]",
+    "MVKDeviceMemory::ensureMTLBuffer()",
+    "MVKDeviceMemory::MVKDeviceMemory(MVKDevice*, VkMemoryAllocateInfo const*, VkAllocationCallbacks const*)",
+    "MVKDevice::allocateMemory(VkMemoryAllocateInfo const*, VkAllocationCallbacks const*)",
+    "vkAllocateMemory",
+    "vk_malloc_slice",
+    "vk_buf_create",
+    "pl_buf_create",
+    "pl_tex_download_pbo",
+    "pl_tex_download",
+    "control",
+    "run_control",
+    "mp_dispatch_queue_process",
+    "vo_thread",
+    "_pthread_start"
+  ],
+  "correction": "Do not request gpu-next/libplacebo screenshot readback under targetEnvironment(simulator). Device foreground bootstrap stays asynchronous. Simulator real SW-frame PiP checks remain required."
+}

@@ -1,5 +1,6 @@
 import XCTest
 import CoreFoundation
+import CoreGraphics
 
 /// Exercises the independent AI library with separate fixture and bounded live checks.
 final class AIDramaUITests: XCTestCase {
@@ -824,7 +825,7 @@ final class AIDramaUITests: XCTestCase {
         for y in 8..<24 {
             for x in 20..<44 {
                 let offset = (y * width + x) * 4
-                if pixels[offset..<(offset + 3)].max() ?? 0 > 45 { visible += 1 }
+                if (pixels[offset..<(offset + 3)].max() ?? 0) > 45 { visible += 1 }
                 total += 1
             }
         }
