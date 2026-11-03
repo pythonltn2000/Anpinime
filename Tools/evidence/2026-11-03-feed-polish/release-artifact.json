@@ -1,0 +1,24 @@
+{
+  "run": 41600837879,
+  "artifactID": 13215081382,
+  "artifactName": "AnPinime_UNSIGNED",
+  "artifactURL": "https://github.com/thuyan1510/AnPinime/actions/runs/41600837879/artifacts/13215081382",
+  "artifactZipSHA256": "d0a1b6cfef2e30fb22b76f108474afbe4c34ad1e82b921a4de92f0bfecbd251f",
+  "ipaSHA256": "814286b4a9cc3984a81ffe4808f0ec366615af5d9bdd8934fb2d85668e006871",
+  "ipaBytes": 30540151,
+  "appCommit": "30d304ea4d478cf1fdd85e37ac7eb003135f1bc6",
+  "applicationSourceTree": "524c59a7592c08b2124e16ecfdddeec2fcba5689",
+  "version": "2.8.0",
+  "build": "18",
+  "bundleID": "com.xemphim.aipinime",
+  "minimumOS": "15.0",
+  "backgroundModes": [
+    "audio"
+  ],
+  "unsigned": true,
+  "publicationRequires": [
+    "build-ios success",
+    "ai-drama success including live PineDrama"
+  ],
+  "publicationJob": 125803435716
+}

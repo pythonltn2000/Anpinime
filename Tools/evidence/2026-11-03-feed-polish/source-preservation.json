@@ -61,5 +61,7 @@
     "paused": true,
     "muted": true,
     "persistentMediaCache": false
-  }
+  },
+  "applicationSourceTree": "524c59a7592c08b2124e16ecfdddeec2fcba5689",
+  "observedAppCommit": "30d304ea4d478cf1fdd85e37ac7eb003135f1bc6"
 }

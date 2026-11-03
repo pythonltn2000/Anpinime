@@ -18,7 +18,7 @@ model caching and first-frame/pre-render methods. These establish a media
 preload path beyond recommendation metadata; they do not prove a particular
 cache size or device latency, and the original IPA was not executed here.
 
-## Changes under verification
+## Delivered changes
 
 - Home removes the separate dark gradient attached to the top toolbar. The hero
   retains its continuous legibility gradient.
@@ -50,7 +50,7 @@ cache size or device latency, and the original IPA was not executed here.
   prepared content source. Manual PiP uses the same path. Debug-only events record
   readiness, background requests and real AVKit delegate success/failure.
 
-## Required evidence
+## Verification requirements
 
 The release must pass the complete provider/store checks, actual native UI
 checks, and MKV/PiP output/seek/pause/GPU restoration checks. Fullscreen UI checks
@@ -62,3 +62,21 @@ misrepresent forced-landscape window coordinates. System PiP delegate success
 is separate from software-frame success. No physical
 iPhone is connected to this execution environment; that limit must remain
 explicit even if simulator system PiP succeeds.
+
+
+## Verified delivery
+
+[Run 41600837879](https://github.com/thuyan1510/AnPinime/actions/runs/41600837879)
+passed 6 native UI/live cases, with no failures and one explicit system-PiP skip.
+The physical-screen fixture image has central visible fraction 1.0; its native
+player reports 874×402 bounds, 2622×1206 drawable/output, decoded 640×360 video
+at 12.417 seconds. Fullscreen entry/exit, next preloaded portrait video and
+complete-playlist handoff passed in 35.210 seconds. Native MKV/PiP rendering,
+pause/seek/GPU restoration, HLS relay and anime fixture playback passed.
+
+The gated delivery job published unsigned **2.8.0 (18)** only after both required
+jobs succeeded. See [release identity](release-artifact.json) and
+[exact-run results](run-41600837879-final.json). Actual automatic PiP on a physical
+iPhone remains unverified; AVKit reports that system capability unsupported on
+the runner. Fresh Anime/Free1/Core success is not inferred from the fixture or
+captured-metadata gateway checks.

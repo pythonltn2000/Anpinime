@@ -1,4 +1,65 @@
-# AnPinime 2.7.0 (17) — Phim ngắn, Khám phá và player
+# AnPinime 2.8.0 (18) — Home, lướt Phim ngắn, toàn màn hình và PiP
+
+**Bản giao đã xác minh:** [IPA unsigned 2.8.0 (18)](https://github.com/thuyan1510/AnPinime/actions/runs/41600837879/artifacts/13215081382).
+[Run 41600837879](https://github.com/thuyan1510/AnPinime/actions/runs/41600837879),
+mã ứng dụng `30d304ea4d478cf1fdd85e37ac7eb003135f1bc6`, cây nguồn ứng dụng
+`524c59a7592c08b2124e16ecfdddeec2fcba5689`.
+Nhánh `feature/ai-drama`, [PR #2](https://github.com/thuyan1510/AnPinime/pull/2),
+tiếp nối sửa nguồn 2 tại `a785d35`; chưa gộp vào main.
+
+IPA được mở kiểm tra: **2.8.0 (18)**, `com.xemphim.aipinime`, iOS 15+,
+có background audio, không có chữ ký/provisioning profile. SHA-256:
+`814286b4a9cc3984a81ffe4808f0ec366615af5d9bdd8934fb2d85668e006871`.
+[Danh tính artifact](Tools/evidence/2026-11-03-feed-polish/release-artifact.json).
+
+## Thay đổi
+
+- Bỏ lớp nền tối riêng phía sau thanh nút Home. Banner ưu tiên ảnh nguồn cung cấp
+  và ảnh từ metadata của phim đang hiển thị; giữ ảnh cũ nếu ảnh mới kém nét hơn.
+  Không đoán URL ảnh lớn và không sửa parser/luồng dữ liệu nguồn 1/3.
+- Phim ngắn cuộn bằng UIScrollView native, nội dung đi theo ngón tay. Chuẩn bị tối
+  đa một video kế tiếp, tạm dừng/tắt tiếng, bộ đệm 3 giây/12 MiB. Khi chuyển sang
+  video đó, dùng player đã chuẩn bị. Dọn khi rời tab, xuống nền, có cảnh báo bộ nhớ
+  hoặc hết 45 giây; không ghi video chưa xem vào lịch sử.
+- Chỉ clip ngang có nút toàn màn hình. Màn phát UIKit riêng che thanh tab và các
+  nút thư viện. Khi đổi dọc/ngang, tạo bề mặt Metal mới và khôi phục tập/vị trí xem.
+  Dùng link còn mới trong bộ nhớ; link cũ được resolve lại. Dừng/tắt tiếng owner cũ
+  trước khi lắp owner mới. Video dọc giữ nguyên hướng.
+- PiP chuẩn bị AVKit content source trong foreground bằng frame thật, qua lệnh
+  bất đồng bộ và `screenshot-sw=yes`. Chuẩn bị frame phần mềm trước khi xuống nền,
+  yêu cầu mở PiP khi thật sự vào background, khôi phục GPU khi trở lại. Tránh đọc
+  ảnh trực tiếp từ GPU vì đường đó làm crash Metal Simulator.
+- IPA chính thức chỉ được xuất sau khi cả kiểm tra native và Phim AI, gồm phát
+  live PineDrama, đều thành công. Bản build đơn thuần được đặt tên Candidate.
+
+## Kiểm chứng của bản giao
+
+**6 XCTest PASS, 0 lỗi, 1 SKIP.** Native fixture kiểm tra phân trang/lọc, cuộn,
+chuẩn bị video kế tiếp với API cố tình chậm 4 giây, mở trọn bộ 40 tập, hủy phản hồi
+trễ, lịch sử, pause/background và vùng bấm ảnh/tên phim. Kiểm tra fullscreen đọc
+ảnh **toàn màn hình hệ thống**, yêu cầu vùng giữa có hình video >80%, đồng thời
+kiểm tra kích thước, thanh tab, thoát về dọc và tiếp tục phát. Ảnh cửa sổ app có thể
+bị cắt sai tọa độ khi ép xoay; không dùng nó làm bằng chứng duy nhất.
+
+Hai XCTest live PineDrama đều PASS: catalog/danh sách tập và video đầu/giữa/cuối;
+feed Phim ngắn, fullscreen, mở đúng tập và danh sách đầy đủ.
+MKV native phát đến 9 giây, có 2 audio/2 subtitle; PiP tạo 8 frame phần mềm,
+pause/seek/khôi phục GPU thành công. HLS qua relay và anime dynamic-episode fixture
+đều phát tăng thời gian. Gateway dùng metadata Core đã chụp phát 1920×1080 tới
+15,974 giây; không coi đó là chứng minh Core fresh-live.
+
+**PiP tự mở trên iPhone vật lý chưa được xác nhận.** Simulator báo AVKit system PiP
+không được hỗ trợ nên riêng XCTest này SKIP; kiểm tra frame phần mềm PASS không
+thay thế cho hành vi cửa sổ hệ thống trên điện thoại. Không có JSON pass fresh-live
+cho Anime/Free1/Core ở lượt này; các giới hạn cũ vẫn được giữ rõ.
+
+[Bằng chứng và kết quả](Tools/evidence/2026-11-03-feed-polish/README.md) ·
+[Kết quả đúng run](Tools/evidence/2026-11-03-feed-polish/run-41600837879-final.json) ·
+[Bảo vệ nguồn 1/3 và cấu hình mpv](Tools/evidence/2026-11-03-feed-polish/source-preservation.json).
+
+---
+
+## Lịch sử bản 2.7.0 (17)
 
 **Bản giao:** [IPA unsigned, artifact 13199392297](https://github.com/thuyan1510/AnPinime/actions/runs/41565698005/artifacts/13199392297).
 Mã ứng dụng `e6ee6dc02624ae27e4cce38011a9c1fa26fcb570`,

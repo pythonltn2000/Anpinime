@@ -1,0 +1,202 @@
+{
+  "run": 41600837879,
+  "appCommit": "30d304ea4d478cf1fdd85e37ac7eb003135f1bc6",
+  "applicationSourceTree": "524c59a7592c08b2124e16ecfdddeec2fcba5689",
+  "deliveryAccepted": true,
+  "xctests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 1,
+    "cases": [
+      {
+        "name": "CatalogPagingFiltersAndLibraryChoices",
+        "result": "PASS",
+        "seconds": 99.073
+      },
+      {
+        "name": "ShortFeedSwipeFullscreenAndFullPlaylist",
+        "result": "PASS",
+        "seconds": 35.21
+      },
+      {
+        "name": "VerticalEpisodesPlaylistAndLifecycle",
+        "result": "PASS",
+        "seconds": 72.706
+      },
+      {
+        "name": "MovieSearchEachPartOfAResultSelectsThatExactRow",
+        "result": "PASS",
+        "seconds": 12.67
+      },
+      {
+        "name": "LivePineDramaPlaylistAndVideo",
+        "result": "PASS",
+        "seconds": 52.205
+      },
+      {
+        "name": "LivePineDramaShortFeedAndPlaylist",
+        "result": "PASS",
+        "seconds": 48.459
+      },
+      {
+        "name": "AutomaticPiPPreparationAndBackgroundTransition",
+        "result": "SKIP",
+        "reason": "AVKit system PiP unsupported on simulator",
+        "seconds": 16.003
+      }
+    ]
+  },
+  "shortsAssertions": [
+    "Real physical-screen central video coverage >0.8",
+    "Native video surface covers >90% of both fullscreen dimensions",
+    "Library tab bar and feed footer covered during fullscreen",
+    "Return to portrait succeeds",
+    "Portrait recommendation has no rotate button",
+    "Next recommendation resolves and requests media before swipe",
+    "Selected warm recommendation is not resolved again before play-all handoff",
+    "Prepared next video advances within the bounded UI latency check",
+    "Full 40-episode playlist opens exact selected episode",
+    "Leaving releases all player ownership"
+  ],
+  "nativePlayback": {
+    "playback-mpv.json": {
+      "audioChoices": 2,
+      "autoplayVerified": true,
+      "backend": "mpv",
+      "height": 402,
+      "landscape": true,
+      "mkvAudioAndDualSubtitlesVerified": true,
+      "pipSeekPauseRestoreVerified": true,
+      "pipSoftwareVisibleFrames": 8,
+      "pipSystemWindowOnDeviceVerified": false,
+      "qualityChoices": 1,
+      "subtitleChoices": 3,
+      "time": 9,
+      "width": 874
+    },
+    "automatic-pip-events.json": [
+      {
+        "active": false,
+        "applicationState": 0,
+        "automatic": true,
+        "event": "armedWithDecodedFrame",
+        "paused": false,
+        "pending": true,
+        "player": "0AEA99F5-7E8B-4A38-80BA-D0AEA5994BB0",
+        "possible": false,
+        "time": 2.292,
+        "timestamp": 1793693508.950027,
+        "videoOutput": "libmpv"
+      }
+    ],
+    "playback-phim4k-hls.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 1,
+      "backend": "mpv",
+      "fileLoadedElapsedSeconds": 0.47788629166666396,
+      "firstDecodedVideoElapsedSeconds": 0.47788629166666396,
+      "height": 402,
+      "landscape": true,
+      "mediaInfo": "hls · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 640 × 360 · AAC (Advanced Audio Coding)",
+      "qualityChoices": 1,
+      "sample": "Local source-2 HLS through relay",
+      "startupTimingResolutionSeconds": 0.25,
+      "subtitleChoices": 1,
+      "time": 3.648,
+      "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+      "videoHeight": 360,
+      "videoWidth": 640,
+      "width": 874
+    },
+    "playback-anime-provider.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 1,
+      "backend": "mpv",
+      "cancelledEpisodeLoadVerified": true,
+      "episodeCount": 2,
+      "height": 402,
+      "landscape": true,
+      "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 320 × 180 · AAC (Advanced Audio Coding)",
+      "qualityChoices": 1,
+      "sample": "Local anime metadata → dynamic episodes → player",
+      "selectedEpisodeNumber": 1,
+      "subtitleChoices": 1,
+      "time": 3.7916666666666665,
+      "videoHeight": 180,
+      "videoWidth": 320,
+      "width": 874
+    },
+    "playback-phim4k-gateway.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 2,
+      "backend": "mpv",
+      "coreMetadataReplayed": true,
+      "fileLoadedElapsedSeconds": 3.218973291666657,
+      "firstDecodedVideoElapsedSeconds": 3.218973291666657,
+      "height": 402,
+      "landscape": true,
+      "liveGateway": true,
+      "mediaInfo": "mkv · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 1920 × 1080 · ATSC A/52A (AC-3)",
+      "metadataServerCount": 5,
+      "qualityChoices": 1,
+      "replayedCoreServerIDs": [
+        "31937",
+        "33090",
+        "27463",
+        "31938",
+        "31939"
+      ],
+      "sample": "Replayed Core metadata / Wakanda 10403 / server 31937 / live gateway and media",
+      "selectedServerID": "31937",
+      "startupTimingResolutionSeconds": 0.25,
+      "subtitleChoices": 3,
+      "time": 15.973999999999998,
+      "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+      "videoHeight": 1080,
+      "videoWidth": 1920,
+      "width": 874
+    }
+  },
+  "actualAutomaticPiPOnPhysicalIPhoneVerified": false,
+  "freshAnimeFree1CorePlaybackVerified": false,
+  "freshProviderLimit": "No fresh-live success result JSON for Anime, Free1 or Core. Gateway playback uses captured/replayed Core metadata; it is not fresh Core proof.",
+  "fullscreenPhysicalScreen": {
+    "artifactID": 13215490807,
+    "artifactMember": "ai-drama-20261103T080711Z-2112/attachments/DD7F071D-A87B-430A-9A1C-1FE321A3FF57.png",
+    "sha256": "6731c191145d4ff5dc7e240dd3aa9a743d77cf582feb44913b2d6b77445e0117",
+    "pngPixelSize": [
+      1206,
+      2622
+    ],
+    "centralVisibleFraction": 1.0,
+    "requiredFraction": 0.8,
+    "measurement": "Physical screen, RGB max >45 over x20..<44,y8..<24 in a 64x32 thumbnail; same center region as native UI assertion."
+  },
+  "fullscreenNativeState": {
+    "automaticPiPRequests": 0,
+    "cancelledResolutions": 0,
+    "currentTime": 12.416666666666666,
+    "manuallyPaused": false,
+    "maximumOwnedPlayers": 1,
+    "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 640 × 360 · AAC (Advanced Audio Coding)",
+    "nativeGeometry": {
+      "bounds": "(0.0, 0.0, 874.0, 402.0)",
+      "drawableHeight": 1206,
+      "drawableWidth": 2622,
+      "rendererHeight": 1206,
+      "rendererWidth": 2622,
+      "surface": "(0.0, 0.0, 874.0, 402.0)",
+      "videoOutput": "gpu-next",
+      "view": "(0.0, 0.0, 874.0, 402.0)"
+    },
+    "ownedPlayers": 1,
+    "piPActive": false,
+    "piPPossible": false,
+    "piPPrepared": false,
+    "piPSupported": false,
+    "playerCreations": 2,
+    "resolving": false,
+    "selectedEpisodeID": "7000000000000000105",
+    "subtitleTrack": "off"
+  }
+}
