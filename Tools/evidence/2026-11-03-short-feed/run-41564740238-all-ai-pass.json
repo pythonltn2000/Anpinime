@@ -1,0 +1,45 @@
+{
+  "runID": 41564740238,
+  "appCommit": "4fd93a117f215557cf1bd08d71679c7293d323b6",
+  "result": "PASS",
+  "testEvidence": "Actual XCTest case result lines; no relaxed assertions or workflow step conclusion substituted for playback.",
+  "tests": [
+    {
+      "name": "CatalogPagingFiltersAndLibraryChoices",
+      "seconds": 94.802,
+      "result": "PASS"
+    },
+    {
+      "name": "ShortFeedSwipeFullscreenAndFullPlaylist",
+      "seconds": 25.665,
+      "result": "PASS"
+    },
+    {
+      "name": "VerticalEpisodesPlaylistAndLifecycle",
+      "seconds": 61.37,
+      "result": "PASS"
+    },
+    {
+      "name": "MovieSearchEachResultHitRegions",
+      "seconds": 11.306,
+      "result": "PASS"
+    },
+    {
+      "name": "LivePineDramaPlaylistAndVideo",
+      "seconds": 55.574,
+      "result": "PASS"
+    },
+    {
+      "name": "LivePineDramaShortFeedAndPlaylist",
+      "seconds": 52.321,
+      "result": "PASS"
+    }
+  ],
+  "nativeChecks": [
+    "Exact first/second/final episode IDs independently checked against the full native panel",
+    "Decoded dimensions and advancing playback time",
+    "Short feed paging, landscape/portrait rotation and exact playlist handoff",
+    "Native subtitle off and embedded-track restoration through the new settings panel",
+    "Cancellation, manual pause/background, history resume and logical player ownership cleanup"
+  ]
+}

@@ -1,0 +1,253 @@
+{
+  "runID": 41565698005,
+  "appCommit": "e6ee6dc02624ae27e4cce38011a9c1fa26fcb570",
+  "overallRequiredChecks": "PASS",
+  "tests": [
+    {
+      "name": "CatalogPagingFiltersAndLibraryChoices",
+      "result": "PASS",
+      "seconds": 101.68
+    },
+    {
+      "name": "ShortFeedSwipeFullscreenAndFullPlaylist",
+      "result": "PASS",
+      "seconds": 24.635
+    },
+    {
+      "name": "VerticalEpisodesPlaylistAndLifecycle",
+      "result": "PASS",
+      "seconds": 62.045
+    },
+    {
+      "name": "MovieSearchEachResultHitRegions",
+      "result": "PASS",
+      "seconds": 12.791
+    },
+    {
+      "name": "LivePineDramaPlaylistAndVideo",
+      "result": "PASS",
+      "seconds": 53.247
+    },
+    {
+      "name": "LivePineDramaShortFeedAndPlaylist",
+      "result": "PASS",
+      "seconds": 50.791
+    }
+  ],
+  "nativePlayback": {
+    "playback-mpv": {
+      "sha256": "3c37f4f09f33e2e99d8d488a777081c30c68d0f23ddb4527b979f874d5d7983f",
+      "observations": {
+        "audioChoices": 2,
+        "autoplayVerified": true,
+        "backend": "mpv",
+        "height": 402,
+        "landscape": true,
+        "mkvAudioAndDualSubtitlesVerified": true,
+        "pipSeekPauseRestoreVerified": true,
+        "pipSoftwareVisibleFrames": 13,
+        "pipSystemWindowOnDeviceVerified": false,
+        "qualityChoices": 1,
+        "subtitleChoices": 3,
+        "time": 9.958,
+        "width": 874
+      }
+    },
+    "playback-phim4k-hls": {
+      "sha256": "1a140f8688c624d1d3d63c22b243da0b21bf986fe8f37c9204bcca2044f502a2",
+      "observations": {
+        "advancingVideoVerified": true,
+        "audioChoices": 1,
+        "backend": "mpv",
+        "fileLoadedElapsedSeconds": 0.5069801666666649,
+        "firstDecodedVideoElapsedSeconds": 0.5069801666666649,
+        "height": 402,
+        "landscape": true,
+        "mediaInfo": "hls · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 640 × 360 · AAC (Advanced Audio Coding)",
+        "qualityChoices": 1,
+        "sample": "Local source-2 HLS through relay",
+        "startupTimingResolutionSeconds": 0.25,
+        "subtitleChoices": 1,
+        "time": 3.44,
+        "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+        "videoHeight": 360,
+        "videoWidth": 640,
+        "width": 874
+      }
+    },
+    "playback-anime-provider": {
+      "sha256": "671010ae90ddd3aedcacf42c2b50674bb69681ba2f8a1ea92d5064803eef6188",
+      "observations": {
+        "advancingVideoVerified": true,
+        "audioChoices": 1,
+        "backend": "mpv",
+        "cancelledEpisodeLoadVerified": true,
+        "episodeCount": 2,
+        "height": 402,
+        "landscape": true,
+        "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 320 × 180 · AAC (Advanced Audio Coding)",
+        "qualityChoices": 1,
+        "sample": "Local anime metadata → dynamic episodes → player",
+        "selectedEpisodeNumber": 1,
+        "subtitleChoices": 1,
+        "time": 3.583333333333333,
+        "videoHeight": 180,
+        "videoWidth": 320,
+        "width": 874
+      }
+    },
+    "playback-phim4k-gateway": {
+      "sha256": "7a9e27455b5058e5edde3e55e78da2ffc05e9544c868b062749341fab452f6f4",
+      "observations": {
+        "advancingVideoVerified": true,
+        "audioChoices": 2,
+        "backend": "mpv",
+        "coreMetadataReplayed": true,
+        "fileLoadedElapsedSeconds": 3.027795250000054,
+        "firstDecodedVideoElapsedSeconds": 3.027795250000054,
+        "height": 402,
+        "landscape": true,
+        "liveGateway": true,
+        "mediaInfo": "mkv · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 1920 × 1080 · ATSC A/52A (AC-3)",
+        "metadataServerCount": 5,
+        "qualityChoices": 1,
+        "replayedCoreServerIDs": [
+          "31937",
+          "33090",
+          "27463",
+          "31938",
+          "31939"
+        ],
+        "sample": "Replayed Core metadata / Wakanda 10403 / server 31937 / live gateway and media",
+        "selectedServerID": "31937",
+        "startupTimingResolutionSeconds": 0.25,
+        "subtitleChoices": 3,
+        "time": 15.641,
+        "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+        "videoHeight": 1080,
+        "videoWidth": 1920,
+        "width": 874
+      }
+    }
+  },
+  "actualPhysicalIPhoneSystemPiPVerified": false,
+  "optionalExistingLiveChecks": {
+    "animeLive": "FAIL; no successful live playback result JSON",
+    "source2Free1Live": "FAIL; no successful live playback result JSON",
+    "freshCoreWakanda": "FAIL before media",
+    "freshCoreSpiderManLowSize": "FAIL before media",
+    "freshCoreSpiderMan4K": "FAIL before media",
+    "gatewayUsingCapturedCoreMetadata": "PASS, 1920x1080 advancing to 15.641 seconds; not fresh Core proof"
+  },
+  "nativeLiveEvidence": {
+    "AIDramaUITests/testLivePineDramaPlaylistAndVideo()": [
+      {
+        "attachment": "136D0B9F-614B-4824-AD51-16BCC2A05D9D.txt",
+        "data": {
+          "cancelledResolutions": 0,
+          "currentTime": 3.033333333333333,
+          "manuallyPaused": false,
+          "maximumOwnedPlayers": 1,
+          "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "playerCreations": 3,
+          "resolving": false,
+          "selectedEpisodeID": "7688489628675951890",
+          "subtitleTrack": "off"
+        }
+      },
+      {
+        "attachment": "9EE243C2-2A3E-467B-9CBC-42DB4EDE176B.txt",
+        "data": {
+          "cancelledResolutions": 0,
+          "currentTime": 3.3333333333333335,
+          "manuallyPaused": false,
+          "maximumOwnedPlayers": 1,
+          "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 962 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "playerCreations": 2,
+          "resolving": false,
+          "selectedEpisodeID": "7688489513844215048",
+          "subtitleTrack": "off"
+        }
+      },
+      {
+        "attachment": "A789B3B6-B407-476D-818B-65E2FA93232C.txt",
+        "data": {
+          "cancelledResolutions": 0,
+          "currentTime": 2.8666666666666667,
+          "manuallyPaused": false,
+          "maximumOwnedPlayers": 1,
+          "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "playerCreations": 1,
+          "resolving": false,
+          "selectedEpisodeID": "7688489490830183687",
+          "subtitleTrack": "off"
+        }
+      }
+    ],
+    "AIDramaUITests/testLivePineDramaShortFeedAndPlaylist()": [
+      {
+        "attachment": "DA02626F-2160-4C66-9424-9A29763B6726.txt",
+        "data": {
+          "cancelledResolutions": 0,
+          "currentTime": 3.1333333333333333,
+          "manuallyPaused": false,
+          "maximumOwnedPlayers": 1,
+          "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 960 × 540 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "playerCreations": 2,
+          "resolving": false,
+          "selectedEpisodeID": "7676596803499789589",
+          "subtitleTrack": "off"
+        }
+      },
+      {
+        "attachment": "C49718E6-7329-49EF-90FF-DC9CCE0D2DFE.txt",
+        "data": {
+          "cancelledResolutions": 0,
+          "currentTime": 2.3,
+          "manuallyPaused": false,
+          "maximumOwnedPlayers": 1,
+          "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 960 × 540 · AAC (Advanced Audio Coding)",
+          "ownedPlayers": 1,
+          "playerCreations": 1,
+          "resolving": false,
+          "selectedEpisodeID": "7676596649946369301",
+          "subtitleTrack": "off"
+        }
+      }
+    ]
+  },
+  "independentCatalogOracle": {
+    "catalogLabel": "Võ Sĩ Cấp SSS Ra Tù, Toàn Cầu Báo Động, 40,100,663 lượt xem, 105 tập",
+    "episodeCount": 105,
+    "oracleRequestCount": 1,
+    "panelEpisodeCount": 105,
+    "selectionPolicy": "First actual fresh catalog card, fixed before the single panel request",
+    "seriesID": "7688489302510228498",
+    "targets": [
+      {
+        "id": "7688489490830183687",
+        "number": 1
+      },
+      {
+        "id": "7688489513844215048",
+        "number": 2
+      },
+      {
+        "id": "7688489628675951890",
+        "number": 105
+      }
+    ]
+  },
+  "liveShortFeedSample": {
+    "title": "Long Vương Tái Xuất",
+    "collectionID": "7676596328591266837",
+    "reportedAndPanelEpisodeCount": 113,
+    "decodedVideo": "HEVC 960x540",
+    "selectedVideoID": "7676596649946369301",
+    "lastVideoID": "7676596803499789589"
+  }
+}

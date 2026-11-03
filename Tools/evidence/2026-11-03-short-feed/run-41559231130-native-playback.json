@@ -1,0 +1,127 @@
+{
+  "runID": 41559231130,
+  "appCommit": "c4db8561435a91f90f086b351d144aa282ec23e4",
+  "nativeChecks": {
+    "playback-mpv": {
+      "sha256": "11f0d9a10c14c189745f3bd19b76ad97f21aaf0d82a04324c5745ac76d414b15",
+      "observations": {
+        "audioChoices": 2,
+        "autoplayVerified": true,
+        "backend": "mpv",
+        "height": 402,
+        "landscape": true,
+        "mkvAudioAndDualSubtitlesVerified": true,
+        "pipSeekPauseRestoreVerified": true,
+        "pipSoftwareVisibleFrames": 8,
+        "pipSystemWindowOnDeviceVerified": false,
+        "qualityChoices": 1,
+        "subtitleChoices": 3,
+        "time": 9.25,
+        "width": 874
+      }
+    },
+    "playback-phim4k-hls": {
+      "sha256": "077fc3fd690a8a30d49e9fa360856f1261346beeafd58c026234701f749dc58a",
+      "observations": {
+        "advancingVideoVerified": true,
+        "audioChoices": 1,
+        "backend": "mpv",
+        "fileLoadedElapsedSeconds": 0.689681749999977,
+        "firstDecodedVideoElapsedSeconds": 0.689681749999977,
+        "height": 402,
+        "landscape": true,
+        "mediaInfo": "hls · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 640 × 360 · AAC (Advanced Audio Coding)",
+        "qualityChoices": 1,
+        "sample": "Local source-2 HLS through relay",
+        "startupTimingResolutionSeconds": 0.25,
+        "subtitleChoices": 1,
+        "time": 3.7310000000000003,
+        "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+        "videoHeight": 360,
+        "videoWidth": 640,
+        "width": 874
+      }
+    },
+    "playback-anime-provider": {
+      "sha256": "55ec1b19d633b36c72ec30558fd3b53fdd6df90e61c36b4081747c09e2d719ce",
+      "observations": {
+        "advancingVideoVerified": true,
+        "audioChoices": 1,
+        "backend": "mpv",
+        "cancelledEpisodeLoadVerified": true,
+        "episodeCount": 2,
+        "height": 402,
+        "landscape": true,
+        "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 320 × 180 · AAC (Advanced Audio Coding)",
+        "qualityChoices": 1,
+        "sample": "Local anime metadata → dynamic episodes → player",
+        "selectedEpisodeNumber": 1,
+        "subtitleChoices": 1,
+        "time": 2.875,
+        "videoHeight": 180,
+        "videoWidth": 320,
+        "width": 874
+      }
+    },
+    "playback-phim4k-gateway": {
+      "sha256": "2586f4adad1ede62ac738988d9180287e67f6bee05a11b7abe88d3d034e7c7ec",
+      "observations": {
+        "advancingVideoVerified": true,
+        "audioChoices": 2,
+        "backend": "mpv",
+        "coreMetadataReplayed": true,
+        "fileLoadedElapsedSeconds": 4.128167416666656,
+        "firstDecodedVideoElapsedSeconds": 4.128167416666656,
+        "height": 402,
+        "landscape": true,
+        "liveGateway": true,
+        "mediaInfo": "mkv · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 1920 × 1080 · ATSC A/52A (AC-3)",
+        "metadataServerCount": 5,
+        "qualityChoices": 1,
+        "replayedCoreServerIDs": [
+          "31937",
+          "33090",
+          "27463",
+          "31938",
+          "31939"
+        ],
+        "sample": "Replayed Core metadata / Wakanda 10403 / server 31937 / live gateway and media",
+        "selectedServerID": "31937",
+        "startupTimingResolutionSeconds": 0.25,
+        "subtitleChoices": 3,
+        "time": 16.349999999999998,
+        "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+        "videoHeight": 1080,
+        "videoWidth": 1920,
+        "width": 874
+      }
+    }
+  },
+  "actualSystemPiPOnPhysicalIPhoneVerified": false,
+  "piPRendererTransitions": [
+    {
+      "stage": 0,
+      "frames": 0,
+      "visibleFrames": 0,
+      "videoOutput": "gpu-next"
+    },
+    {
+      "stage": 0,
+      "frames": 0,
+      "visibleFrames": 0,
+      "videoOutput": "gpu-next"
+    },
+    {
+      "stage": 3,
+      "frames": 35,
+      "visibleFrames": 35,
+      "videoOutput": "libmpv"
+    },
+    {
+      "stage": 6,
+      "frames": 0,
+      "visibleFrames": 0,
+      "videoOutput": "gpu-next"
+    }
+  ]
+}

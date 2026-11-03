@@ -1,0 +1,130 @@
+{
+  "runID": 41562704775,
+  "appCommit": "c4a4fa74481277363cdce46a5da4a1325ace2749",
+  "test": "AIDramaUITests.testShortFeedSwipeFullscreenAndFullPlaylist",
+  "result": "PASS",
+  "durationSeconds": 32.519,
+  "verifiedAssertions": [
+    "First actual landscape recommendation decodes and advances in portrait",
+    "Fullscreen rotates the same selected video and playback keeps advancing",
+    "Portrait returns and a lower-screen vertical drag selects and plays the next recommendation",
+    "Near-end paging fetches native feed page two",
+    "Play all opens the exact selected episode in its 40-episode playlist",
+    "Leaving the short tab releases its logical player owner",
+    "No social controls"
+  ],
+  "fixtureEvents": [
+    {
+      "event": "short_feed",
+      "elapsed": 197.851,
+      "page": 1
+    },
+    {
+      "event": "resolve_started",
+      "elapsed": 198.188,
+      "episode": 5,
+      "episodeID": "7000000000000000105"
+    },
+    {
+      "event": "resolve_finished",
+      "elapsed": 198.189,
+      "episode": 5,
+      "episodeID": "7000000000000000105"
+    },
+    {
+      "event": "media",
+      "elapsed": 198.265,
+      "episode": 5,
+      "clip": 5,
+      "method": "GET",
+      "partial": true
+    },
+    {
+      "event": "media",
+      "elapsed": 198.282,
+      "episode": 5,
+      "clip": 5,
+      "method": "GET",
+      "partial": true
+    },
+    {
+      "event": "media",
+      "elapsed": 200.479,
+      "episode": 5,
+      "clip": 5,
+      "method": "GET",
+      "partial": true
+    },
+    {
+      "event": "resolve_started",
+      "elapsed": 210.932,
+      "episode": 3,
+      "episodeID": "7000000000000000203"
+    },
+    {
+      "event": "short_feed",
+      "elapsed": 210.932,
+      "page": 2
+    },
+    {
+      "event": "resolve_finished",
+      "elapsed": 210.935,
+      "episode": 3,
+      "episodeID": "7000000000000000203"
+    },
+    {
+      "event": "media",
+      "elapsed": 210.951,
+      "episode": 3,
+      "clip": 3,
+      "method": "GET",
+      "partial": true
+    },
+    {
+      "event": "playlist",
+      "elapsed": 215.362,
+      "seriesID": "7000000000000000002",
+      "count": 40
+    },
+    {
+      "event": "resolve_started",
+      "elapsed": 215.579,
+      "episode": 3,
+      "episodeID": "7000000000000000203"
+    },
+    {
+      "event": "resolve_finished",
+      "elapsed": 215.579,
+      "episode": 3,
+      "episodeID": "7000000000000000203"
+    },
+    {
+      "event": "media",
+      "elapsed": 215.644,
+      "episode": 3,
+      "clip": 3,
+      "method": "GET",
+      "partial": true
+    },
+    {
+      "event": "resolve_started",
+      "elapsed": 217.292,
+      "episode": 3,
+      "episodeID": "7000000000000000203"
+    },
+    {
+      "event": "resolve_finished",
+      "elapsed": 217.305,
+      "episode": 3,
+      "episodeID": "7000000000000000203"
+    },
+    {
+      "event": "media",
+      "elapsed": 217.308,
+      "episode": 3,
+      "clip": 3,
+      "method": "GET",
+      "partial": true
+    }
+  ]
+}

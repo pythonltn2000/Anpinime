@@ -1,0 +1,74 @@
+{
+  "runID": 41559677883,
+  "appCommit": "b9ccdf39be472de178326198d160538826cd2a2c",
+  "scope": "Historical check before decorative footer/title hit-testing repair.",
+  "tests": {
+    "catalogAndLibraryChoices": "PASS, 106.742 seconds",
+    "episodeLifecycleAndHistory": "PASS, 51.003 seconds",
+    "movieSearchHitRegions": "PASS, 11.827 seconds",
+    "liveCatalogFirstSecondLast": "PASS, 52.553 seconds",
+    "liveShortFeedFullscreenAndFinalEpisode": "PASS, 34.534 seconds",
+    "fixtureShortFeedSwipe": "FAIL — decoded the first landscape short and rotated successfully, but the lower swipe never started the next recommendation."
+  },
+  "shortFeedNativeStates": [
+    {
+      "cancelledResolutions": 0,
+      "currentTime": 3.0666666666666664,
+      "manuallyPaused": false,
+      "maximumOwnedPlayers": 1,
+      "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+      "ownedPlayers": 1,
+      "playerCreations": 1,
+      "resolving": false,
+      "selectedEpisodeID": "7687981447822593301"
+    },
+    {
+      "cancelledResolutions": 0,
+      "currentTime": 2.7333333333333334,
+      "manuallyPaused": false,
+      "maximumOwnedPlayers": 1,
+      "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 576 × 1024 · AAC (Advanced Audio Coding)",
+      "ownedPlayers": 1,
+      "playerCreations": 2,
+      "resolving": false,
+      "selectedEpisodeID": "7687981531268320532"
+    }
+  ],
+  "fixtureShortRequestEvidence": [
+    {
+      "event": "short_feed",
+      "page": 1,
+      "elapsed": 296.234
+    },
+    {
+      "event": "resolve_started",
+      "episode": 5,
+      "episodeID": "7000000000000000105",
+      "elapsed": 296.363
+    },
+    {
+      "event": "resolve_finished",
+      "episode": 5,
+      "episodeID": "7000000000000000105",
+      "elapsed": 296.401
+    },
+    {
+      "event": "media",
+      "episode": 5,
+      "clip": 5,
+      "elapsed": 296.534
+    },
+    {
+      "event": "media",
+      "episode": 5,
+      "clip": 5,
+      "elapsed": 296.558
+    },
+    {
+      "event": "media",
+      "episode": 5,
+      "clip": 5,
+      "elapsed": 297.9
+    }
+  ]
+}

@@ -1,103 +1,113 @@
 # AnPinime 2.7.0 (17) — Phim ngắn, Khám phá và player
 
+**Bản giao:** [IPA unsigned, artifact 13199392297](https://github.com/thuyan1510/AnPinime/actions/runs/41565698005/artifacts/13199392297).
+Mã ứng dụng `e6ee6dc02624ae27e4cce38011a9c1fa26fcb570`,
+[run 41565698005](https://github.com/thuyan1510/AnPinime/actions/runs/41565698005).
 Nhánh `feature/ai-drama`, [PR #2](https://github.com/thuyan1510/AnPinime/pull/2),
 tiếp nối nhánh sửa nguồn 2 tại `a785d35`; chưa gộp vào main.
-**Bản giao cuối: đang chờ kiểm tra native và IPA cùng mã nguồn cuối.**
 
-## Giao diện theo yêu cầu mới
+IPA đã được mở để kiểm tra `Info.plist`: **2.7.0 (17)**,
+`com.xemphim.aipinime`, iOS tối thiểu 15.0, có background audio, không có
+provisioning profile/chữ ký app. SHA-256:
+`0b80b998655f8f769c9a2c3f4a3041e9cddce825e1fa93c947fcb4ff60635fac`.
+[Danh tính artifact](Tools/evidence/2026-11-03-short-feed/release-artifact.json).
 
-Ba thư viện ngang hàng vẫn là **Anime / Phim / Phim AI**. Phim AI có bốn tab:
+## Giao diện
+
+Ba thư viện ngang hàng là **Anime / Phim / Phim AI**. Phim AI có bốn tab:
 **Trang chủ / Phim ngắn / Khám phá / Cài đặt**. Ba mục **Thịnh hành / Danh mục /
-Mới** nằm trong Khám phá; dữ liệu, bốn hàng lọc và phân trang native được giữ.
+Mới** nằm trong Khám phá; giữ dữ liệu thật, bốn hàng lọc và tải tiếp native.
 
-Phim ngắn lấy endpoint feed riêng của PineDrama, không lấy lại một trang xếp
-hạng rồi đổi tên. Lướt dọc chuyển giữa các video được giới thiệu; chỉ trang
-đã chọn sở hữu player. Video ngang nằm vừa trong màn hình dọc; nút toàn màn
-hình xoay ngang cùng player, giữ tập và tiến độ. Chỉ giữ tên phim, số tập,
-phát/tạm dừng và **Phát tất cả**; không thêm tim, bình luận hay chia sẻ.
+**Phim ngắn** dùng feed riêng của PineDrama, không lấy lại bảng xếp hạng.
+Lướt dọc chuyển video; video ngang nằm vừa trong màn hình dọc. Nút toàn màn
+hình xoay ngang cùng player và giữ tiến độ. Chỉ giữ tên phim, tập, phát/tạm
+dừng, toàn màn hình và **Phát tất cả**. Không thêm tim, bình luận, chia sẻ.
 
-**Phát tất cả** lấy panel tập của đúng collection, kiểm tra đầy đủ, rồi mở
-đúng tập đang xem. Player preview được dừng trước khi player danh sách nhận
-quyền phát. URL video được lấy mới theo ID khi chọn tập, không lưu vào history.
-Feed tải tiếp theo các video ID đã nhận, loại trùng và dừng khi không còn ID
-mới; lỗi mạng có thao tác thử lại và không thay bằng catalog khác.
+**Phát tất cả** lấy panel của đúng collection, kiểm tra đầy đủ rồi mở đúng
+tập đang xem. Dừng preview trước khi player danh sách nhận quyền phát. Feed
+tải tiếp theo ID video đã nhận, loại trùng và dừng nếu không còn ID mới.
+URL video được lấy mới theo tập, không lưu vào lịch sử.
 
-Banner Trang chủ kéo tới đỉnh sau nút đổi thư viện/nguồn đặt chồng lên ảnh.
-Đã bỏ nút tải lại trên Home. Ảnh bìa, tên và khoảng trống trong thẻ/kết quả
-cùng là vùng bấm của đúng phim; không để artwork nhận/chặn riêng sự kiện.
+Một bộ nhận cử chỉ chung xử lý vuốt trên cả video và vùng phủ; UIKit thực
+hiện hoạt ảnh chuyển trang. Cách này giữ nút bấm hoạt động và tránh tranh
+chấp giữa vùng phủ/scroll recognizer. Các phản hồi trễ không được lắp player
+cho tập đã bỏ qua. Chỉ tập hiện tại sở hữu player đang phát.
+
+Banner Home kéo tới đỉnh sau nút đổi thư viện/nguồn đặt chồng lên ảnh. Đã bỏ
+nút tải lại trên Home. Toàn bộ thẻ/kết quả gồm ảnh, tên và vùng trống mở đúng
+phim. Anime vẫn có Lịch chiếu; thư viện Phim giữ các tab riêng của nó.
 
 ## Cài đặt phát và PiP
 
-Đối chiếu IPA Phim4K gốc cho thấy sáu nhóm **Âm thanh / Phụ đề / Hiển thị /
-Tốc độ / Chung / Thông tin**. Menu mới dùng hàng tab ngang gọn, vùng tùy chọn
-cuộn, lựa chọn track lớn và rõ trạng thái đang chọn. Hiển thị gồm tỷ lệ video,
-lấp đầy khung hình và kiểu phụ đề; các lựa chọn thật vẫn dùng track ID của
-player. Menu này cũng có trong player Phim AI.
+IPA Phim4K gốc có sáu nhóm **Âm thanh / Phụ đề / Hiển thị / Tốc độ / Chung /
+Thông tin**. Menu mới dùng hàng tab ngang, vùng tùy chọn cuộn và hàng chọn
+track lớn. Hiển thị có tỷ lệ video, lấp đầy khung hình và kiểu phụ đề. Menu
+cũng có trong player AI; lựa chọn audio/subtitle/file rời nối tới ID track
+thật. AI ghi nhớ tốc độ và dùng tùy chọn tự chuyển tập của người dùng.
 
-PiP dùng AVSampleBufferDisplayLayer và cùng decoder/âm thanh mpv. Chỉ khi cần
-PiP mới chuyển sang khung render CPU nhỏ; phát thường giữ Metal và cấu hình
-cache/hardware decoding cũ. Luồng render chạy riêng và được giải phóng trước
-khi hủy mpv. Khi trả về app phải đưa output GPU trở lại trước khi giải phóng
-render context PiP, để tránh mpv tự hủy video đang sử dụng context đó.
+PiP native dùng AVSampleBufferDisplayLayer cùng decoder/âm thanh mpv. Chỉ
+PiP chuyển sang khung render CPU nhỏ; phát thường giữ Metal và các tùy chọn
+cache/hardware decoding cũ. Khi trở về, GPU nhận output trước khi giải phóng
+render context PiP. Có nút cửa sổ nổi, tùy chọn PiP khi rời app và background
+audio. AVPlayer/WKWebView bật khả năng PiP của hệ thống; web player còn phụ
+thuộc trang phát.
 
-Có nút cửa sổ nổi và tùy chọn **PiP khi rời ứng dụng**. App khai báo chế độ âm
-thanh nền. Kết quả renderer/seek/restore trên simulator phải được ghi riêng;
-chưa xác nhận tự bật cửa sổ PiP trên iPhone vật lý. Không coi có nút hoặc build
-thành công là PiP đã hoạt động.
+**Chưa xác nhận cửa sổ PiP tự bật trên iPhone vật lý.** Kiểm tra simulator
+bên dưới xác nhận frame/pause/seek/restore; không thay cho hành vi hệ thống
+trên điện thoại hoặc chứng nhận mọi web player hỗ trợ PiP.
 
-Nguồn 2 hiển thị `S01E001` thành **Tập 1**, vẫn giữ nguyên ID mùa/tập và server
-cho resolver. Tên đặc biệt không bị thay bằng số đoán theo tiêu đề.
+Nguồn 2 hiển thị `S01E001` thành **Tập 1** bằng thuộc tính trình bày riêng.
+Tên tập gốc, công thức ID lịch sử và ID lookup mùa/tập giữ nguyên. Catalog
+nguồn 2 trở lại byte-identical với baseline; không sửa dữ liệu để đổi nhãn.
 
-## Kiểm chứng và giới hạn hiện tại
+## Kết quả của đúng bản giao
 
-[Bằng chứng feed và phạm vi bảo vệ](Tools/evidence/2026-11-03-short-feed/README.md)
-ghi hash IPA gốc, địa chỉ mã, hợp đồng feed và quan sát mạng đã loại URL ký.
-Một mẫu feed live có panel **89 tập liên tục**, video response trùng chính xác
-collection/video/số tập. Đây là quan sát API, không thay thế playback iOS.
+Bốn XCTest fixture và hai XCTest live đều **PASS** trong run `41565698005`:
 
-Run [41558237765](https://github.com/thuyan1510/AnPinime/actions/runs/41558237765),
-commit `93dd048`, có kết quả XCTest thực:
+| Kiểm tra | Thời gian |
+| --- | ---: |
+| Khám phá, phân trang, bốn bộ lọc, đổi thư viện | 101.680 giây |
+| Phim ngắn: phát ngang/dọc, vuốt, tải tiếp, Phát tất cả, dọn player | 24.635 giây |
+| Player tập, chọn phụ đề thật, hủy tập trễ, pause/background, history | 62.045 giây |
+| Bấm các phần của hàng tìm kiếm chọn đúng phim | 12.791 giây |
+| Live catalog → panel đầy đủ → đúng tập đầu/hai/cuối | 53.247 giây |
+| Live feed → xoay cùng video → panel đầy đủ → phát tập cuối | 50.791 giây |
 
-- Khám phá/phân trang/bốn bộ lọc/đổi ba thư viện: PASS, 104.679 giây.
-- Player tập/lịch sử/cancel tập chậm/pause/background/dọn player: PASS, 53.876 giây.
-- Vùng bấm các phần của kết quả tìm kiếm: PASS, 12.997 giây.
-- Live catalog → panel đầy đủ → tập đầu/hai/cuối: PASS, 40.257 giây; giải mã
-  HEVC 540×960, thời gian tiến lên, mỗi lần một player.
-- Feed mới: FAIL ở nhận diện trạng thái trong XCTest. Identifier cấp màn hình
-  đè lên ID từng nút; đã sửa và đang chạy lại cả luồng lướt/xoay/Phát tất cả.
-- MKV/PiP mới: FAIL do video output initialization. Đã sửa thứ tự restore/free
-  và thêm log native theo giai đoạn; đang kiểm tra lại. Release build PASS
-  của run này không được dùng làm bằng chứng đã sửa PiP.
+JSON playback native của cùng run xác nhận:
 
-[Bản ghi từng kết quả](Tools/evidence/2026-11-03-short-feed/run-41558237765-partial.json).
-Run/IPA cuối cùng sẽ được ghi sau khi các kiểm tra cần thiết đạt.
+- MKV tự phát, hai audio và hai làn phụ đề; **13 frame PiP hợp lệ**, pause,
+  seek và restore GPU thành công, playback tiếp tục tới **9.958 giây**.
+- HLS nguồn 2 qua relay: giải mã **640×360**, thời gian tiến tới **3.440 giây**.
+- Anime fixture qua danh sách tập động/resolver: **320×180**, **3.583 giây**.
+- Gateway nguồn 2 dùng metadata Core đã lưu: **1920×1080**, **15.641 giây**;
+  đây không phải xác nhận fresh Core catalog.
 
-Các bộ có catalog tổng tập khác panel vẫn báo chưa đủ danh sách, không tự
-coi panel thiếu là trọn bộ. Ví dụ trước đây collection `7696940578596328500`
-báo 45 tập nhưng panel chỉ có 41. Phép thử live PASS của một bộ khác không
-chứng minh mọi phim đều đầy đủ. [Lịch sử điều tra UI 2.6](Tools/evidence/2026-11-02-ai-library-v2/)
-và [baseline player 2.5](Tools/evidence/2026-11-02-ai-baseline/README.md) được
-lưu riêng, không dùng IPA cũ làm bản giao mới.
+CLI parser/provider/protocol/JS và AI provider/store cũng đạt. Bài kiểm tra
+ID nguồn 2 xác nhận nhãn mới giữ nguyên persistence key và lookup IDs. Thứ
+tự phản hồi chậm đối chiếu bằng **đúng episode ID**, không lẫn hai bộ có
+cùng số tập trong các bài kiểm tra dùng chung fixture.
 
-## Các sửa đổi Movie được giữ
+[Kết quả từng phép thử và hash JSON](Tools/evidence/2026-11-03-short-feed/run-41565698005-final.json).
+[Bằng chứng feed gốc và phạm vi bảo vệ](Tools/evidence/2026-11-03-short-feed/README.md).
+Các snapshot `partial`/baseline giữ lịch sử điều tra; không dùng IPA cũ làm
+bản giao. Không suy ra playback chỉ từ trạng thái workflow/build xanh.
 
-Ba nhãn nguồn là **Anpinime Free / Anpinime Premium / Anpinime dự phòng**.
-Raw cases, URL/ID lịch sử và routing của nguồn 1/3 được giữ nguyên. Parser,
-resolver, catalog và relay được so sánh hash với baseline; player/menu/banner
-chung thay đổi theo yêu cầu lần này.
+## Phạm vi bảo vệ và phần chưa xác nhận
 
-Tìm kiếm bắt đúng đối tượng trên hàng đang hiển thị, bỏ kết quả cũ khi query/
-nguồn đổi, hủy phản hồi trễ và mở đúng phim khi bấm ảnh, chữ hoặc vùng trống.
+Ba nhãn Movie là **Anpinime Free / Anpinime Premium / Anpinime dự phòng**.
+Raw source cases, URL/ID lịch sử và routing nguồn 1/3 không đổi. Hash của
+parser, catalog, provider, relay và cấu hình mpv thường được so với baseline.
+Player/menu/banner chung thay đổi theo yêu cầu này.
 
-Nguồn 2 tiếp tục dùng cache ngắn cho directory đã xác thực và probe GET giới
-hạn thay cho HEAD rồi GET. Không cache media URL có thời hạn hoặc tráo server.
-Phân tích mẫu **Người Nhện: Khởi đầu mới**, Core ID `17997`, cho thấy các link
-MKV đã đo có đoạn mở đầu đen; điều này có thể làm người xem tưởng chưa có hình.
-Chưa kết luận đã sửa hết lag/tốc độ trên iPhone. Phép đo Core mới trước đây gặp
-403 ở bước detail; số đo Linux hoặc gateway dùng metadata lưu không đại diện
-cho startup fresh Core trên máy người dùng.
+Các kiểm tra live **AnimeVietsub, Free1 và fresh Core** trong run này chưa
+phát thành công; ghi riêng trong kết quả, dù các bước optional không chặn
+IPA. Gateway có metadata lưu phát được không chứng minh fresh Core đã sửa.
+Các bộ có tổng catalog khác panel vẫn báo chưa đủ danh sách, ví dụ mẫu cũ
+45 tập nhưng panel chỉ 41; không tự nhận đó là trọn bộ.
 
-[Phân tích và giới hạn startup nguồn 2](Tools/source2-startup-analysis.md),
-[kết quả iOS nguồn 2](Tools/evidence/2026-11-02-source2-startup/ios-startup-results.json).
-Free1 live, anime live và VIP phải đọc theo kết quả playback riêng của từng
-lượt, không lấy trạng thái build xanh để kết luận tất cả đã sửa.
+Chưa kết luận đã sửa hết tốc độ/lag MKV trên iPhone. Các tối ưu directory
+cache/probe giới hạn từ 2.6 được giữ, không cache URL video có thời hạn và
+không tráo server. Mẫu Người Nhện có đoạn mở đầu đen; đo Linux hoặc gateway
+không thay cho startup fresh Core trên máy người dùng.
+[Phân tích startup nguồn 2](Tools/source2-startup-analysis.md),
+[kết quả iOS trước đó](Tools/evidence/2026-11-02-source2-startup/ios-startup-results.json).

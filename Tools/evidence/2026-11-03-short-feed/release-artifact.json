@@ -1,0 +1,22 @@
+{
+  "version": "2.7.0",
+  "build": "17",
+  "bundleID": "com.xemphim.aipinime",
+  "unsigned": true,
+  "backgroundModes": [
+    "audio"
+  ],
+  "minimumOS": "15.0",
+  "appCommit": "e6ee6dc02624ae27e4cce38011a9c1fa26fcb570",
+  "appSourceTree": "1d9b45f6f929c8c6acab25fcc7db5e3db487b9f4",
+  "ipaBytes": 30513095,
+  "ipaSHA256": "0b80b998655f8f769c9a2c3f4a3041e9cddce825e1fa93c947fcb4ff60635fac",
+  "buildRunID": 41565698005,
+  "buildJobID": 125686566656,
+  "artifactID": 13199392297,
+  "downloadURL": "https://github.com/thuyan1510/AnPinime/actions/runs/41565698005/artifacts/13199392297",
+  "deliveryCandidate": true,
+  "artifactExpiresUTC": "2026-11-17T02:32:00Z",
+  "verificationRunID": 41565698005,
+  "artifactZipDigest": "sha256:ea46f39511c18df1a27ce420272089d948f30ac746f2d3d1f238165e5f9e06cd"
+}

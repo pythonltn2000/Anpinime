@@ -55,3 +55,22 @@ must be reported separately from this test.
 `source-preservation.json` compares shared parsing, movie transports, relays and
 the normal mpv option map against the repair baseline. UI and PiP presentation
 changes are explicitly within the current request.
+
+## Final validation and artifact
+
+Run `41565698005`, application commit `e6ee6dc`, passed all four fixture UI
+cases and both bounded live PineDrama cases. The live feed sample was
+**Long Vương Tái Xuất**, 113 episodes: decoded landscape HEVC 960×540 for the
+selected recommendation and the last episode. The independent catalog case
+validated and decoded episodes 1, 2 and 105 of its selected 105-episode series.
+
+The matching native MKV result contains 13 visible PiP frames and successful
+pause/seek/GPU restoration at 9.958 seconds; two audio tracks and two subtitle
+lanes also passed. HLS-relay and dynamic-anime fixtures passed. These results
+are from actual playback JSON/XCTest assertions, separate from build status.
+
+`run-41565698005-final.json` records the final evidence, including unsuccessful
+optional live Anime/Free1/fresh-Core checks. `release-artifact.json` pins the
+unsigned 2.7.0 (17) IPA and its hash. Later report-only commits do not change
+the recorded application source tree. Physical-iPhone automatic PiP remains
+unverified.
