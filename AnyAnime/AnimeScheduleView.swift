@@ -85,6 +85,7 @@ struct AnimeScheduleView: View {
                 .hidden()
             }
         }
+        .navigationBarHidden(false)
         .navigationTitle("Lịch chiếu")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

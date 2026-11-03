@@ -20,7 +20,7 @@ struct AIDramaLibraryView: View {
             .tabItem { Label("Trang chủ", systemImage: "house.fill") }.tag(0)
 
             AIDramaShortsView(provider: store.provider, active: selectedTab == 1 && presentation == nil,
-                              openAll: { series, episode in open(series, episode) }, fullscreenChanged: { shortsFullscreen = $0 })
+                              openAll: { series, episode, ready in open(series, episode, whenReady: ready) }, fullscreenChanged: { shortsFullscreen = $0 })
                 .overlay(alignment: .topLeading) { if !shortsFullscreen { libraryButton.padding(.leading, 16).padding(.top, 4) } }
                 .tabItem { Label("Phim ngắn", systemImage: "play.rectangle.fill") }.tag(1)
 
@@ -61,9 +61,14 @@ struct AIDramaLibraryView: View {
     }
 
     private func open(_ series: AIDramaSeries, _ episodeID: String?) {
+        open(series, episodeID, whenReady: nil)
+    }
+
+    private func open(_ series: AIDramaSeries, _ episodeID: String?, whenReady: (() -> Void)?) {
         openingTask?.cancel()
         openingTask = Task { @MainActor in
             guard let playlist = await store.loadPlaylist(for: series), !Task.isCancelled else { return }
+            whenReady?()
             presentation = PlaylistPresentation(playlist: playlist, initialEpisodeID: episodeID)
         }
     }

@@ -638,6 +638,7 @@ struct AnimeGridView: View {
                 .refreshable { await load() }
             }
         }
+        .navigationBarHidden(false)
         .navigationTitle(ContentDisplayText.sourceLabels(title))
         .task { await load() }
         .onChange(of: service.verificationGeneration) { _ in Task { await load() } }

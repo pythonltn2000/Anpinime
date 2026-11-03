@@ -11,3 +11,6 @@ build-simulator/
 previews/
 
 Tests/source2-hls/
+
+__pycache__/
+*.py[cod]

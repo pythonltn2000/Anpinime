@@ -8,6 +8,7 @@ struct AIDramaPlayerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var session: AIDramaPlaybackSession
     @State private var playlistPresented = false
+    @State private var settingsPresented = false
 
     init(playlist: AIDramaPlaylist, provider: AIDramaProviding, initialEpisodeID: String? = nil) {
         _session = StateObject(wrappedValue: AIDramaPlaybackSession(playlist: playlist, provider: provider,
@@ -44,6 +45,14 @@ struct AIDramaPlayerView: View {
         }
         .preferredColorScheme(.dark)
         .statusBar(hidden: true)
+        .sheet(isPresented: $settingsPresented) {
+            if let playback = session.playback {
+                PlayerSettingsPanel(playback: playback, initialTab: "audio", title: session.playlist.series.title,
+                                    source: "Phim AI", close: { settingsPresented = false },
+                                    reload: { settingsPresented = false; session.retry() })
+                    .preferredColorScheme(.dark)
+            }
+        }
         .sheet(isPresented: $playlistPresented) { playlistDrawer }
         .onAppear { session.setPresented(true, sceneActive: scenePhase == .active) }
         .onChange(of: scenePhase) { session.setSceneActive($0 == .active) }
@@ -92,6 +101,9 @@ struct AIDramaPlayerView: View {
                 .accessibilityLabel(session.manuallyPaused ? "Phát" : "Tạm dừng")
                 .accessibilityIdentifier("aidrama.playpause")
                 Spacer()
+                Button { settingsPresented = true } label: {
+                    Image(systemName: "gearshape").frame(width: 44, height: 44)
+                }.accessibilityLabel("Cài đặt phát")
                 Button { playlistPresented = true } label: {
                     Label("Danh sách tập (\(session.playlist.episodes.count))", systemImage: "list.bullet.rectangle")
                         .font(.subheadline.weight(.semibold)).padding(.vertical, 12).padding(.horizontal, 14)

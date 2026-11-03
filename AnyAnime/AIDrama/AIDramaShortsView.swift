@@ -74,10 +74,10 @@ struct AIDramaShortsView: View {
     @StateObject private var feed: AIDramaShortsStore
     @State private var landscape = false
     let active: Bool
-    let openAll: (AIDramaSeries, String) -> Void
+    let openAll: (AIDramaSeries, String, @escaping () -> Void) -> Void
     let fullscreenChanged: (Bool) -> Void
 
-    init(provider: AIDramaProviding, active: Bool, openAll: @escaping (AIDramaSeries, String) -> Void, fullscreenChanged: @escaping (Bool) -> Void) {
+    init(provider: AIDramaProviding, active: Bool, openAll: @escaping (AIDramaSeries, String, @escaping () -> Void) -> Void, fullscreenChanged: @escaping (Bool) -> Void) {
         _feed = StateObject(wrappedValue: AIDramaShortsStore(provider: provider))
         self.active = active; self.openAll = openAll; self.fullscreenChanged = fullscreenChanged
     }
@@ -90,7 +90,10 @@ struct AIDramaShortsView: View {
             }
             if let session = feed.session, let item = feed.selected {
                 AIDramaShortsControls(session: session, item: item, landscape: $landscape) {
-                    openAll(item.series, item.episode.id)
+                    openAll(item.series, item.episode.id) {
+                        // Stop preview ownership before the full playlist creates its player.
+                        feed.setActive(false, sceneActive: false)
+                    }
                 }
                 #if DEBUG
                 if AIDramaDebugSupport.enabled {
