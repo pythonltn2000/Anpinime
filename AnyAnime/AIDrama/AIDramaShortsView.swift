@@ -245,6 +245,7 @@ private struct AIDramaShortsPager: UIViewControllerRepresentable {
         }
         @MainActor required dynamic init?(coder: NSCoder) { fatalError("init(coder:)") }
     }
+    @MainActor
     final class Coordinator: NSObject {
         let feed: AIDramaShortsStore
         private var transitioning = false

@@ -24,7 +24,7 @@ on:
 
 jobs:
   build-ios:
-    if: ${{ !inputs.gateway_frame_only && !inputs.ai_drama_only && !inputs.shorts_only && !inputs.shorts_only }}
+    if: ${{ !inputs.gateway_frame_only && !inputs.ai_drama_only && !inputs.shorts_only }}
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -151,7 +151,7 @@ jobs:
           retention-days: 14
 
   preview:
-    if: github.event_name == 'workflow_dispatch' && inputs.preview && !inputs.gateway_frame_only && !inputs.ai_drama_only && !inputs.shorts_only && !inputs.shorts_only
+    if: github.event_name == 'workflow_dispatch' && inputs.preview && !inputs.gateway_frame_only && !inputs.ai_drama_only && !inputs.shorts_only
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
