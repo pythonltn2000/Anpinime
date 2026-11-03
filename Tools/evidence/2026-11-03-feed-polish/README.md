@@ -33,7 +33,11 @@ cache size or device latency, and the original IPA was not executed here.
   or PiP. Leaving, backgrounding, a memory warning, or 45 seconds discards it.
 - Landscape recommendations open a real fullscreen cover containing the same
   native controller. Tabs, library controls and playlist footer stay outside the
-  presentation. Portrait recommendations have no rotate button. Returning moves
+  presentation. The pinned MPVKit MoltenVK patch reads layer size only during
+  renderer reconfiguration; updating UIKit/Metal bounds alone leaves a stale
+  viewport. AI players request that reconfiguration after a size change, while
+  retaining the same decoder owner, file, time and audio. Portrait recommendations
+  have no rotate button. Returning moves
   the same controller back without resolving the media again.
 - PiP creates its AVKit content source and enqueues an actual mpv decoded frame
   during foreground playback. The async snapshot requires mpv `screenshot-sw=yes`,

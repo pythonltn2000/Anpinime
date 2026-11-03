@@ -18,7 +18,7 @@ final class MPVPlaybackController: UIViewController {
     private let resizesEmbeddedSurface: Bool
     private var rendererSize = CGSize.zero
     private var resizeTask: Task<Void, Never>?
-    private var alternateGPUConfiguration = false
+    private var reconfiguringGPU = false
     private var automaticPiPPrepared = false
     private var snapshotPending = false
     private var snapshotReady = false
@@ -30,7 +30,8 @@ final class MPVPlaybackController: UIViewController {
     var nativeGeometry: [String: Any] {
         ["view": String(describing: view.frame), "bounds": String(describing: view.bounds),
          "surface": String(describing: surface.frame), "drawableWidth": surface.drawableSize.width,
-         "drawableHeight": surface.drawableSize.height, "videoOutput": string("current-vo")]
+         "drawableHeight": surface.drawableSize.height, "videoOutput": string("current-vo"),
+         "rendererWidth": number("osd-width"), "rendererHeight": number("osd-height")]
     }
     var piPPrepared: Bool { pictureInPicture != nil }
     var piPPossible: Bool { pictureInPicture?.possible == true }
@@ -121,18 +122,27 @@ final class MPVPlaybackController: UIViewController {
         guard size.width > 1, size.height > 1, size != rendererSize else { return }
         let hadSize = rendererSize != .zero
         rendererSize = size
-        guard resizesEmbeddedSurface, hadSize, loaded else { return }
+        guard resizesEmbeddedSurface, hadSize, loaded, !reconfiguringGPU else { return }
         resizeTask?.cancel()
         resizeTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 200_000_000)
             guard !Task.isCancelled, let self, self.handle != nil, self.rendererSize == size,
+                  UIApplication.shared.applicationState == .active,
                   self.string("current-vo") == "gpu-next" else { return }
-            // The pinned MPVKit MoltenVK context reads CAMetalLayer.drawableSize only
-            // in reconfig(), and its control() emits no VO_EVENT_RESIZE. Updating the
-            // layer alone leaves the old viewport. Reconfigure that same output using
-            // equivalent driver lists; no second player, file reload or resolve occurs.
-            self.alternateGPUConfiguration.toggle()
-            self.set("vo", self.alternateGPUConfiguration ? "gpu-next,gpu-next" : "gpu-next")
+            // This MPVKit context reads layer size only during reconfig() and emits
+            // no resize event. Let null output commit before restoring gpu-next, so
+            // option caching cannot coalesce an equivalent driver list. Audio, file,
+            // decoder ownership and playback position continue in the same player.
+            self.reconfiguringGPU = true
+            self.set("vo", "null")
+            for _ in 0..<20 {
+                guard self.handle != nil, !Task.isCancelled else { self.reconfiguringGPU = false; return }
+                if self.string("current-vo") == "null" { break }
+                try? await Task.sleep(nanoseconds: 25_000_000)
+            }
+            if self.handle != nil, !Task.isCancelled, UIApplication.shared.applicationState == .active,
+               self.string("current-vo") == "null" { self.set("vo", "gpu-next") }
+            self.reconfiguringGPU = false
         }
     }
 

@@ -1,0 +1,59 @@
+{
+  "run": 41575210652,
+  "appCommit": "78412621a46a3d524fa346a7f269b6da15f03ce5",
+  "deliveryAccepted": false,
+  "buildIOS": "PASS",
+  "nativeMKV": {
+    "audioChoices": 2,
+    "autoplayVerified": true,
+    "backend": "mpv",
+    "height": 402,
+    "landscape": true,
+    "mkvAudioAndDualSubtitlesVerified": true,
+    "pipSeekPauseRestoreVerified": true,
+    "pipSoftwareVisibleFrames": 12,
+    "pipSystemWindowOnDeviceVerified": false,
+    "qualityChoices": 1,
+    "subtitleChoices": 3,
+    "time": 7.917,
+    "width": 874
+  },
+  "bootstrapFrame": [
+    {
+      "active": false,
+      "applicationState": 0,
+      "automatic": true,
+      "event": "armedWithDecodedFrame",
+      "paused": false,
+      "pending": true,
+      "player": "107C5CE0-1B92-43AB-8236-AD937E51015E",
+      "possible": false,
+      "time": 2.167,
+      "timestamp": 1793678504.051827,
+      "videoOutput": "libmpv"
+    }
+  ],
+  "nativeAI": {
+    "catalogPagingFilters": "PASS",
+    "verticalPlaylistLifecycle": "PASS",
+    "posterSearchHitRegions": "PASS",
+    "shortFullscreenPixels": "FAIL: central visible fraction 0.0026041667, required >0.8",
+    "systemAutomaticPiP": "SKIP: AVKit system PiP unsupported by simulator",
+    "liveCatalogPlaylist": "PASS",
+    "liveShortFeedPlaylist": "PASS"
+  },
+  "fullscreenGeometry": {
+    "viewBounds": [
+      874,
+      402
+    ],
+    "metalDrawableSize": [
+      2622,
+      1206
+    ],
+    "videoOutput": "gpu-next",
+    "ownedPlayers": 1,
+    "playerCreations": 1
+  },
+  "conclusion": "UIKit and CAMetalLayer bounds updated correctly, but the actual video viewport remained stale. A successful build and valid container geometry were not accepted as a fullscreen fix."
+}
