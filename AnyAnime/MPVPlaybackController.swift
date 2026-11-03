@@ -14,6 +14,13 @@ final class MPVPlaybackController: UIViewController {
     private var timer: Timer?
     private let surface = MPVSurface()
     private var pictureInPicture: MPVPictureInPicture?
+    private var preloading: Bool
+    private var automaticPiPPrepared = false
+    #if DEBUG
+    private(set) var automaticPiPRequests = 0
+    var piPPrepared: Bool { pictureInPicture != nil }
+    var piPPossible: Bool { pictureInPicture?.possible == true }
+    #endif
     private var loaded = false
     private var userPaused = false
     private var backgroundPaused = false
@@ -26,7 +33,8 @@ final class MPVPlaybackController: UIViewController {
     #endif
     var onFailure: ((String) -> Void)?
 
-    init(url: URL, headers: [String: String], playback: PlaybackState) {
+    init(url: URL, headers: [String: String], playback: PlaybackState, preloading: Bool = false) {
+        self.preloading = preloading
         self.url = url; self.headers = headers; self.playback = playback; self.userPaused = playback.userPaused
         super.init(nibName: nil, bundle: nil)
     }
@@ -53,6 +61,11 @@ final class MPVPlaybackController: UIViewController {
                              "sub-auto": "no", "audio-display": "no", "pause": "no"] {
             mpv_set_option_string(context, key, value)
         }
+        if preloading {
+            for (key, value) in ["pause": "yes", "volume": "0", "cache-secs": "3", "demuxer-max-bytes": "12MiB", "demuxer-max-back-bytes": "0"] {
+                mpv_set_option_string(context, key, value)
+            }
+        }
         if let agent = headers["User-Agent"] { mpv_set_option_string(context, "user-agent", agent) }
         if let referer = headers["Referer"] { mpv_set_option_string(context, "referrer", referer) }
         let extra = headers.filter { !["User-Agent", "Referer"].contains($0.key) }
@@ -67,7 +80,7 @@ final class MPVPlaybackController: UIViewController {
         playback.pictureInPictureSupported = AVPictureInPictureController.isPictureInPictureSupported()
         playback.engine = "mpv"
         playback.supportsAdvancedSubtitles = true
-        set("speed", String(playback.rate)); set("volume", String(playback.volume * 100))
+        set("speed", String(playback.rate)); set("volume", preloading ? "0" : String(playback.volume * 100))
         applyStyle()
         command(["loadfile", url.absoluteString, "replace"])
         startedAt = Date()
@@ -76,7 +89,7 @@ final class MPVPlaybackController: UIViewController {
         }
         NotificationCenter.default.addObserver(self, selector: #selector(prepareForBackground), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(background), name: UIApplication.didEnterBackgroundNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(foreground), name: UIApplication.willEnterForegroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(foreground), name: UIApplication.didBecomeActiveNotification, object: nil)
     }
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
@@ -104,44 +117,126 @@ final class MPVPlaybackController: UIViewController {
         pictureInPicture = nil
     }
 
-    @objc private func prepareForBackground() {
-        if UserDefaults.standard.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true { preparePictureInPicture() }
+    func finishPreloading() {
+        preloading = false
+        set("cache-secs", "20"); set("demuxer-max-bytes", "96MiB"); set("demuxer-max-back-bytes", "16MiB")
+        set("volume", String(playback.volume * 100))
     }
 
-    func preparePictureInPicture(start: Bool = true) {
-        guard loaded, !userPaused, handle != nil, pictureInPicture == nil else { return }
-        guard playback.pictureInPictureSupported || !start else { return }
+    private var automaticPiPEnabled: Bool {
+        !preloading && (UserDefaults.standard.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true)
+    }
+
+    @objc private func prepareForBackground() { prepareAutomaticPictureInPicture() }
+
+    /// Begin preparing frames at resign-active, but let the system's inline transition
+    /// start PiP. An explicit fallback request follows only on actual background entry.
+    func prepareAutomaticPictureInPicture() {
+        guard automaticPiPEnabled, !userPaused else { return }
+        preparePictureInPicture(start: false)
+        automaticPiPPrepared = pictureInPicture != nil
+    }
+
+    private func armPictureInPicture() {
+        guard pictureInPicture == nil, loaded, !preloading, let handle else { return }
         playback.pictureInPictureError = nil
         let pip = MPVPictureInPicture(playback: playback, command: { [weak self] name, value in
             guard let self else { return }
-            if name == "pipOutput" { self.set("hwdec", "videotoolbox-copy"); self.set("vo", "libmpv") }
-            else { self.playback.send(name, value) }
+            if name == "pipOutput" {
+                self.set("hwdec", "videotoolbox-copy"); self.set("vo", "libmpv")
+                self.surface.isHidden = true
+            } else { self.playback.send(name, value) }
         }, restoreVideo: { [weak self] in
             self?.set("vo", "gpu-next"); self?.set("hwdec", "videotoolbox")
+            self?.surface.isHidden = false
         }, finished: { [weak self] in
             guard let self else { return }
-            self.pictureInPicture = nil
+            self.pictureInPicture = nil; self.automaticPiPPrepared = false
             if UIApplication.shared.applicationState == .background { self.background() }
         })
         pictureInPicture = pip
         pip.layer.frame = view.bounds
-        view.layer.addSublayer(pip.layer)
-        let width = number("video-params/w"), height = number("video-params/h")
-        pip.prepare(handle: handle!, size: CGSize(width: max(1, width), height: max(1, height)), start: start)
+        view.layer.insertSublayer(pip.layer, below: surface)
+        pip.onSystemStart = { [weak self] in self?.preparePictureInPicture(start: false) }
+        pip.arm(snapshot: decodedSnapshot(handle), automatic: automaticPiPEnabled && !userPaused)
+    }
+
+    func preparePictureInPicture(start: Bool = true) {
+        guard loaded, !userPaused, !preloading, let handle else { return }
+        guard playback.pictureInPictureSupported || !start else { return }
+        armPictureInPicture()
+        let size = CGSize(width: max(1, number("video-params/w")), height: max(1, number("video-params/h")))
+        pictureInPicture?.prepare(handle: handle, size: size, start: start)
     }
 
     @objc private func background() {
+        if automaticPiPPrepared, !userPaused {
+            #if DEBUG
+            automaticPiPRequests += 1
+            #endif
+            pictureInPicture?.requestStart()
+        }
         guard !playback.pictureInPictureActive, !playback.pictureInPicturePending else { return }
         backgroundPaused = !userPaused
         set("pause", "yes")
     }
-    @objc private func foreground() { if backgroundPaused && !userPaused { set("pause", "no") }; backgroundPaused = false }
+    @objc private func foreground() {
+        if automaticPiPPrepared, !playback.pictureInPictureActive, let pip = pictureInPicture {
+            automaticPiPPrepared = false
+            pip.stop(restore: true) { [weak self] in self?.pictureInPicture = nil }
+        }
+        if backgroundPaused && !userPaused { set("pause", "no") }
+        backgroundPaused = false
+    }
+
+    /// mpv's own decoded frame arms sample-buffer PiP before iOS suspends the app.
+    /// The native screenshot node is copied into one small buffer, then freed immediately.
+    private func decodedSnapshot(_ handle: OpaquePointer) -> CVPixelBuffer? {
+        let strings = ["screenshot-raw", "video"].map { strdup($0) }
+        defer { strings.forEach { free($0) } }
+        var arguments: [UnsafePointer<CChar>?] = strings.map { $0.map { UnsafePointer<CChar>($0) } } + [nil]
+        var node = mpv_node()
+        guard mpv_command_ret(handle, &arguments, &node) >= 0 else { return nil }
+        defer { mpv_free_node_contents(&node) }
+        guard node.format == MPV_FORMAT_NODE_MAP, let list = node.u.list?.pointee,
+              list.num > 0, list.num <= 32, let keys = list.keys, let values = list.values else { return nil }
+        var fields: [String: mpv_node] = [:]
+        for index in 0..<Int(list.num) { if let key = keys[index] { fields[String(cString: key)] = values[index] } }
+        guard let w = fields["w"], w.format == MPV_FORMAT_INT64,
+              let h = fields["h"], h.format == MPV_FORMAT_INT64,
+              let row = fields["stride"], row.format == MPV_FORMAT_INT64,
+              let format = fields["format"], format.format == MPV_FORMAT_STRING, let name = format.u.string,
+              ["bgr0", "bgra"].contains(String(cString: name)),
+              let data = fields["data"], data.format == MPV_FORMAT_BYTE_ARRAY, let bytes = data.u.ba?.pointee,
+              let pointer = bytes.data else { return nil }
+        let width = Int(w.u.int64), height = Int(h.u.int64), stride = Int(row.u.int64)
+        guard width > 0, width <= 8192, height > 0, height <= 8192,
+              stride >= width * 4, stride <= 131072, stride * height <= 64 * 1024 * 1024,
+              bytes.size >= stride * height else { return nil }
+        let color = CGColorSpaceCreateDeviceRGB()
+        guard let provider = CGDataProvider(dataInfo: nil, data: pointer, size: stride * height, releaseData: { _, _, _ in }),
+              let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                  bytesPerRow: stride, space: color, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
+                  provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent) else { return nil }
+        let scale = min(1, 640.0 / Double(max(width, height)))
+        let outputWidth = max(4, Int(Double(width) * scale)), outputHeight = max(4, Int(Double(height) * scale))
+        var buffer: CVPixelBuffer?
+        guard CVPixelBufferCreate(kCFAllocatorDefault, outputWidth, outputHeight, kCVPixelFormatType_32BGRA,
+            [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &buffer) == kCVReturnSuccess, let buffer else { return nil }
+        CVPixelBufferLockBaseAddress(buffer, []); defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        guard let destination = CGContext(data: CVPixelBufferGetBaseAddress(buffer), width: outputWidth, height: outputHeight,
+            bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer), space: color,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) else { return nil }
+        destination.interpolationQuality = .medium
+        destination.draw(image, in: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
+        return buffer
+    }
 
     func perform(_ name: String, value: Double) {
         switch name {
         case "pip": preparePictureInPicture()
         case "play": userPaused = false; set("pause", "no")
-        case "pause": userPaused = true; set("pause", "yes")
+        case "pause": userPaused = true; set("pause", "yes"); pictureInPicture?.setAutomatic(false)
         case "seek": command(["seek", String(max(0, min(value, playback.duration))), "absolute+exact"])
         case "rate": set("speed", String(value))
         case "volume": set("volume", String(value * 100))
@@ -211,6 +306,11 @@ final class MPVPlaybackController: UIViewController {
         playback.playing = loaded && string("pause") == "no" && !playback.buffering && string("idle-active") != "yes"
         if loaded && (playback.currentTime > 0 || number("video-params/w") > 0) { playback.loading = false; playback.error = nil }
         if !loaded && Date().timeIntervalSince(startedAt) > 40 { fail("Máy chủ chưa trả dữ liệu video. Hãy thử lại hoặc chọn máy chủ khác.") }
+        if loaded, playback.currentTime > 0.5, automaticPiPEnabled, !userPaused,
+           UIApplication.shared.applicationState == .active, playback.pictureInPictureSupported {
+            armPictureInPicture()
+        }
+        pictureInPicture?.setAutomatic(automaticPiPEnabled && !userPaused)
         pictureInPicture?.invalidatePlaybackState()
         playback.mediaInfo = [string("file-format"), string("video-codec"), "\(Int(number("video-params/w"))) × \(Int(number("video-params/h")))", string("audio-codec")].filter { !$0.isEmpty }.joined(separator: " · ")
         #if DEBUG

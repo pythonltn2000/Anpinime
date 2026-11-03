@@ -303,7 +303,6 @@ struct HomeView: View {
                 }
             }
             .padding(.horizontal, 16).padding(.top, 6)
-            .background(LinearGradient(colors: [.black.opacity(0.6), .clear], startPoint: .top, endPoint: .bottom).padding(.bottom, -25))
         }
         .task(id: service.source) {
             if service.homeSections.isEmpty { await service.loadHome() }
@@ -397,7 +396,7 @@ struct FeaturedHeroCard: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            RemoteImage(url: anime.imageURL ?? anime.bannerURL)
+            RemoteImage(url: anime.bannerURL ?? anime.imageURL)
                 .frame(maxWidth: .infinity)
                 .frame(height: 465)
 

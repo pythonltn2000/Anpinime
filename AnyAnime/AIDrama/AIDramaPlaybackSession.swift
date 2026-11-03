@@ -2,7 +2,8 @@ import AVFoundation
 import Combine
 import UIKit
 
-/// One owner for resolution, native playback and progress. Pager neighbors never own players.
+/// One owner for resolution, native playback and progress. A warm neighbor stays silent
+/// and cannot acquire the audio session, PiP or viewing history until promoted.
 @MainActor
 final class AIDramaPlaybackSession: ObservableObject {
     let playlist: AIDramaPlaylist
@@ -17,6 +18,7 @@ final class AIDramaPlaybackSession: ObservableObject {
     @Published private(set) var error: String?
     @Published private(set) var manuallyPaused: Bool
     @Published private(set) var transitioning = false
+    private(set) var preloading: Bool
 
     private var generation = UUID()
     private var resolution: Task<Void, Never>?
@@ -41,10 +43,11 @@ final class AIDramaPlaybackSession: ObservableObject {
     #endif
 
     init(playlist: AIDramaPlaylist, provider: AIDramaProviding, initialEpisodeID: String? = nil,
-         defaults: UserDefaults = .standard) {
+         defaults: UserDefaults = .standard, preloading: Bool = false) {
         self.playlist = playlist
         self.provider = provider
         self.defaults = defaults
+        self.preloading = preloading
         positions = defaults.dictionary(forKey: "AnPinime.AIDrama.positions." + playlist.series.id) as? [String: Double] ?? [:]
         let storedSelection = defaults.string(forKey: "AnPinime.AIDrama.selected." + playlist.series.id)
         manuallyPaused = (initialEpisodeID == nil || initialEpisodeID == storedSelection)
@@ -55,7 +58,7 @@ final class AIDramaPlaybackSession: ObservableObject {
 
     var selectedIndex: Int? { playlist.episodes.firstIndex { $0.id == selectedEpisodeID } }
     var selectedEpisode: AIDramaEpisode? { selectedIndex.map { playlist.episodes[$0] } }
-    private var mayPlay: Bool { presented && (sceneActive || playback?.pictureInPictureActive == true || playback?.pictureInPicturePending == true) && !transitioning && attached && !manuallyPaused }
+    private var mayPlay: Bool { !preloading && presented && (sceneActive || playback?.pictureInPictureActive == true || playback?.pictureInPicturePending == true) && !transitioning && attached && !manuallyPaused }
     private var mayResolve: Bool { presented && sceneActive && !transitioning }
 
     func setPresented(_ value: Bool, sceneActive: Bool) {
@@ -66,10 +69,19 @@ final class AIDramaPlaybackSession: ObservableObject {
     }
 
     func setSceneActive(_ value: Bool) {
-        if !value, presented, !manuallyPaused,
-           defaults.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true { controller?.preparePictureInPicture() }
+        if !value, !preloading, presented, !manuallyPaused,
+           defaults.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true { controller?.prepareAutomaticPictureInPicture() }
         sceneActive = value
         if !value { transitioning = false; transitionGeneration = nil }
+        reconcile()
+    }
+
+    func promotePreloadedVideo() {
+        guard preloading else { return }
+        preloading = false
+        manuallyPaused = false
+        // A recommendation always starts at its first frame; warming never writes progress.
+        controller?.finishPreloading()
         reconcile()
     }
 
@@ -159,7 +171,7 @@ final class AIDramaPlaybackSession: ObservableObject {
             releaseActivity()
             return
         }
-        acquireActivity()
+        if !preloading { acquireActivity() }
         if advanceCompletedEpisode() { return }
         guard controller == nil else { applyPlaybackIntent(); return }
         guard resolution == nil, error == nil else { return }
@@ -193,7 +205,7 @@ final class AIDramaPlaybackSession: ObservableObject {
         let rate = rememberSpeed ? (defaults.object(forKey: "AnPinime.playbackRate") as? Double ?? 1) : 1
         state.rate = rate.isFinite ? min(3, max(0.25, rate)) : 1
         state.userPaused = true
-        let player = MPVPlaybackController(url: stream.url, headers: stream.headers, playback: state)
+        let player = MPVPlaybackController(url: stream.url, headers: stream.headers, playback: state, preloading: preloading)
         player.onFailure = { [weak self] message in
             // mpv can report failure while its polling loop still holds the native handle.
             // Leave that stack before teardown, and recheck ownership after the hop.
@@ -220,7 +232,7 @@ final class AIDramaPlaybackSession: ObservableObject {
             guard let self, self.generation == token, self.controller === player else { return }
             player?.addSubtitle(url, slot: slot)
         }
-        pendingResume = positions[episode.id].flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        pendingResume = preloading ? nil : positions[episode.id].flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
         resumeSeekRequestedAt = nil
         lastSavedTime = pendingResume ?? 0
         playback = state
@@ -272,6 +284,7 @@ final class AIDramaPlaybackSession: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.generation == token, self.selectedEpisodeID == episode.id,
                       self.controller != nil else { return }
+                guard !self.preloading else { return }
                 self.completedEpisode = true
                 self.pendingResume = nil
                 self.resumeSeekRequestedAt = nil
@@ -341,6 +354,7 @@ final class AIDramaPlaybackSession: ObservableObject {
     }
 
     private func savePosition(time: Double? = nil, recordHistory: Bool = true) {
+        guard !preloading else { return }
         guard let id = selectedEpisodeID, let state = playback else { return }
         if let target = pendingResume {
             // Teardown can happen between issuing a seek and MPV's confirming poll.
@@ -371,6 +385,7 @@ final class AIDramaPlaybackSession: ObservableObject {
     }
 
     private func persistPauseIntent() {
+        guard !preloading else { return }
         defaults.set(manuallyPaused, forKey: "AnPinime.AIDrama.paused." + playlist.series.id)
     }
 

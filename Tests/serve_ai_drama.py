@@ -206,7 +206,7 @@ class Handler(BaseHTTPRequestHandler):
             number = int(raw_sequence)
             raw_id = str(base + number)
             self.fixture.record("resolve_started", episode=number, episodeID=raw_id)
-            if number == 2:
+            if number == 2 or (number == 3 and raw_id == "7000000000000000203"):
                 time.sleep(4)
             url = f"http://127.0.0.1:{self.fixture.port}/media/episode-{number:02d}.mp4"
             payload = {"status_code": 0, "collection": {"collection_id": int(series)},

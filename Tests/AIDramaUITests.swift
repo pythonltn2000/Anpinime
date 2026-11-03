@@ -205,19 +205,36 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["aidrama.shorts.title"].label, "Short Feed Fixture 1")
         assertNoSocialControls()
         capture("short-feed-landscape-in-portrait")
+        let secondID = String(Int64(7_000_000_000_000_000_100) + 100 + 3)
+        try waitFor("The next recommendation resolves and fetches media before a swipe", timeout: 15) {
+            guard let stats = try? self.fixtureJSON("/__smoke__/stats"), let events = stats["events"] as? [[String: Any]] else { return false }
+            return events.contains { $0["event"] as? String == "resolve_finished" && $0["episodeID"] as? String == secondID }
+                && events.contains { $0["event"] as? String == "media" && $0["episode"] as? Int == 3 }
+        }
         let before = try requirePlayerState().currentTime
         app.buttons["aidrama.shorts.fullscreen"].tap()
         try waitFor("Fullscreen rotates the same short video") { self.app.frame.width > self.app.frame.height }
         XCTAssertEqual(try requirePlayerState().selectedEpisodeID, episodeID(5))
         try waitFor("Fullscreen retains advancing playback") { (self.playerState()?.currentTime ?? 0) > before + 0.5 }
+        XCTAssertFalse(app.tabBars.buttons["Phim ngắn"].isHittable, "Fullscreen covers library navigation")
+        XCTAssertFalse(app.buttons["aidrama.shorts.all"].isHittable)
+        let surface = app.otherElements["aidrama.shorts.video"].firstMatch
+        XCTAssertTrue(surface.exists)
+        XCTAssertGreaterThan(surface.frame.width, app.frame.width * 0.90)
+        XCTAssertGreaterThan(surface.frame.height, app.frame.height * 0.90)
         capture("short-feed-fullscreen-landscape")
         app.buttons["aidrama.shorts.fullscreen"].tap()
         try waitFor("Exiting fullscreen returns to portrait") { self.app.frame.width < self.app.frame.height }
+        let swipeStarted = Date()
         dragToNextEpisode()
-        let secondID = String(Int64(7_000_000_000_000_000_100) + 100 + 3)
         try waitFor("A vertical swipe plays the next actual recommendation", timeout: 25) {
             self.playerState()?.selectedEpisodeID == secondID && (self.playerState()?.currentTime ?? 0) > 1
         }
+        XCTAssertLessThan(Date().timeIntervalSince(swipeStarted), 5, "Prepared video starts without repeating the delayed resolution")
+        XCTAssertFalse(app.buttons["aidrama.shorts.fullscreen"].exists, "Portrait videos stay portrait")
+        let warmedStats = try fixtureJSON("/__smoke__/stats")
+        let warmedEvents = warmedStats["events"] as? [[String: Any]] ?? []
+        XCTAssertEqual(warmedEvents.filter { $0["event"] as? String == "resolve_started" && $0["episodeID"] as? String == secondID }.count, 1)
         try waitFor("Near the feed end loads the next native page") {
             guard let stats = try? self.fixtureJSON("/__smoke__/stats"), let events = stats["events"] as? [[String: Any]] else { return false }
             return events.contains { $0["event"] as? String == "short_feed" && $0["page"] as? Int == 2 }

@@ -244,8 +244,16 @@ struct AIDramaNativeSurface: UIViewControllerRepresentable {
         weak var session: AIDramaPlaybackSession?
 
         func mount(_ player: MPVPlaybackController, session: AIDramaPlaybackSession) {
-            guard self.player !== player else { return }
+            guard self.player !== player || player.parent !== self else { return }
             unmount()
+            // Fullscreen moves this same decoder between two containers. An older
+            // SwiftUI host may dismantle later; it must not detach the new owner.
+            if let previous = player.parent as? Container { previous.unmount() }
+            else if player.parent != nil {
+                player.willMove(toParent: nil)
+                player.view.removeFromSuperview()
+                player.removeFromParent()
+            }
             self.player = player
             self.session = session
             addChild(player)
@@ -261,10 +269,12 @@ struct AIDramaNativeSurface: UIViewControllerRepresentable {
 
         func unmount() {
             guard let player else { return }
-            session?.didDetach(player)
-            player.willMove(toParent: nil)
-            player.view.removeFromSuperview()
-            player.removeFromParent()
+            if player.parent === self {
+                session?.didDetach(player)
+                player.willMove(toParent: nil)
+                player.view.removeFromSuperview()
+                player.removeFromParent()
+            }
             self.player = nil
             session = nil
         }

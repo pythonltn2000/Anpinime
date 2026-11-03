@@ -99,6 +99,10 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private var cleanupComplete = false
     private var stopCompletions: [() -> Void] = []
     private var prepared = false
+    private var preparing = false
+    private var timeoutStarted = false
+    var onSystemStart: (() -> Void)?
+    var possible: Bool { controller?.isPictureInPicturePossible == true }
     private let command: (String, Double) -> Void
     private let restoreVideo: () -> Void
     private let finished: () -> Void
@@ -119,37 +123,59 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         output.frame = { [weak self] pixelBuffer in self?.enqueue(pixelBuffer) }
     }
 
+    /// Arm AVKit while the app is still foreground, using a real decoded frame.
+    /// GPU playback continues normally until background/explicit PiP requests CPU output.
+    func arm(snapshot: CVPixelBuffer?, automatic: Bool) {
+        guard !stopped else { return }
+        if controller == nil {
+            let content = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: layer, playbackDelegate: self)
+            controller = AVPictureInPictureController(contentSource: content)
+            controller?.delegate = self
+            possibility = controller?.observe(\.isPictureInPicturePossible, options: [.new]) { [weak self] _, _ in
+                Task { @MainActor [weak self] in self?.startIfPossible() }
+            }
+        }
+        setAutomatic(automatic)
+        invalidatePlaybackState()
+        if let snapshot { enqueue(snapshot, rendered: false) }
+    }
+
+    func setAutomatic(_ enabled: Bool) {
+        controller?.canStartPictureInPictureAutomaticallyFromInline = enabled
+    }
+
     func prepare(handle: OpaquePointer, size: CGSize, start: Bool) {
         guard !stopped else { return }
-        wantsStart = start
-        playback.pictureInPicturePending = start
-        let content = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: layer, playbackDelegate: self)
-        controller = AVPictureInPictureController(contentSource: content)
-        controller?.delegate = self
-        controller?.canStartPictureInPictureAutomaticallyFromInline = true
-        possibility = controller?.observe(\.isPictureInPicturePossible, options: [.new]) { [weak self] _, _ in
-            Task { @MainActor [weak self] in self?.startIfPossible() }
-        }
+        playback.pictureInPicturePending = true
+        if start { requestStart() }
+        guard !preparing, !prepared else { return }
+        preparing = true
         output.prepare(handle: handle, size: size) { [weak self] success in
             guard let self, !self.stopped else { return }
             guard success else { self.fail("Thiết bị chưa khởi tạo được hình ảnh cho PiP."); return }
             self.prepared = true
-            // Copy-back hardware decoding gives the software renderer readable video frames.
             self.command("pipOutput", 1)
             self.invalidatePlaybackState()
             self.output.start()
         }
-        if start {
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                guard let self, !self.stopped, !self.playback.pictureInPictureActive else { return }
-                self.fail("iOS chưa mở được cửa sổ PiP. Hãy thử nút cửa sổ nổi khi đang xem.")
-            }
+    }
+
+    func requestStart() {
+        guard !stopped else { return }
+        wantsStart = true
+        playback.pictureInPicturePending = true
+        startIfPossible()
+        guard !timeoutStarted else { return }
+        timeoutStarted = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard let self, !self.stopped, !self.playback.pictureInPictureActive else { return }
+            self.fail("iOS chưa mở được cửa sổ PiP. Hãy thử nút cửa sổ nổi khi đang xem.")
         }
     }
 
-    private func enqueue(_ buffer: CVPixelBuffer) {
-        guard prepared, !stopped else { return }
+    private func enqueue(_ buffer: CVPixelBuffer, rendered: Bool = true) {
+        guard !stopped else { return }
         if layer.status == .failed { layer.flush() }
         guard layer.isReadyForMoreMediaData else { return }
         var description: CMVideoFormatDescription?
@@ -162,7 +188,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
             formatDescription: description, sampleTiming: &timing, sampleBufferOut: &sample) == noErr, let sample else { return }
         layer.enqueue(sample)
         #if DEBUG
-        frameCount += 1
+        if rendered { frameCount += 1 }
         CVPixelBufferLockBaseAddress(buffer, .readOnly)
         if let bytes = CVPixelBufferGetBaseAddress(buffer)?.assumingMemoryBound(to: UInt8.self) {
             let width = CVPixelBufferGetWidth(buffer), height = CVPixelBufferGetHeight(buffer), stride = CVPixelBufferGetBytesPerRow(buffer)
@@ -172,7 +198,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
                     for channel in 0..<3 { values.append(bytes[y * stride + x * 4 + channel]) }
                 }
             }
-            if Int(values.max() ?? 0) - Int(values.min() ?? 0) > 30 { visibleFrameCount += 1 }
+            if rendered, Int(values.max() ?? 0) - Int(values.min() ?? 0) > 30 { visibleFrameCount += 1 }
         }
         CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
         #endif
@@ -204,7 +230,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         Task { @MainActor [weak playback] in playback?.pictureInPictureActive = false }
         // A render context freed while libmpv still owns the VO calls kill_video_async.
         // Switch back while the render queue is still serving frames, then free it.
-        if restore { restoreVideo() }
+        if restore, prepared { restoreVideo() }
         output.frame = nil
         output.stop { [self] in
             layer.flushAndRemoveImage(); layer.removeFromSuperlayer()
@@ -219,7 +245,9 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         stop(restore: true) { [weak self] in self?.finished() }
     }
     func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        starting = true
         playback.pictureInPicturePending = true
+        onSystemStart?()
     }
     func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         playback.pictureInPictureActive = true; playback.pictureInPicturePending = false; playback.pictureInPictureError = nil
