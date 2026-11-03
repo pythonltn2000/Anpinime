@@ -88,6 +88,15 @@ struct PlayerSettingsPanel: View {
             if let importError { Text(ContentDisplayText.sourceLabels(importError)).font(.footnote).foregroundColor(.orange) }
             Text("Phụ đề phụ hiển thị phía trên. Chữ đã ghép vào hình không thể tắt.").font(.caption).foregroundStyle(.secondary)
         case "display":
+            heading("Khung hình")
+            if playback.engine == "mpv" {
+                Picker("Tỷ lệ khung hình", selection: $playback.aspectRatio) {
+                    Text("Tự động").tag(-1.0); Text("16:9").tag(16.0 / 9.0)
+                    Text("4:3").tag(4.0 / 3.0); Text("2.39:1").tag(2.39)
+                }.pickerStyle(.menu).onChange(of: playback.aspectRatio) { playback.send("aspect", $0) }
+            }
+            Toggle("Lấp đầy màn hình", isOn: $playback.fill).onChange(of: playback.fill) { playback.send("fit", $0 ? 1 : 0) }
+            Divider()
             heading("Hiển thị phụ đề")
             Picker("Phông chữ", selection: $playback.subtitleStyle.font) {
                 ForEach(["Arial", "Helvetica", "Times New Roman", "Menlo"], id: \.self) { Text($0).tag($0) }
@@ -118,7 +127,6 @@ struct PlayerSettingsPanel: View {
             Toggle("Ghi nhớ tốc độ", isOn: $rememberSpeed)
         case "general":
             heading("Chung")
-            Toggle("Lấp đầy màn hình", isOn: $playback.fill).onChange(of: playback.fill) { playback.send("fit", $0 ? 1 : 0) }
             Toggle("Tự phát tập tiếp theo", isOn: $autoNext)
             Toggle("PiP khi rời ứng dụng", isOn: $automaticPiP)
             if playback.pictureInPictureSupported {

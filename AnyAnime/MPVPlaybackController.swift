@@ -145,6 +145,7 @@ final class MPVPlaybackController: UIViewController {
         case "seek": command(["seek", String(max(0, min(value, playback.duration))), "absolute+exact"])
         case "rate": set("speed", String(value))
         case "volume": set("volume", String(value * 100))
+        case "aspect": set("video-aspect-override", String(value))
         case "fit": set("panscan", value == 1 ? "1" : "0")
         case "subtitleStyle", "subtitleSize", "subtitleBackground": applyStyle()
         default: break

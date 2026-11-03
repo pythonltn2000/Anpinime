@@ -23,6 +23,7 @@ final class PlaybackState: ObservableObject {
     @Published var endCount = 0
     @Published var rate = 1.0
     @Published var fill = false
+    @Published var aspectRatio = -1.0
     @Published var volume = 1.0
     @Published var audioTracks: [PlaybackChoice] = []
     @Published var subtitleTracks: [PlaybackChoice] = []
