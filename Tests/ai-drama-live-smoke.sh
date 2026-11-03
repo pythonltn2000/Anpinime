@@ -74,6 +74,7 @@ xcodebuild test -project AnyAnime.xcodeproj -scheme AnyAnime -configuration Debu
   -destination "platform=iOS Simulator,id=$ANPINIME_SIMULATOR_ID" \
   -derivedDataPath "${ANPINIME_AI_DERIVED_DATA:-$ANPINIME_TEMP/DerivedData}" \
   -resultBundlePath "$ANPINIME_ARTIFACTS/ui.xcresult" \
+  -only-testing:AnyAnimeUI/AIDramaUITests/testLivePineDramaShortFeedAndPlaylist \
   -only-testing:AnyAnimeUI/AIDramaUITests/testLivePineDramaPlaylistAndVideo \
   -parallel-testing-enabled NO -test-timeouts-enabled YES \
   -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 120 \

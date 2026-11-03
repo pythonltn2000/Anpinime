@@ -154,6 +154,9 @@ private struct AIDramaShortsControls: View {
                         Label("Phát tất cả" + (item.series.episodeCount.map { " · \($0) tập" } ?? ""), systemImage: "list.bullet.rectangle")
                             .font(.subheadline.bold()).padding(12).background(.white.opacity(0.16), in: Capsule())
                     }.accessibilityIdentifier("aidrama.shorts.all")
+                    #if DEBUG
+                    .accessibilityValue(AIDramaDebugSupport.enabled ? "\(item.series.id)|\(item.episode.id)|\(item.episode.number)|\(item.series.episodeCount ?? 0)" : "")
+                    #endif
                     Spacer(minLength: 0)
                     Button { landscape.toggle() } label: {
                         Image(systemName: landscape ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")

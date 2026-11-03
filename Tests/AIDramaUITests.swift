@@ -393,6 +393,50 @@ final class AIDramaUITests: XCTestCase {
         app.buttons["aidrama.close"].tap()
     }
 
+    func testLivePineDramaShortFeedAndPlaylist() throws {
+        try assertAITabs()
+        app.tabBars.buttons["Phim ngắn"].tap()
+        try waitForLive("A native live feed video decodes and advances", timeout: 30) {
+            guard let state = self.playerState() else { return false }
+            return state.currentTime > 1 && state.ownedPlayers == 1 && state.mediaInfo.contains("×")
+        }
+        let all = app.buttons["aidrama.shorts.all"]
+        let fields = (all.value as? String ?? "").split(separator: "|").map(String.init)
+        guard fields.count == 4, let number = Int(fields[2]), let total = Int(fields[3]), total > 0 else {
+            throw HarnessError.failed("Live short feed metadata is absent")
+        }
+        let episodes = try livePanelOracle(seriesID: fields[0], expectedCount: total)
+        XCTAssertTrue(episodes.contains { $0.id == fields[1] && $0.number == number })
+        capture("live-short-feed-native-video")
+        attachTelemetry(name: "live-short-feed-decoded-state")
+        assertNoSocialControls()
+        app.buttons["aidrama.shorts.fullscreen"].tap()
+        try waitForLive("The same live recommendation rotates to fullscreen", timeout: 8) { self.app.frame.width > self.app.frame.height }
+        XCTAssertEqual(try requirePlayerState().selectedEpisodeID, fields[1])
+        capture("live-short-feed-fullscreen")
+        app.buttons["aidrama.shorts.fullscreen"].tap()
+        try waitForLive("The live feed returns to portrait", timeout: 8) { self.app.frame.width < self.app.frame.height }
+        all.tap()
+        try waitForLivePlaying(id: fields[1], number: number, total: total)
+        app.buttons["aidrama.playlist.open"].tap()
+        try waitForLive("The live feed opens its independently verified complete playlist", timeout: 5) {
+            self.app.buttons["aidrama.playlist.close"].isHittable
+        }
+        let final = episodes.last!
+        let last = app.buttons["aidrama.playlist.episode." + final.id]
+        for _ in 0..<10 {
+            try requireLiveBudget()
+            if last.isHittable { break }
+            app.swipeUp()
+        }
+        guard last.isHittable else { throw HarnessError.failed("Last native feed episode missing") }
+        last.tap()
+        try waitForLivePlaying(id: final.id, number: final.number, total: total)
+        attachTelemetry(name: "live-short-feed-final-episode-decoded-state")
+        capture("live-short-feed-final-episode")
+        app.buttons["aidrama.close"].tap()
+    }
+
     /// One independent native panel request, only from the simulator test runner.
     private func livePanelOracle(seriesID: String, expectedCount: Int) throws -> [LiveEpisode] {
         try requireLiveBudget()

@@ -409,7 +409,7 @@ def main():
     args = parser.parse_args()
     if not 0 <= args.port <= 65535:
         parser.error("port must be between 0 and 65535")
-    for episode in (1, 3, 40):
+    for episode in (1, 3, 5, 40):
         if not (args.media_root / f"episode-{episode:02d}.mp4").is_file():
             parser.error(f"missing generated clip for episode {episode}")
     state = FixtureState(args.media_root.resolve(), args.identity or uuid.uuid4().hex)
