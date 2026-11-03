@@ -99,6 +99,16 @@ struct Episode: Identifiable, Hashable {
     var playback: EpisodePlayback = .animePage
 
     var id: String { source.rawValue + ":" + url.absoluteString + "|" + season + "|" + title + "|" + qualityBadge }
+
+    /// Keep the raw label in persistence/routing; normalize only source-2 UI text.
+    var displayTitle: String {
+        guard source == .phim4k else { return title }
+        let label = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard label.range(of: #"^S[0-9]+E[0-9]+$"#, options: [.regularExpression, .caseInsensitive]) != nil,
+              let marker = label.range(of: "E", options: .caseInsensitive),
+              let number = Int(label[marker.upperBound...]), number > 0 else { return title }
+        return "Tập \(number)"
+    }
 }
 
 struct AnimeDetail: Hashable {

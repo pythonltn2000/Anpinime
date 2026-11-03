@@ -120,24 +120,12 @@ enum Phim4KCatalog {
                 let episodeID = MovieCatalog.text(row["episodes_id"])
                 let title = MovieCatalog.text(row["episodes_name"])
                 guard !episodeID.isEmpty else { continue }
-                result.append(Episode(title: displayEpisodeTitle(title, fallbackNumber: index + 1), url: detailURL, number: index + 1,
+                result.append(Episode(title: title.isEmpty ? "Tập \(index + 1)" : title, url: detailURL, number: index + 1,
                                       season: "VIP/Premium · " + name, qualityBadge: MovieCatalog.detectQualityBadge(from: name + " " + title),
                                       source: .phim4k, playback: .phim4kCore(detailURL: detailURL, seasonID: id, episodeID: episodeID)))
             }
         }
         return result
-    }
-
-    /// Display only: season/episode IDs and server lookup keep the original values.
-    static func displayEpisodeTitle(_ raw: String, fallbackNumber: Int) -> String {
-        let title = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let range = title.range(of: #"^S[0-9]+E([0-9]+)$"#, options: [.regularExpression, .caseInsensitive]),
-           range == title.startIndex..<title.endIndex,
-           let marker = title.range(of: "E", options: .caseInsensitive),
-           let number = Int(title[marker.upperBound...]), number > 0 {
-            return "Tập \(number)"
-        }
-        return title.isEmpty ? "Tập \(fallbackNumber)" : title
     }
 
     static func stream(_ json: Object, seasonID: String?, episodeID: String, base: URL) -> (url: URL, web: Bool)? {

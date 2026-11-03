@@ -384,7 +384,7 @@ struct AnimeDetailView: View {
                     Button {
                         selectedEpisode = episode
                     } label: {
-                        Text(episode.title)
+                        Text(episode.displayTitle)
                             .font(.caption.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }

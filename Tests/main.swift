@@ -298,6 +298,11 @@ for ext in ["ts", "m4s", "mp4", "aac", "vtt", "m3u8"] {
 check(Phim4KRelayNaming.suffix(for: URL(string: "https://media.example/api/content/stream/hls?id=hidden")!) == "m3u8", "Extensionless source-2 HLS remains a playlist")
 check(Phim4KRelayNaming.suffix(for: URL(string: "https://media.example/unsafe.html")!) == "bin", "Unknown media suffixes remain opaque")
 
-check(Phim4KCatalog.displayEpisodeTitle("S01E001", fallbackNumber: 7) == "Tập 1", "Source 2 formats padded episode labels for display")
-check(Phim4KCatalog.displayEpisodeTitle("s02e012", fallbackNumber: 7) == "Tập 12", "Source 2 preserves numeric episode labels across seasons")
-check(Phim4KCatalog.displayEpisodeTitle("Đặc biệt", fallbackNumber: 7) == "Đặc biệt", "Source 2 leaves named specials intact")
+// The display change must not invalidate persisted source-2 episode keys or lookup IDs.
+let paddedEpisode = Episode(title: "S01E001", url: URL(string: "https://core.example/show/123")!, number: 1,
+                            season: "VIP/Premium · Season 1", source: .phim4k,
+                            playback: .phim4kCore(detailURL: URL(string: "https://core.example/show/123")!, seasonID: "17", episodeID: "91"))
+check(paddedEpisode.displayTitle == "Tập 1" && paddedEpisode.title == "S01E001"
+      && paddedEpisode.id == "phim4k:https://core.example/show/123|VIP/Premium · Season 1|S01E001|"
+      && paddedEpisode.playback == .phim4kCore(detailURL: URL(string: "https://core.example/show/123")!, seasonID: "17", episodeID: "91"),
+      "Source-2 readable episode labels preserve persisted identity and exact backend lookup IDs")

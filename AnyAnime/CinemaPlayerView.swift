@@ -201,7 +201,7 @@ struct PlayerView: View {
             VStack(spacing: 16) {
                 Text("ANPINIME").font(.system(size: 11, weight: .bold, design: .rounded)).tracking(6).foregroundColor(.white.opacity(0.65))
                 PulsingMovieTitle(title: title, size: size.width > 600 ? 40 : 30)
-                Text(current.title).font(.subheadline.weight(.medium)).foregroundColor(.white.opacity(0.7))
+                Text(current.displayTitle).font(.subheadline.weight(.medium)).foregroundColor(.white.opacity(0.7))
             }.padding(.horizontal, 36).opacity(playback.duration > 0 ? 0 : 1)
         }.ignoresSafeArea().allowsHitTesting(false)
     }
@@ -216,7 +216,7 @@ struct PlayerView: View {
                     controlButton("chevron.left", "Đóng trình phát") { dismiss() }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title).font(.headline).lineLimit(1)
-                        Text(ContentDisplayText.sourceLabels(current.source.isMovie ? "\(current.season) · \(current.title)" : current.title)).font(.caption).foregroundColor(.white.opacity(0.65)).lineLimit(1)
+                        Text(ContentDisplayText.sourceLabels(current.source.isMovie ? "\(current.season) · \(current.displayTitle)" : current.displayTitle)).font(.caption).foregroundColor(.white.opacity(0.65)).lineLimit(1)
                     }
                     Spacer(minLength: 0)
                     if playback.pictureInPictureSupported { controlButton("pip.enter", "Mở cửa sổ nổi") { playback.send("pip") } }
@@ -312,7 +312,7 @@ struct PlayerView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(panelTitle(kind)).font(.title3.bold())
-                    Text(kind == "episodes" ? "\(episodes.count) tập · \(current.title)" : "Theo cách bạn thích")
+                    Text(kind == "episodes" ? "\(episodes.count) tập · \(current.displayTitle)" : "Theo cách bạn thích")
                         .font(.caption).foregroundColor(.white.opacity(0.5))
                 }
                 Spacer()
@@ -340,7 +340,7 @@ struct PlayerView: View {
                             Button { select(item) } label: {
                                 VStack(spacing: 6) {
                                     if item.id == current.id { Image(systemName: "waveform").font(.caption) }
-                                    Text(item.title).font(.caption.weight(.semibold)).lineLimit(2)
+                                    Text(item.displayTitle).font(.caption.weight(.semibold)).lineLimit(2)
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 60)
                                 .background(item.id == current.id ? Color.anpinimeAccent.opacity(0.3) : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
