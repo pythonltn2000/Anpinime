@@ -26,7 +26,7 @@ struct PlayerSettingsPanel: View {
             HStack {
                 Text("Cài đặt").font(.headline)
                 Spacer()
-                Button(action: close) { Image(systemName: "xmark").frame(width: 40, height: 40) }.accessibilityLabel("Đóng cài đặt")
+                Button(action: close) { Image(systemName: "xmark").frame(width: 40, height: 40).contentShape(Rectangle()) }.accessibilityLabel("Đóng cài đặt")
             }.padding(.horizontal, 18)
             Divider()
             ScrollView(.horizontal, showsIndicators: false) {

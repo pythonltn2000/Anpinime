@@ -102,7 +102,7 @@ struct AIDramaPlayerView: View {
                 .accessibilityIdentifier("aidrama.playpause")
                 Spacer()
                 Button { settingsPresented = true } label: {
-                    Image(systemName: "gearshape").frame(width: 44, height: 44)
+                    Image(systemName: "gearshape").frame(width: 44, height: 44).contentShape(Rectangle())
                 }.accessibilityLabel("Cài đặt phát")
                 Button { playlistPresented = true } label: {
                     Label("Danh sách tập (\(session.playlist.episodes.count))", systemImage: "list.bullet.rectangle")
