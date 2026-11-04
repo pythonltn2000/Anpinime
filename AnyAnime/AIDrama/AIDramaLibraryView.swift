@@ -146,7 +146,7 @@ private struct AIDramaSettingsView: View {
                     Text("5 video").tag(5)
                     Text("10 video").tag(10)
                 }
-                Text("Chuẩn bị media của các video kế tiếp. Cache tạm giới hạn 256 MB, không ghi vào lịch sử phim chưa xem.")
+                Text("Chuẩn bị video kế tiếp để lướt nhanh hơn. Dùng tối đa 256 MB dung lượng tạm.")
                     .font(.footnote).foregroundColor(.secondary)
             }
             Section("Giới thiệu") {

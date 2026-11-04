@@ -291,6 +291,8 @@ jobs:
         run: |
           brew install xcodegen ffmpeg
           xcodegen generate
+      - name: Verify five/ten actual AI media downloads and reverse-swipe cache
+        run: bash Tests/ai-cache-smoke.sh
       - name: Verify actual portrait swipes, full playlist and player lifetime
         run: bash Tests/ai-drama-smoke.sh
       - name: Verify live PineDrama catalog, full playlist and first, second and last episodes

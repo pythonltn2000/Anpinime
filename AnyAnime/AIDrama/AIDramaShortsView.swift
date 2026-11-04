@@ -2,8 +2,8 @@ import Combine
 import SwiftUI
 import UIKit
 
-/// The committed video plus, at most, one silent prepared neighbor. Signed URLs
-/// and decoded frames stay in memory and are discarded on leaving the feed.
+/// The committed video plus, at most, one silent prepared neighbor. The bounded
+/// temporary media cache downloads the next five/ten clips without more decoders.
 @MainActor
 final class AIDramaShortsStore: ObservableObject {
     @Published private(set) var videos: [AIDramaShortVideo] = []
@@ -77,6 +77,7 @@ final class AIDramaShortsStore: ObservableObject {
     private var preloadCount: Int { UserDefaults.standard.integer(forKey: "AnPinime.AIDrama.preloadCount") == 10 ? 10 : 5 }
     private func prepareWindow() {
         guard active, sceneActive, let index = videos.firstIndex(where: { $0.id == selectedID }) else { return }
+        guard session?.playback?.loading == false else { return }
         let next = Array(videos.dropFirst(index + 1).prefix(preloadCount).map(\.episode))
         let previous = Array(videos.prefix(index).suffix(3).map(\.episode))
         let current = selectedID
@@ -103,14 +104,16 @@ final class AIDramaShortsStore: ObservableObject {
         let currentID = selectedID, next = videos[index + 1]
         warming = Task { [weak self] in
             // Let the visible video win the first network/decoder work.
-            for _ in 0..<100 {
+            while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 200_000_000)
                 guard !Task.isCancelled, let self, self.active, self.sceneActive,
                       self.selectedID == currentID else { return }
+                if self.session?.error != nil { self.warming = nil; return }
                 if self.session?.playback?.loading == false { break }
             }
             guard !Task.isCancelled, let self, self.active, self.sceneActive,
                   self.selectedID == currentID else { return }
+            self.prepareWindow()
             self.warmID = next.id
             let prepared = self.makeSession(next, preloading: true)
             self.warmSession = prepared
@@ -243,8 +246,16 @@ private struct AIDramaShortsControls: View {
     let item: AIDramaShortVideo
     let fullscreen: () -> Void
     let openAll: () -> Void
+    @State private var settingsPresented = false
     var body: some View {
         VStack {
+            HStack {
+                Spacer()
+                Button { settingsPresented = true } label: {
+                    Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44)
+                        .cinemaGlass(cornerRadius: 22, interactive: true)
+                }.accessibilityLabel("Cài đặt phát").accessibilityIdentifier("aidrama.shorts.settings")
+            }.padding(.horizontal, 20).padding(.top, 60)
             Spacer()
             if session.resolving { ProgressView().tint(.white) }
             if let error = session.error {
@@ -279,6 +290,14 @@ private struct AIDramaShortsControls: View {
             }.padding(20).padding(.top, 30)
                 .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom))
         }.buttonStyle(.plain)
+            .sheet(isPresented: $settingsPresented) {
+                if let playback = session.playback {
+                    PlayerSettingsPanel(playback: playback, initialTab: "audio", title: item.series.title,
+                        source: "Phim AI", close: { settingsPresented = false },
+                        reload: { settingsPresented = false; session.retry() })
+                        .preferredColorScheme(.dark).modifier(AIDramaHalfSheet())
+                }
+            }
     }
 }
 
@@ -305,8 +324,7 @@ private struct AIDramaShortsPage: View {
             } else if feed.warmID == item.id, let prepared = feed.warmSession {
                 AIDramaVideoCanvas(session: prepared, cover: item.series.coverURL)
             } else {
-                AsyncImage(url: item.series.coverURL) { image in image.resizable().scaledToFill() } placeholder: { Color.black }
-                    .allowsHitTesting(false)
+                AIDramaFullCover(url: item.series.coverURL)
             }
         }.clipped()
     }

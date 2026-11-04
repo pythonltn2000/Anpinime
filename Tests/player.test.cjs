@@ -162,16 +162,44 @@ console.log('PASS: actual JW audio/caption selection, off, caption visibility an
 
 const lowReady = fixture('<div id="player"><video src="https://cdn.example/movie.mp4"></video></div>', w => {
   Object.defineProperty(w.document.querySelector('video'), 'readyState', {get: () => 2});
+  w.Date.now = () => 1000;
 });
 lowReady.video.currentTime = 12;
 lowReady.intervals.forEach(fn => fn());
 assert(lowReady.messages.some(m => m.name === 'mediaState' && m.value.time === 12 && !m.value.buffering));
+lowReady.w.Date.now = () => 4000;
+lowReady.intervals.forEach(fn => fn());
+assert(lowReady.messages.filter(m => m.name === 'mediaState').at(-1).value.buffering, 'A real stall still reports buffering');
+lowReady.command('pause');
+assert(!lowReady.messages.filter(m => m.name === 'mediaState').at(-1).value.buffering, 'User pause does not leave a buffering spinner');
 lowReady.dom.window.close();
-const pauseOverlay = fixture('<div class="jwplayer"><video src="https://cdn.example/movie.mp4"></video><div class="jw-overlays"><div class="jw-captions">Subtitle</div><div class="pause-ad"><button>Đóng quảng cáo</button></div></div></div>');
+const pauseOverlay = fixture('<div class="jwplayer"><video src="https://cdn.example/movie.mp4"></video><div class="jw-overlays"><div class="mixed-overlay"><div class="jw-captions">Subtitle</div><div id="unmarked-buttons"><button>Đóng quảng cáo</button><button>Đóng và xem tiếp</button></div></div><div class="pause-ad"><button>Ad</button></div></div></div>');
 pauseOverlay.command('pause'); pauseOverlay.w.__anyanimeFocusPlayer();
 assert.equal(pauseOverlay.w.document.querySelector('.pause-ad').style.display, 'none');
+assert.equal(pauseOverlay.w.document.querySelector('#unmarked-buttons').style.display, 'none', 'Pause ad controls are hidden even when their wrapper shares captions and has no ad class');
 assert.notEqual(pauseOverlay.w.document.querySelector('.jw-captions').style.display, 'none');
 pauseOverlay.dom.window.close();
+
+const webPiP = fixture('<div id="player"><video src="blob:movie"></video></div>', w => {
+  const v = w.document.querySelector('video');
+  v.webkitSupportsPresentationMode = mode => mode === 'picture-in-picture';
+  v.webkitSetPresentationMode = mode => { v.webkitPresentationMode = mode; };
+});
+assert(webPiP.messages.some(m => m.name === 'mediaState' && m.value.pipSupported));
+webPiP.command('pip');
+assert.equal(webPiP.video.webkitPresentationMode, 'picture-in-picture', 'The native PiP command reaches the actual WebKit video');
+webPiP.video.webkitPresentationMode = 'inline';
+webPiP.command('pause'); webPiP.command('pip');
+assert.equal(webPiP.video.webkitPresentationMode, 'inline', 'Paused videos do not automatically open PiP');
+webPiP.command('play');
+Object.defineProperty(webPiP.w.document, 'hidden', {value: true});
+webPiP.w.document.dispatchEvent(new webPiP.w.Event('visibilitychange'));
+assert.equal(webPiP.video.webkitPresentationMode, 'picture-in-picture', 'Leaving the app asks the playing web video to enter PiP');
+webPiP.video.webkitSupportsPresentationMode = () => false;
+webPiP.w.__anyanimeFocusPlayer();
+assert(!webPiP.messages.filter(m => m.name === 'mediaState').at(-1).value.pipSupported, 'An unsupported API does not advertise usable PiP');
+webPiP.dom.window.close();
+console.log('PASS: WebKit PiP command, background request, paused intent and capability reporting');
 (async () => {
   const manifest = '#EXTM3U\n#EXT-X-TARGETDURATION:60\n#EXTINF:60,\na.ts\n#EXTINF:60,\nb.ts\n#EXTINF:60,\nc.ts\n#EXT-X-ENDLIST';
   const blob = fixture('<div id="player"><video src="blob:https://animevietsub.example/movie"></video></div>', w => {
@@ -182,5 +210,13 @@ pauseOverlay.dom.window.close();
   blob.intervals.forEach(fn => fn());
   assert(blob.messages.some(m => m.name === 'videoFound' && m.value.url === 'https://cdn.example/episode.m3u8'), 'A duration-matched VOD manifest behind a blob can hand off to native');
   blob.dom.window.close();
+  const wrongManifest = fixture('<div id="player"><video src="blob:https://animevietsub.example/movie"></video></div>', w => {
+    w.fetch = async () => ({url:'https://cdn.example/unrelated.m3u8',headers:{get:()=> 'application/vnd.apple.mpegurl'},clone:()=>({text:async()=>manifest.replace(/#EXTINF:60/g, '#EXTINF:20')})});
+  });
+  await wrongManifest.w.fetch('https://cdn.example/unrelated.m3u8');
+  await Promise.resolve(); await Promise.resolve();
+  wrongManifest.intervals.forEach(fn => fn());
+  assert(!wrongManifest.messages.some(m => m.name === 'videoFound'), 'An unrelated VOD with a different duration cannot replace the active video');
+  wrongManifest.dom.window.close();
   console.log('PASS: progressing readyState=2, pause-ad isolation and matched blob HLS handoff');
 })().catch(error => { console.error(error); process.exitCode = 1; });

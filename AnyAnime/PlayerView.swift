@@ -853,6 +853,10 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
               return originalOpen.apply(this,arguments);
             };
           }
+          function supportsPiP(v){
+            if(!v)return false;
+            try{return !!((v.webkitSetPresentationMode&&(!v.webkitSupportsPresentationMode||v.webkitSupportsPresentationMode('picture-in-picture')))||(v.requestPictureInPicture&&document.pictureInPictureEnabled&&!v.disablePictureInPicture));}catch(e){return false;}
+          }
           function requestPiP(v){
             if(!v||v.paused||isAdvertisement(v))return;
             try{
@@ -862,6 +866,14 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           }
           document.addEventListener('visibilitychange',function(){if(document.hidden)requestPiP(activeVideo);});
           function hidePauseOverlays(root){
+            function keepMedia(el){
+              Array.from(el.children).forEach(function(child){
+                if(child.matches('video,.jw-captions'))return;
+                if(child.querySelector('video,.jw-captions'))keepMedia(child);
+                else important(child,'display','none');
+              });
+            }
+            root.querySelectorAll('.jw-overlays').forEach(keepMedia);
             root.querySelectorAll('.jw-overlays > *,[class*="pause-ad"],[class*="pauseAd"],[id*="pause-ad"],.jw-ad-container,.vast-blocker').forEach(function(el){
               if(!el.matches('.jw-captions')&&!el.querySelector('.jw-captions')&&!el.querySelector('video'))important(el,'display','none');
             });
@@ -966,10 +978,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           function state(){
             var v=activeVideo;if(!v||isAdvertisement(v))return;
             reportSource(v);
-            var api=playerAPI(v),sources=contentSources(api),current=mediaURL(v);
             var now=Date.now();if(v.__aaLastTime!==v.currentTime){v.__aaLastTime=v.currentTime;v.__aaAdvancedAt=now;}
             var advancing=now-(v.__aaAdvancedAt||now)<1200;
-            send('mediaState',{pipSupported:!!(v.webkitSetPresentationMode||v.requestPictureInPicture),pipActive:v.webkitPresentationMode==='picture-in-picture'||document.pictureInPictureElement===v,time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3&&!advancing,ready:v.readyState>=2||(v.currentTime>0&&v.videoWidth>0),ended:v.ended,videoWidth:v.videoWidth||0,videoHeight:v.videoHeight||0,tracks:trackState(v)});
+            send('mediaState',{pipSupported:supportsPiP(v),pipActive:v.webkitPresentationMode==='picture-in-picture'||document.pictureInPictureElement===v,time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3&&!advancing,ready:v.readyState>=2||(v.currentTime>0&&v.videoWidth>0),ended:v.ended,videoWidth:v.videoWidth||0,videoHeight:v.videoHeight||0,tracks:trackState(v)});
           }
           window.addEventListener('message',function(event){
             var c=event.data;if(!c||c.type!=='AnPinimeCommand')return;

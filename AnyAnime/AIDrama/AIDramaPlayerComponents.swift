@@ -11,7 +11,7 @@ struct AIDramaVideoCanvas: View {
     }
 }
 
-private struct AIDramaFullCover: View {
+struct AIDramaFullCover: View {
     let url: URL?
     var body: some View {
         GeometryReader { geometry in
@@ -114,7 +114,7 @@ struct AIDramaEpisodeSheet: View {
 
 struct AIDramaHalfSheet: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 16.4, *) { content.presentationDetents([.medium, .large]).presentationDragIndicator(.visible).presentationCornerRadius(28) }
+        if #available(iOS 16.4, *) { content.presentationDetents([.medium, .large]).presentationDragIndicator(.visible).presentationCornerRadius(28).presentationBackground(.clear) }
         else if #available(iOS 16, *) { content.presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
         else { content }
     }

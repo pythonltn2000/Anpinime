@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Resolves and caches actual movie bytes, not just recommendation JSON. Files are
 /// private temporary data; the current/nearby clips are kept within a 256 MiB budget.
@@ -14,7 +17,7 @@ actor AIDramaMediaCache: AIDramaProviding {
     private var entries: [String: Entry] = [:]
     private var resolving: [String: (id: UUID, task: Task<AIDramaStream, Error>)] = [:]
     private var failed = Set<String>()
-    private var filling: [String: Task<Void, Never>] = [:]
+    private var filling: [String: (id: UUID, task: Task<Void, Never>)] = [:]
     private var desired: [AIDramaEpisode] = []
     private var priority: [String] = []
     private var currentID: String?
@@ -65,7 +68,7 @@ actor AIDramaMediaCache: AIDramaProviding {
         desired = next.filter { !$0.isLocked }
         priority = ([current].compactMap { $0 }) + desired.map(\.id) + previous.map(\.id)
         let wanted = Set(priority)
-        for id in Array(filling.keys) where !wanted.contains(id) { filling.removeValue(forKey: id)?.cancel() }
+        for id in Array(filling.keys) where !wanted.contains(id) { filling.removeValue(forKey: id)?.task.cancel() }
         for id in Array(resolving.keys) where !wanted.contains(id) { resolving.removeValue(forKey: id)?.task.cancel() }
         trim()
         pump()
@@ -73,7 +76,7 @@ actor AIDramaMediaCache: AIDramaProviding {
 
     func stop(purge: Bool = false) {
         generation = UUID()
-        filling.values.forEach { $0.cancel() }; filling.removeAll()
+        filling.values.forEach { $0.task.cancel() }; filling.removeAll()
         resolving.values.forEach { $0.task.cancel() }; resolving.removeAll()
         desired = []
         if purge {
@@ -89,16 +92,19 @@ actor AIDramaMediaCache: AIDramaProviding {
         let token = generation
         for episode in desired where filling[episode.id] == nil && entries[episode.id]?.file == nil {
             guard filling.count < 2 else { break }
-            // Failed/oversized clips are retried on a later window, not in a hot loop.
+            // Failed/oversized downloads keep their network stream available;
+            // never retry the same failed download in a hot loop.
             if failed.contains(episode.id) || entries[episode.id]?.bytes == -1 { continue }
-            filling[episode.id] = Task { [weak self] in
+            let jobID = UUID()
+            let task = Task { [weak self] in
                 guard let self else { return }
-                await self.fill(episode, token: token)
+                await self.fill(episode, token: token, jobID: jobID)
             }
+            filling[episode.id] = (jobID, task)
         }
     }
 
-    private func fill(_ episode: AIDramaEpisode, token: UUID) async {
+    private func fill(_ episode: AIDramaEpisode, token: UUID, jobID: UUID) async {
         do {
             let stream = try await resolve(episode)
             try Task.checkCancellation()
@@ -116,7 +122,7 @@ actor AIDramaMediaCache: AIDramaProviding {
             let (temporary, response) = try await session.download(for: request)
             defer { try? FileManager.default.removeItem(at: temporary) }
             try Task.checkCancellation()
-            guard generation == token, priority.contains(episode.id),
+            guard generation == token, filling[episode.id]?.id == jobID, priority.contains(episode.id),
                   let http = response as? HTTPURLResponse, [200, 206].contains(http.statusCode) else { throw URLError(.cancelled) }
             let size = (try temporary.resourceValues(forKeys: [.fileSizeKey])).fileSize ?? 0
             guard size > 16, Int64(size) <= perClipLimit else { throw URLError(.dataLengthExceedsMaximum) }
@@ -135,10 +141,10 @@ actor AIDramaMediaCache: AIDramaProviding {
             guard var entry = entries[episode.id] else { try? FileManager.default.removeItem(at: file); throw URLError(.cancelled) }
             entry.file = file; entry.bytes = size; entries[episode.id] = entry
         } catch {
-            if generation == token { failed.insert(episode.id) }
-            if generation == token, var entry = entries[episode.id], !(error is CancellationError) { entry.bytes = -1; entries[episode.id] = entry }
+            if generation == token, filling[episode.id]?.id == jobID { failed.insert(episode.id) }
+            if generation == token, filling[episode.id]?.id == jobID, var entry = entries[episode.id], !(error is CancellationError) { entry.bytes = -1; entries[episode.id] = entry }
         }
-        guard generation == token else { return }
+        guard generation == token, filling[episode.id]?.id == jobID else { return }
         filling[episode.id] = nil
         trim(); pump()
     }
@@ -157,7 +163,7 @@ actor AIDramaMediaCache: AIDramaProviding {
     }
 
     deinit {
-        filling.values.forEach { $0.cancel() }; resolving.values.forEach { $0.task.cancel() }
+        filling.values.forEach { $0.task.cancel() }; resolving.values.forEach { $0.task.cancel() }
         try? FileManager.default.removeItem(at: folder)
     }
 }

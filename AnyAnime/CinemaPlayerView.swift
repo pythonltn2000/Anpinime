@@ -53,6 +53,7 @@ final class PlaybackState: ObservableObject {
         loading = true; buffering = false; playing = false; userPaused = false
         pictureInPictureSupported = false; pictureInPictureActive = false; pictureInPicturePending = false; pictureInPictureError = nil
         currentTime = 0; duration = 0; error = nil; verification = false
+        videoWidth = 0; videoHeight = 0
         audioTracks = []; subtitleTracks = []; audioTrack = ""; subtitleTrack = "off"
         qualities = [.automatic]; quality = "auto"
         secondarySubtitleTrack = "off"; supportsAdvancedSubtitles = false; engine = "WebKit"; mediaInfo = ""
