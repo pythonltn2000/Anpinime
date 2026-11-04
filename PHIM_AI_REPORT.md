@@ -1,4 +1,54 @@
-# AnPinime 2.8.0 (18) — Home, lướt Phim ngắn, toàn màn hình và PiP
+# AnPinime 2.9.0 (19) — sửa player và bộ đệm Phim AI
+
+**Đã sửa mã, chưa có IPA 2.9 đã kiểm chứng.** Mã ứng dụng:
+[`6c6f548`](https://github.com/thuyan1510/AnPinime/commit/6c6f548f30b26a5432a72ae3a1811fc2afcaebee),
+nhánh `feature/ai-drama`, [PR #2](https://github.com/thuyan1510/AnPinime/pull/2) còn draft.
+
+- Anime vẫn có WebView dự phòng khi chưa lấy được URL phát trực tiếp. Sửa trạng
+  thái loading/buffering theo tiến độ video; giữ pause của người dùng. Ẩn popup
+  và hai nút quảng cáo kể cả khi nằm chung wrapper với phụ đề. Bổ sung nhận diện
+  manifest VOD khớp thời lượng của video blob để chuyển sang player native;
+  giữ decoder web khi nguồn yêu cầu sealed loader.
+- Phim AI tải trước **5 hoặc 10 file video**, tối đa hai lượt tải đồng thời,
+  ưu tiên video đang xem. Giữ ba video vừa qua để lướt xuống quay lại đúng phim;
+  lướt lên tiếp tục danh sách hiện có. Vẫn chỉ chuẩn bị một decoder kế tiếp.
+  Cache tạm tối đa 256 MiB, mỗi clip tối đa 24 MiB; file quá lớn/tải lỗi dùng
+  luồng mạng. Đây là chính sách nạp trước, không bảo đảm mọi video live có thể
+  phát ngay bất kể tốc độ mạng và kích thước.
+- Sửa nút thu nhỏ bằng cách đóng controller UIKit trực tiếp. Ảnh chờ phủ kín
+  vùng phát. Nút tập, tốc độ và toàn màn hình đặt cạnh nhau; danh sách tập chia
+  nhóm 24 tập, sáu cột, mở đúng tập từ feed.
+- Cài đặt player dùng kính mờ; trên iOS 26 dùng Liquid Glass. Bảng nằm ngang
+  rộng nửa màn hình; Phim AI dọc mở sheet nửa màn hình. Bổ sung cài đặt khi
+  xem Phim ngắn.
+- PiP native giữ frame thật sẵn sàng trong foreground và gửi yêu cầu từ
+  `willResignActive`; WebView có lệnh PiP riêng, kiểm tra API hỗ trợ và giữ
+  ý định tạm dừng. **Chưa xác nhận PiP mở ngay lần đầu trên iPhone hoặc đủ tất
+  cả nguồn.** Không thay đổi đường an toàn khôi phục GPU của bản trước.
+
+**Kiểm tra cục bộ PASS:** 7 nhóm JavaScript của player, 143 assertion provider
+PineDrama và 18 assertion cache trên Swift/Linux. Máy chủ fixture xác nhận đủ
+10 lượt tải hoàn chỉnh; kiểm tra lướt ngược, hủy, dọn bộ nhớ, loại file HTML và
+file chỉ tải một phần. Parse cú pháp toàn bộ Swift ứng dụng và XCTest, typecheck
+Foundation models/cache, kiểm tra Python/shell và diff đều qua. Parse cú pháp
+không thay thế biên dịch UIKit hay chạy app iOS.
+
+**GitHub chặn job trước bước đầu tiên:**
+[run 41761873633](https://github.com/thuyan1510/AnPinime/actions/runs/41761873633)
+báo thanh toán gần đây thất bại hoặc cần tăng spending limit trong Billing & plans.
+Lượt này chạy trên commit `2d28879`; mã cuối `6c6f548` chưa chạy iOS. Không có
+log biên dịch, XCTest iOS hay IPA mới. Cần gỡ chặn tài khoản rồi chạy lại workflow
+đầy đủ để kiểm tra anime live, MKV/HLS, fullscreen và PiP; chưa có số đo cải thiện
+startup live cho tất cả nguồn.
+
+[Bằng chứng của lượt này](Tools/evidence/2026-11-04-player-followup/README.md) ·
+[Bảo vệ nguồn 1/3](Tools/evidence/2026-11-04-player-followup/source-preservation.json).
+Provider/catalog/transport được bảo vệ và cấu hình mpv thông thường giữ nguyên;
+thay đổi shared player ở trên nằm trong yêu cầu mới của người dùng.
+
+---
+
+## Lịch sử bản 2.8.0 (18) — Home, lướt Phim ngắn, toàn màn hình và PiP
 
 **Bản giao đã xác minh:** [IPA unsigned 2.8.0 (18)](https://github.com/thuyan1510/AnPinime/actions/runs/41600837879/artifacts/13215081382).
 [Run 41600837879](https://github.com/thuyan1510/AnPinime/actions/runs/41600837879),

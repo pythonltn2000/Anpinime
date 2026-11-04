@@ -1,0 +1,74 @@
+{
+  "baseline": "a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a",
+  "protectedSource1And3": [
+    {
+      "path": "AnyAnime/AnimeService.swift",
+      "sha256": "6e480dc47feccd515ccf05a21ef249e58d689e60629ebdc42ba0f2163837ad8e",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/MovieProvider.swift",
+      "sha256": "40a9ca83ecb7fdbc9ee8d6871de9963a29c4dfe221000c093f34eea43d7f8d93",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/MovieCatalog.swift",
+      "sha256": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/MovieBrowseCatalog.swift",
+      "sha256": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/FilmMediaRelay.swift",
+      "sha256": "e7f645c93d195a5057b7b05eaa38bdea96fac5867e317620cdb684ce1f3bbbaa",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/FilmMediaTransform.swift",
+      "sha256": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/HTMLParser.swift",
+      "sha256": "d8d4a7512bb0737b4954b53f58a2768728c146580786ee7baa952bd2da18a6bb",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/DomainResolver.swift",
+      "sha256": "10abe7b61cab6be7e53c94ba1f76c8d8f15e502c367748562da24885aa56c008",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/Phim4KCatalog.swift",
+      "sha256": "8fa7b95cdcbbab2fe9b67d78494dacf0369977100af936fcc5321446128c0178",
+      "identicalToBaseline": true
+    }
+  ],
+  "normalMPVOptionMapIdenticalToPreviousRelease": true,
+  "applicationCommit": "6c6f548f30b26a5432a72ae3a1811fc2afcaebee",
+  "applicationSourceTree": "d6a593c5d83678d5f6e967469bc4313a69574c77",
+  "authorizedSharedChanges": [
+    "Web playback state and DOM presentation",
+    "Duration-matched native video handoff",
+    "PiP foreground readiness and WebKit command",
+    "Half-width glass player settings"
+  ],
+  "aiMediaCache": {
+    "upcomingClips": [
+      5,
+      10
+    ],
+    "parallelDownloads": 2,
+    "maximumFileBytes": 25165824,
+    "totalFileBudgetBytes": 268435456,
+    "previousClipsKept": 3,
+    "warmDecoders": 1,
+    "warmBufferSeconds": 3,
+    "warmDemuxBytes": "12MiB",
+    "signedURLOnDisk": false,
+    "persistentMediaLibrary": false
+  }
+}

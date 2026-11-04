@@ -1,0 +1,19 @@
+PASS: Five actual movie files are ready, not only metadata
+PASS: Concurrent active/cache resolution coalesces for clip-1
+PASS: Concurrent active/cache resolution coalesces for clip-2
+PASS: Concurrent active/cache resolution coalesces for clip-3
+PASS: Concurrent active/cache resolution coalesces for clip-4
+PASS: Concurrent active/cache resolution coalesces for clip-5
+PASS: Cached data contains the complete MP4 fixture
+PASS: All ten upcoming videos can be cached in the same window
+PASS: A reverse swipe reuses the previous exact movie file
+PASS: The ten-video window can prepare later recommendations
+PASS: Memory cleanup preserves the currently playing local file
+PASS: Cleanup removes unpinned previous movie data
+PASS: An HTTP/HTML failure is never handed to the player as a cached video
+PASS: A failed preload does not enter an automatic retry loop
+PASS: A partial oversized movie never becomes a local playback URL
+PASS: An HTML body with HTTP 200 is never cached as MP4
+PASS: Leaving cancels an unfinished resolution
+PASS: Returning after cancellation starts a fresh usable resolution
+All media preloading checks passed

@@ -1,0 +1,144 @@
+PASS: Native feed skips non-series rows and duplicate video IDs
+PASS: Feed keeps exact series/video identities and native total independently of ranking catalogs
+PASS: Landscape recommendation keeps the actual episode number
+PASS: Feed introduction is not substituted for a numbered episode
+PASS: feed service refusal has the expected error
+PASS: truncated feed protobuf has the expected error
+PASS: Catalog preserves numeric Int64 ID beyond 2^53
+PASS: Catalog trims title and retains complete-series count
+PASS: Catalog filters invalid cover candidates
+PASS: Catalog exposes the actual next-page cursor
+PASS: Catalog retains native has_more independently of the cursor
+PASS: Home recommendation continuation does not fabricate a cursor
+PASS: Empty terminal catalog page is valid
+PASS: empty catalog without explicit pagination envelope has the expected error
+PASS: Card metadata comes from native view count and category text
+PASS: Existing saved series decode when newer card metadata is absent
+PASS: String Int64 catalog IDs remain exact
+PASS: status-zero empty catalog has the expected error
+PASS: duplicate catalog IDs has the expected error
+PASS: catalog nonzero service status has the expected error
+PASS: catalog nonzero business status has the expected error
+PASS: catalog missing service status has the expected error
+PASS: invalid catalog ID true has the expected error
+PASS: invalid catalog ID 0 has the expected error
+PASS: invalid catalog ID -1 has the expected error
+PASS: invalid catalog ID 1.5 has the expected error
+PASS: invalid catalog ID not-an-id has the expected error
+PASS: invalid catalog ID 9223372036854775808 has the expected error
+PASS: Library route uses original scene 6 through GET
+PASS: Library scene 6 forwards the server cursor unchanged
+PASS: Library route uses original scene 7 through GET
+PASS: Library scene 7 forwards the server cursor unchanged
+PASS: Library route uses original scene 8 through GET
+PASS: Library scene 8 forwards the server cursor unchanged
+PASS: Home continuation carries the last 20 actual loaded collection identities
+PASS: Home uses actual loaded count without fabricating a session ID or cursor
+PASS: Home refresh starts a new actual recommendation state
+PASS: Four selected groups use original POST JSON category endpoint
+PASS: All three exact native category IDs remain separate filters
+PASS: Time window uses native recent_days filter and exact next cursor
+PASS: Service metadata supplies all four filter groups in order
+PASS: Metadata preserves the server category IDs and release windows
+PASS: All choices clear their group without inventing a category ID
+PASS: incomplete four-group metadata has the expected error
+PASS: unsupported time window has the expected error
+PASS: invalid loaded home identity has the expected error
+PASS: duplicate loaded home identity has the expected error
+PASS: Playlist returns all 40 real episode rows
+PASS: Playlist sorts actual sequence numbers
+PASS: Every playlist Int64 episode ID remains exact
+PASS: Every episode retains its parent series
+PASS: Intro is excluded without discarding any real episode
+PASS: missing real episode has the expected error
+PASS: intro replacing a real episode has the expected error
+PASS: status-zero empty playlist has the expected error
+PASS: playlist without a reported series count has the expected error
+PASS: duplicate episode IDs has the expected error
+PASS: duplicate episode numbers has the expected error
+PASS: conflicting sequence and displayed number has the expected error
+PASS: numbering gap despite 40 rows has the expected error
+PASS: boolean episode ID has the expected error
+PASS: Paid unpurchased episodes lock; purchased and limited-free episodes unlock
+PASS: locked episode stream has the expected error
+PASS: JSON response preserves selected episode media URL
+PASS: Resolved stream uses provider user agent without account cookies
+PASS: JSON selects the matching row instead of the first row
+PASS: JSON with no matching episode has the expected error
+PASS: JSON with duplicate matching rows has the expected error
+PASS: JSON with wrong series has the expected error
+PASS: JSON with no series identity has the expected error
+PASS: JSON with wrong sequence has the expected error
+PASS: JSON contradictory paid-video and aweme identities has the expected error
+PASS: JSON intro instead of episode has the expected error
+PASS: status-zero empty video rows has the expected error
+PASS: Aweme paid-content series identity is validated when collection detail is absent
+PASS: conflicting paid-content series has the expected error
+PASS: JSON paid-content is_partial_preview has the expected error
+PASS: JSON paid-content should_show_preview has the expected error
+PASS: JSON paid-content is_paid_video_encrypted has the expected error
+PASS: JSON token-required video has the expected error
+PASS: unsafe/non-media URL https://user:password@media.example/episode.mp4 has the expected error
+PASS: unsafe/non-media URL javascript:alert(1) has the expected error
+PASS: unsafe/non-media URL https://media.example/episode.mp4#fragment has the expected error
+PASS: unsafe/non-media URL file:///tmp/episode.mp4 has the expected error
+PASS: unsafe/non-media URL https://media.example has the expected error
+PASS: unsafe/non-media URL https://media.example:0/episode.mp4 has the expected error
+PASS: unsafe/non-media URL https://media.example/metadata.json has the expected error
+PASS: unsafe/non-media URL https://media.example/player.html has the expected error
+PASS: unsafe/non-media URL https://media.example/tiktok/md/collection/video/v1/ has the expected error
+PASS: unsafe/non-media URL http://127.0.0.1:8768/media/episode.mp4 has the expected error
+PASS: Loopback media requires the explicit fixture flag
+PASS: JSON filters invalid candidates and supports the H264 address
+PASS: JSON wire signature works even with a protobuf content type
+PASS: oversized video response has the expected error
+PASS: Protobuf fixture matches the independent 93-byte golden
+PASS: Protobuf golden resolves exact Int64 episode, series and sequence
+PASS: Unknown varint, fixed64, bytes and fixed32 fields are skipped at nested and response levels
+PASS: Protobuf selects the matching row instead of the first row
+PASS: protobuf wrong episode ID has the expected error
+PASS: protobuf contradictory paid-video and aweme identities has the expected error
+PASS: protobuf paid-content episode differs from selected video has the expected error
+PASS: protobuf wrong series has the expected error
+PASS: protobuf wrong sequence has the expected error
+PASS: protobuf duplicate selected rows has the expected error
+PASS: protobuf intro row has the expected error
+PASS: protobuf missing series identity has the expected error
+PASS: protobuf service error has the expected error
+PASS: protobuf business error has the expected error
+PASS: protobuf paid-content preview/encryption flag 7 has the expected error
+PASS: protobuf paid-content preview/encryption flag 8 has the expected error
+PASS: protobuf paid-content preview/encryption flag 17 has the expected error
+PASS: protobuf token-required video has the expected error
+PASS: protobuf conflicting paid-content series has the expected error
+PASS: Protobuf paid-content identity is checked without collection detail
+PASS: Protobuf H264 address field is supported
+PASS: protobuf unsafe media URL https://user:password@media.example/episode.mp4 has the expected error
+PASS: protobuf unsafe media URL javascript:alert(1) has the expected error
+PASS: protobuf unsafe media URL https://media.example/episode.mp4#fragment has the expected error
+PASS: protobuf unterminated tag has the expected error
+PASS: protobuf overflowing varint has the expected error
+PASS: protobuf truncated nested payload has the expected error
+PASS: protobuf truncated fixed64 has the expected error
+PASS: protobuf truncated fixed32 has the expected error
+PASS: protobuf zero field tag has the expected error
+PASS: protobuf unsupported group wire type has the expected error
+PASS: protobuf duplicate known scalar has the expected error
+PASS: protobuf wrong known wire type has the expected error
+PASS: status-zero protobuf without video rows has the expected error
+PASS: Injected loopback provider decodes fixture data through URLSession
+PASS: URLProtocol fixture handles the only API request without external networking
+PASS: API request disables cookie handling and strips inherited account cookies
+PASS: API request strips inherited account authorization
+PASS: API request uses its configured provider user agent
+PASS: unpermitted API base http://127.0.0.1:8768 has the expected error
+PASS: unpermitted API base http://api.fixture.example has the expected error
+PASS: unpermitted API base https://user:password@api.fixture.example has the expected error
+PASS: unpermitted API base https://api.fixture.example#fragment has the expected error
+PASS: Rejected API bases never reach the network transport
+PASS: Category reply caches native metadata without another request
+PASS: Both ranking lists and new works use GET transport
+PASS: Category transport uses original JSON POST and conversion header
+PASS: Category requests preserve whole native selected objects and each unselected All object
+PASS: All new library routes preserve account-free transport isolation
+All AI drama provider regressions passed

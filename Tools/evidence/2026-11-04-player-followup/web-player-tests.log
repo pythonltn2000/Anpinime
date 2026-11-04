@@ -1,0 +1,7 @@
+PASS: fullscreen isolation, playback commands, access notice filtering, pause preservation, seek limits, fill persistence and challenge visibility
+PASS: ad-before-movie, same-element JW preroll, ad end isolation and unrelated HLS rejection
+PASS: configured movie handoff during preroll and before video creation
+PASS: StreamC ad-free autoplay preserves the sealed decoder and license
+PASS: actual JW audio/caption selection, off, caption visibility and 3x speed
+PASS: WebKit PiP command, background request, paused intent and capability reporting
+PASS: progressing readyState=2, pause-ad isolation and matched blob HLS handoff

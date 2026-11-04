@@ -1,0 +1,33 @@
+{
+  "applicationCommit": "6c6f548f30b26a5432a72ae3a1811fc2afcaebee",
+  "platform": "Debian 13 x86_64",
+  "compiler": "Swift 6.0.3 (Swift 5 language mode for executable checks)",
+  "webPlayerRegressionGroups": 7,
+  "pineProviderAssertions": 143,
+  "mediaCacheAssertions": 18,
+  "serverConfirmedCompleteMediaIDs": [
+    "clip-1",
+    "clip-2",
+    "clip-3",
+    "clip-4",
+    "clip-5",
+    "clip-6",
+    "clip-7",
+    "clip-8",
+    "clip-9",
+    "clip-10"
+  ],
+  "swiftSyntaxParse": "PASS for all application Swift sources and AIDramaUITests.swift; NOT UIKit typecheck",
+  "foundationModelsAndCacheTypecheck": "PASS",
+  "pythonFixtureCompile": "PASS",
+  "cacheSmokeShellSyntax": "PASS",
+  "gitDiffCheck": "PASS",
+  "iOSCompilation": "NOT RUN: GitHub refused job before its first step",
+  "iOSRuntimeTests": "NOT RUN",
+  "newIPA": null,
+  "attemptedWorkflowRun": 41761873633,
+  "attemptedWorkflowCommit": "2d2887981d2ce0ae1272ae574213ed1e62f3532f",
+  "firstHomeExitPiPOnPhysicaliPhone": "UNVERIFIED",
+  "freshLiveAnimePlayback": "UNVERIFIED",
+  "allSourceStartupImprovement": "NOT MEASURED"
+}

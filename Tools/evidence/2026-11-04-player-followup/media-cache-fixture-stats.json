@@ -1,0 +1,219 @@
+{
+  "service": "anpinime-ai-drama-fixture",
+  "identity": "48555c4250964c1f863276ef35fb0678",
+  "pid": 2277,
+  "port": 44693,
+  "episodeCount": 40,
+  "seriesID": "7000000000000000001",
+  "fixtureVersion": 2,
+  "events": [
+    {
+      "event": "ready",
+      "elapsed": 0.0,
+      "service": "anpinime-ai-drama-fixture",
+      "identity": "48555c4250964c1f863276ef35fb0678",
+      "pid": 2277,
+      "port": 44693,
+      "episodeCount": 40,
+      "seriesID": "7000000000000000001",
+      "fixtureVersion": 2
+    },
+    {
+      "event": "media",
+      "elapsed": 2.108,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-1"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.108,
+      "episode": 1,
+      "episodeID": "clip-1",
+      "complete": true
+    },
+    {
+      "event": "media",
+      "elapsed": 2.109,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-2"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.109,
+      "episode": 1,
+      "episodeID": "clip-2",
+      "complete": true
+    },
+    {
+      "event": "media",
+      "elapsed": 2.167,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-3"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.169,
+      "episode": 1,
+      "episodeID": "clip-3",
+      "complete": true
+    },
+    {
+      "event": "media",
+      "elapsed": 2.171,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-4"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.171,
+      "episode": 1,
+      "episodeID": "clip-4",
+      "complete": true
+    },
+    {
+      "event": "media",
+      "elapsed": 2.231,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-5"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.231,
+      "episode": 1,
+      "episodeID": "clip-5",
+      "complete": true
+    },
+    {
+      "event": "media",
+      "elapsed": 2.394,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-7"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.395,
+      "episode": 1,
+      "episodeID": "clip-7",
+      "complete": true
+    },
+    {
+      "event": "media",
+      "elapsed": 2.395,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-6"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.395,
+      "episode": 1,
+      "episodeID": "clip-6",
+      "complete": true
+    },
+    {
+      "event": "media",
+      "elapsed": 2.454,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-8"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.454,
+      "episode": 1,
+      "episodeID": "clip-8",
+      "complete": true
+    },
+    {
+      "event": "media",
+      "elapsed": 2.458,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-9"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.458,
+      "episode": 1,
+      "episodeID": "clip-9",
+      "complete": true
+    },
+    {
+      "event": "media",
+      "elapsed": 2.517,
+      "episode": 1,
+      "clip": 1,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "clip-10"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 2.517,
+      "episode": 1,
+      "episodeID": "clip-10",
+      "complete": true
+    },
+    {
+      "event": "unknown_route",
+      "elapsed": 2.678,
+      "method": "GET"
+    },
+    {
+      "event": "media",
+      "elapsed": 3.68,
+      "episode": 3,
+      "clip": 3,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "oversized"
+    },
+    {
+      "event": "media",
+      "elapsed": 3.681,
+      "episode": 40,
+      "clip": 40,
+      "method": "GET",
+      "partial": true,
+      "episodeID": "html"
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 3.681,
+      "episode": 40,
+      "episodeID": "html",
+      "complete": true
+    },
+    {
+      "event": "media_complete",
+      "elapsed": 3.708,
+      "episode": 3,
+      "episodeID": "oversized",
+      "complete": false
+    }
+  ]
+}
