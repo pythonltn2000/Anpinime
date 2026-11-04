@@ -180,7 +180,11 @@ struct PlayerView: View {
         }
         .onDisappear {
             hideTask?.cancel()
-            playback.send("pause")
+            // AVKit may temporarily cover the inline host while PiP takes over.
+            // Closing the player still tears down its controller in dismantle.
+            if !playback.pictureInPictureActive && !playback.pictureInPicturePending {
+                playback.send("pause")
+            }
             UIApplication.shared.isIdleTimerDisabled = false
             UIScreen.main.brightness = originalBrightness
         }

@@ -27,6 +27,16 @@ final class AIDramaUITests: XCTestCase {
         let piPPossible: Bool?
         let piPActive: Bool?
         let automaticPiPRequests: Int?
+        let piPPending: Bool?
+        let sceneActive: Bool?
+        let sceneInBackground: Bool?
+        let backgroundTransitionPending: Bool?
+        let controllerIdentity: String?
+        let nativeVideoOutput: String?
+        let playing: Bool?
+        let lastPromotionToPlaybackSeconds: Double?
+        let systemPiPStartCount: Int?
+        let systemPiPStopCount: Int?
     }
 
     private enum HarnessError: Error { case failed(String) }
@@ -50,7 +60,7 @@ final class AIDramaUITests: XCTestCase {
             initialNewPageOneRequests = eventCount(try fixtureJSON("/__smoke__/stats"), "catalog_started", feed: "new", page: 1)
         }
         app.launchArguments = [isLiveTest ? "--ai-drama-live-smoke" : "--ai-drama-smoke"]
-        if name.contains("testVerticalEpisodes") || name.contains("testAutomaticPiP") { app.launchArguments.append("--ai-disable-prefetch") }
+        if name.contains("testVerticalEpisodes") || name.contains("testAutomaticPiP") || name.contains("testTransientInactive") { app.launchArguments.append("--ai-disable-prefetch") }
         app.launch()
     }
 
@@ -78,39 +88,80 @@ final class AIDramaUITests: XCTestCase {
     }
 
     func testAutomaticPiPPreparationAndBackgroundTransition() throws {
-        try assertAITabs()
-        let series = app.buttons["aidrama.series." + seriesID]
-        try waitFor("The fixture series appears") { series.isHittable }
-        series.tap()
+        try openFixtureSeries()
         try waitForPlaying(episode: 1)
         guard try requirePlayerState().piPSupported == true else {
             throw XCTSkip("AVKit system PiP is unsupported on this simulator. Software-frame and restore checks run separately; physical iPhone automatic PiP still needs confirmation.")
         }
-        try waitFor("PiP is prepared during foreground playback", timeout: 10) { self.playerState()?.piPPrepared == true }
-        let prepared = try requirePlayerState()
-        let readiness = XCTAttachment(string: "Foreground AVKit possible: \(prepared.piPPossible == true)")
-        readiness.name = "automatic-pip-foreground-readiness"; readiness.lifetime = .keepAlways; add(readiness)
-        XCUIDevice.shared.press(.home)
-        try waitFor("The playing app enters background") {
-            self.app.state == .runningBackground || self.app.state == .runningBackgroundSuspended
+        try waitFor("PiP is eligible before the first Home exit", timeout: 15) {
+            self.playerState()?.piPPrepared == true && self.playerState()?.piPPossible == true
         }
-        RunLoop.current.run(until: Date().addingTimeInterval(3))
-        capture("automatic-pip-after-home")
-        app.activate()
-        try waitFor("The same episode returns to foreground", timeout: 15) { self.playerState()?.selectedEpisodeID == self.episodeID(1) }
-        capture("automatic-pip-after-reactivation")
+        let prepared = try requirePlayerState()
+        for cycle in 1...2 {
+            let starts = try requirePlayerState().systemPiPStartCount ?? 0
+            let stops = try requirePlayerState().systemPiPStopCount ?? 0
+            XCUIDevice.shared.press(.home)
+            try waitFor("The playing app enters background") {
+                self.app.state == .runningBackground || self.app.state == .runningBackgroundSuspended
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(3))
+            capture("automatic-pip-after-home-\(cycle)")
+            app.activate()
+            try waitFor("PiP returns one advancing player with restored portrait output", timeout: 15) {
+                guard let state = self.playerState() else { return false }
+                return state.selectedEpisodeID == self.episodeID(1) && state.controllerIdentity == prepared.controllerIdentity
+                    && state.ownedPlayers == 1 && state.playerCreations == prepared.playerCreations
+                    && state.playing == true && state.piPActive == false && state.piPPending == false
+                    && state.nativeVideoOutput == "gpu-next"
+                    && (state.systemPiPStartCount ?? 0) > starts
+                    && (state.systemPiPStopCount ?? 0) > stops
+                    && self.app.frame.width < self.app.frame.height
+            }
+            capture("automatic-pip-after-reactivation-\(cycle)")
+        }
         app.buttons["aidrama.close"].tap()
+    }
+
+    func testTransientInactiveDoesNotStartPiPOrReplacePlayer() throws {
+        try openFixtureSeries()
+        try waitForPlaying(episode: 1)
+        let original = try requirePlayerState()
+        for paused in [false, true] {
+            if paused { app.buttons["aidrama.playpause"].tap() }
+            try waitFor("The requested pause intent is committed") { self.playerState()?.manuallyPaused == paused }
+            let before = try requirePlayerState()
+            app.buttons["aidrama.debug.transientInactive"].tap()
+            try waitFor("Transient inactive preserves the same inline player without PiP") {
+                guard let state = self.playerState() else { return false }
+                return state.sceneActive == false && state.sceneInBackground == false
+                    && state.ownedPlayers == 1 && state.controllerIdentity == original.controllerIdentity
+                    && state.playerCreations == original.playerCreations && state.manuallyPaused == paused
+                    && state.piPActive == false && state.piPPending == false && state.nativeVideoOutput == "gpu-next"
+                    && state.automaticPiPRequests == before.automaticPiPRequests
+                    && state.systemPiPStartCount == before.systemPiPStartCount
+            }
+            app.buttons["aidrama.debug.transientActive"].tap()
+            try waitFor("Returning active restores intent without a new decoder") {
+                guard let state = self.playerState() else { return false }
+                return state.sceneActive == true && state.controllerIdentity == original.controllerIdentity
+                    && state.playerCreations == original.playerCreations && state.manuallyPaused == paused
+                    && state.piPActive == false && state.piPPending == false
+                    && (paused || state.currentTime > before.currentTime + 0.25)
+            }
+            if paused { try assertPausedTimeStable(duration: 1) }
+        }
+        app.buttons["aidrama.close"].tap()
+        try waitFor("Closing after transient events releases every player") {
+            let owner = self.app.descendants(matching: .any).matching(identifier: "aidrama.debug.ownedPlayers").firstMatch
+            return owner.exists && Int(owner.value as? String ?? owner.label) == 0
+        }
     }
 
     func testVerticalEpisodesPlaylistAndLifecycle() throws {
         let health = try fixtureJSON("/__smoke__/health")
         XCTAssertEqual(health["service"] as? String, "anpinime-ai-drama-fixture")
         XCTAssertEqual(health["episodeCount"] as? Int, 40)
-        try assertAITabs()
-
-        let series = app.buttons["aidrama.series." + seriesID]
-        try waitFor("The local AI drama catalog appears") { series.exists && series.isHittable }
-        series.tap()
+        try openFixtureSeries()
         try waitForPlaying(episode: 1)
         assertNoSocialControls()
         capture("episode-01-portrait-playing")
@@ -130,7 +181,9 @@ final class AIDramaUITests: XCTestCase {
         }
         capture("episode-01-native-subtitle-menu-selection")
 
-        // A native drag commits episode 2, whose API response takes four seconds.
+        // Gate the response until the next request arrives; host/AX scheduling
+        // cannot let the deliberately stale result escape before the second drag.
+        XCTAssertEqual(try fixtureJSON("/__smoke__/arm-delayed-resolution")["armed"] as? Bool, true)
         dragToNextEpisode()
         try waitFor("Episode 2 starts its delayed resolution", timeout: 3) {
             guard let state = self.playerState() else { return false }
@@ -149,6 +202,8 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertEqual(third.maximumOwnedPlayers, 1)
         XCTAssertEqual(third.playerCreations, 2, "Only episodes 1 and 3 acquired players")
         let afterDelay = try fixtureJSON("/__smoke__/stats")
+        XCTAssertTrue(hasEvent(afterDelay, "resolution_gate_released", episode: 3))
+        XCTAssertFalse(hasEvent(afterDelay, "resolution_gate_timeout", episode: 2))
         XCTAssertTrue(hasEvent(afterDelay, "resolve_finished", episode: 2), "The stale response window was exercised")
         if let secondStarted = eventTime(afterDelay, "resolve_started", episode: 2),
            let thirdStarted = eventTime(afterDelay, "resolve_started", episode: 3),
@@ -276,12 +331,13 @@ final class AIDramaUITests: XCTestCase {
         app.buttons["aidrama.shorts.fullscreen"].tap()
         try waitFor("Exiting fullscreen returns to portrait") { self.app.frame.width < self.app.frame.height }
         XCTAssertEqual(try requirePlayerState().maximumOwnedPlayers, 1, "Surface replacement retains one playback owner")
-        let swipeStarted = Date()
         dragToNextEpisode()
         try waitFor("A vertical swipe plays the next actual recommendation", timeout: 25) {
             self.playerState()?.selectedEpisodeID == secondID && (self.playerState()?.currentTime ?? 0) > 1
         }
-        XCTAssertLessThan(Date().timeIntervalSince(swipeStarted), 5, "Prepared video starts without repeating the delayed resolution")
+        let promoted = try requirePlayerState()
+        let promotionLatency = try XCTUnwrap(promoted.lastPromotionToPlaybackSeconds, "The prepared decoder reports promotion-to-playback timing")
+        XCTAssertLessThan(promotionLatency, 5, "Prepared video starts within five seconds of the committed page, excluding XCTest gesture/AX overhead")
         XCTAssertFalse(app.buttons["aidrama.shorts.fullscreen"].exists, "Portrait videos stay portrait")
         let warmedStats = try fixtureJSON("/__smoke__/stats")
         let warmedEvents = warmedStats["events"] as? [[String: Any]] ?? []
@@ -463,6 +519,9 @@ final class AIDramaUITests: XCTestCase {
         attachTelemetry(name: "live-episode-02-decoded-state")
         capture("live-pinedrama-episode-02-after-vertical-swipe")
 
+        try waitForLive("The full-playlist control is hittable before opening the drawer", timeout: 5) {
+            self.app.buttons["aidrama.playlist.open"].isHittable
+        }
         app.buttons["aidrama.playlist.open"].tap()
         try waitForLive("The complete live episode drawer opens", timeout: 5) {
             self.app.buttons["aidrama.playlist.close"].isHittable
@@ -618,6 +677,14 @@ final class AIDramaUITests: XCTestCase {
 
     private func assertAITabs() throws {
         try assertTabs(["Trang chủ", "Phim ngắn", "Khám phá", "Cài đặt"])
+    }
+
+    private func openFixtureSeries() throws {
+        try assertAITabs()
+        app.tabBars.buttons["Trang chủ"].tap()
+        let series = app.buttons["aidrama.series." + seriesID]
+        try scrollUntilHittable(series, in: app.scrollViews.firstMatch, message: "The exact fixture series can be selected from Home")
+        series.tap()
     }
 
     private func assertTabs(_ titles: [String]) throws {

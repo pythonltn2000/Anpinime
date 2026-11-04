@@ -43,6 +43,10 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
     private var failedNativeSources = Set<URL>()
     private var nativeStartedAt = Date()
     private var preparingNative = false
+    private var deferredDirectSource: (url: URL, referer: URL)?
+    private var nativeFallbackPosition = 0.0
+    private var websiteOwnsPlayback = false
+    private var webPiPConfigured = false
     private var directWebView: WKWebView?
     private var fallbackWebView: WKWebView?
     private var playerController: AVPlayerViewController?
@@ -109,7 +113,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             return
         }
         #endif
-        NotificationCenter.default.addObserver(self, selector: #selector(prepareWebPictureInPicture), name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(startWebPictureInPictureInBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(restoreWebForeground), name: UIApplication.didBecomeActiveNotification, object: nil)
         if episode.source.isMovie { attemptProviderPlayer() }
         else { attemptDirectPlayer() }
     }
@@ -130,7 +135,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         playerController?.player?.pause()
         playerController?.player?.replaceCurrentItem(with: nil)
         for webView in [directWebView, fallbackWebView] {
-            webView?.evaluateJavaScript("document.querySelectorAll('video').forEach(v=>v.pause())")
+            webView?.evaluateJavaScript("window.postMessage({type:'AnPinimeCommand',name:'pipStop'},'*');document.querySelectorAll('video').forEach(v=>v.pause())")
             webView?.stopLoading()
             webView?.navigationDelegate = nil
             ["videoFound", "iframeFound", "playerReady", "playerError", "mediaState"].forEach {
@@ -139,10 +144,29 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         }
     }
 
-    @objc private func prepareWebPictureInPicture() {
-        guard active, mpvController == nil, playerController == nil, playback.playing, !playback.userPaused,
+    private func configureWebPictureInPicture() {
+        guard active, mpvController == nil, playerController == nil else { return }
+        webPiPConfigured = true
+        let automatic = UserDefaults.standard.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true
+        perform("automaticPiP", value: automatic ? 1 : 0)
+    }
+
+    @objc private func startWebPictureInPictureInBackground() {
+        guard UIApplication.shared.applicationState == .background,
+              active, mpvController == nil, playerController == nil else { return }
+        configureWebPictureInPicture()
+        guard playback.playing, !playback.userPaused, !playback.pictureInPictureActive,
+              !playback.pictureInPicturePending,
               UserDefaults.standard.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true else { return }
         perform("pip", value: 1)
+    }
+
+    @objc private func restoreWebForeground() {
+        guard active, mpvController == nil, playerController == nil else { return }
+        if let source = deferredDirectSource, directWebView != nil {
+            deferredDirectSource = nil
+            showNativePlayer(url: source.url, referer: source.referer)
+        } else { configureWebPictureInPicture() }
     }
 
     private func perform(_ name: String, value: Double) {
@@ -263,6 +287,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
 
     private func startFallback(url requestedURL: URL? = nil) {
         guard active, playerController == nil, mpvController == nil else { return }
+        deferredDirectSource = nil
         fallbackTimer?.invalidate()
         ["videoFound", "iframeFound", "playerReady", "playerError", "mediaState"].forEach {
             directWebView?.configuration.userContentController.removeScriptMessageHandler(forName: $0)
@@ -303,15 +328,14 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         fallbackWebView = webView
-        verificationTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.inspectVerification() }
-        }
+        startVerificationTimer()
         fallbackLoadedURL = targetURL
         loadWebPlayer(webView, url: targetURL)
         scheduleFallbackReveal(for: webView)
     }
 
     private func loadWebPlayer(_ webView: WKWebView, url: URL) {
+        webPiPConfigured = false
         Task { @MainActor [weak self, weak webView] in
             guard let self, let webView else { return }
             for cookie in HTTPCookieStorage.shared.cookies ?? [] {
@@ -319,6 +343,13 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             }
             guard self.active, self.fallbackLoadedURL == url else { return }
             webView.load(self.playerRequest(for: url))
+        }
+    }
+
+    private func startVerificationTimer() {
+        guard verificationTimer?.isValid != true else { return }
+        verificationTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.inspectVerification() }
         }
     }
 
@@ -401,6 +432,15 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         if useMPV {
             if !cookies.isEmpty { headers["Cookie"] = HTTPCookie.requestHeaderFields(with: cookies)["Cookie"] }
             let controller = MPVPlaybackController(url: url, headers: headers, playback: playback)
+            let canRestoreWebsite = episode.source == .anime || fallbackWebView != nil || providerWebURL != nil
+            if canRestoreWebsite {
+                controller.onFailure = { [weak self, weak controller] _ in
+                    Task { @MainActor in
+                        guard let self, let controller, self.mpvController === controller else { return }
+                        self.restoreWebsiteAfterNativeFailure(reason: "decoder-failed")
+                    }
+                }
+            }
             mpvController = controller
             addChild(controller)
             controller.view.frame = view.bounds
@@ -412,6 +452,22 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             directWebView?.stopLoading(); directWebView?.removeFromSuperview()
             fallbackWebView?.evaluateJavaScript("window.postMessage({type:'AnPinimeCommand',name:'pause',value:0},'*')")
             fallbackWebView?.isHidden = true
+            if canRestoreWebsite, fallbackWebView != nil {
+                // This handoff is optional. A URL that worked inside a website may
+                // still need its custom decoder/session. Never strand that browser.
+                nativeTimer?.invalidate()
+                nativeTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self, weak controller] _ in
+                    Task { @MainActor in
+                        guard let self, let controller, self.active, self.mpvController === controller else { return }
+                        if self.playback.userPaused { self.nativeStartedAt = Date(); return }
+                        if !self.playback.loading, self.playback.currentTime > 0.1 {
+                            self.nativeTimer?.invalidate(); self.nativeTimer = nil
+                        } else if Date().timeIntervalSince(self.nativeStartedAt) > 10 {
+                            self.restoreWebsiteAfterNativeFailure(reason: "handoff-timeout")
+                        }
+                    }
+                }
+            }
             return
         }
         playback.engine = "AVPlayer"
@@ -467,6 +523,45 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         }
         nativeTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.updateNativeState() }
+        }
+    }
+
+    private func restoreWebsiteAfterNativeFailure(reason: String) {
+        guard active, let controller = mpvController else { return }
+        if let nativeSource { failedNativeSources.insert(nativeSource) }
+        // A rotating signed URL must not restart the same failed handoff. The
+        // website retains this episode until the user explicitly reloads it.
+        websiteOwnsPlayback = true
+        let paused = playback.userPaused
+        let position = playback.currentTime > 0.1 ? playback.currentTime : nativeFallbackPosition
+        nativeTimer?.invalidate(); nativeTimer = nil
+        controller.onFailure = nil
+        mpvController = nil
+        controller.willMove(toParent: nil)
+        controller.view.removeFromSuperview()
+        controller.removeFromParent()
+        controller.shutdown()
+        playback.error = nil; playback.loading = true; playback.buffering = false; playback.playing = false
+        playback.pictureInPictureActive = false; playback.pictureInPicturePending = false
+        playback.pictureInPictureSupported = false; playback.pictureInPictureError = nil
+        playback.audioTracks = []; playback.subtitleTracks = []; playback.engine = "WebKit"
+        playback.userPaused = paused
+        #if DEBUG
+        if PlaybackSmokeTest.animeSmoke { PlaybackSmokeTest.diagnostic("anime-native-failed", fields: ["reason": reason]) }
+        #endif
+        if let webView = fallbackWebView {
+            webView.isHidden = false
+            startVerificationTimer()
+            webView.evaluateJavaScript("window.__anyanimeFocusPlayer && window.__anyanimeFocusPlayer()")
+            if position > 0 { perform("seek", value: position) }
+            perform(paused ? "pause" : "play", value: 0)
+            configureWebPictureInPicture()
+            scheduleFallbackReveal(for: webView)
+            #if DEBUG
+            if PlaybackSmokeTest.animeSmoke { PlaybackSmokeTest.diagnostic("anime-web-restored", fields: ["reusedWebsite": true]) }
+            #endif
+        } else {
+            startFallback()
         }
     }
 
@@ -605,13 +700,35 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             #endif
             let details = message.body as? [String: String]
             guard let value = message.body as? String ?? details?["url"], let url = resolvedURL(from: value),
-                  !failedNativeSources.contains(url), playerController == nil, mpvController == nil, !preparingNative else { return }
+                  !failedNativeSources.contains(url), playerController == nil, mpvController == nil, !preparingNative,
+                  let sourceWebView = message.webView else { return }
+            let fromWebsite = sourceWebView === fallbackWebView
+            guard sourceWebView === directWebView || fromWebsite,
+                  !playback.pictureInPictureActive, !playback.pictureInPicturePending else { return }
+            if fromWebsite, websiteOwnsPlayback { return }
+            // A playlist behind a blob is not proof of a native-decodable stream.
+            // The anime website may decrypt or transform those bytes itself.
+            if fromWebsite, episode.source == .anime, details?["provenance"] != "media" { return }
             let referer = details?["referer"].flatMap(URL.init(string:)) ?? message.frameInfo.request.url ?? episodeURL
+            if UIApplication.shared.applicationState != .active {
+                if !fromWebsite { deferredDirectSource = (url, referer) }
+                return
+            }
             preparingNative = true
-            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
+            nativeFallbackPosition = fromWebsite ? playback.currentTime : 0
+            let websiteURL = fromWebsite ? fallbackLoadedURL : nil
+            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self, weak sourceWebView] cookies in
                 guard let self, self.active else { return }
-                for cookie in cookies { HTTPCookieStorage.shared.setCookie(cookie) }
                 self.preparingNative = false
+                guard let sourceWebView, sourceWebView === self.directWebView || sourceWebView === self.fallbackWebView else { return }
+                guard !fromWebsite || self.fallbackLoadedURL == websiteURL else { return }
+                guard self.playerController == nil, self.mpvController == nil,
+                      !self.playback.pictureInPictureActive, !self.playback.pictureInPicturePending else { return }
+                guard UIApplication.shared.applicationState == .active else {
+                    if !fromWebsite { self.deferredDirectSource = (url, referer) }
+                    return
+                }
+                for cookie in cookies { HTTPCookieStorage.shared.setCookie(cookie) }
                 self.showNativePlayer(url: url, referer: referer)
             }
         case "iframeFound":
@@ -620,6 +737,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         case "playerReady":
             guard playerController == nil, mpvController == nil else { return }
             fallbackWebView?.isHidden = false
+            if !webPiPConfigured { configureWebPictureInPicture() }
         case "mediaState":
             guard playerController == nil, mpvController == nil, let state = message.body as? [String: Any] else { return }
             if let time = state["time"] as? Double, time.isFinite { playback.currentTime = max(0, time) }
@@ -643,6 +761,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             playback.engine = "WebKit"
             playback.pictureInPictureSupported = (state["pipSupported"] as? Bool) == true
             if let pipActive = state["pipActive"] as? Bool, playback.pictureInPictureActive != pipActive { playback.pictureInPictureActive = pipActive }
+            playback.pictureInPicturePending = (state["pipPending"] as? Bool) == true
             if (state["ready"] as? Bool) == true || playback.currentTime > 0 && playback.duration > 0 {
                 let wasLoading = playback.loading
                 playback.loading = false; playback.verification = false; playback.error = nil
@@ -825,46 +944,27 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           var reportedFrames={};
           var activeVideo=null;
           var reportedSources={};
-          var manifests=[];
-          function rememberManifest(url,text){
-            if(needsWebsiteDecoder()||!url||adURL(url)||typeof text!=='string'||text.length>524288||text.indexOf('#EXTM3U')!==0||text.indexOf('#EXT-X-ENDLIST')<0)return;
-            var duration=0;text.split('\\n').forEach(function(line){if(line.indexOf('#EXTINF:')===0)duration+=parseFloat(line.slice(8))||0;});
-            if(duration<45)return;
-            try{url=new URL(url,location.href).href;}catch(e){return;}
-            manifests=manifests.filter(function(x){return x.url!==url;});manifests.push({url:url,duration:duration});if(manifests.length>12)manifests.shift();
-          }
-          function manifestFor(v){
-            if(!v||isAdvertisement(v)||!isFinite(v.duration)||v.duration<45)return '';
-            var match=manifests.find(function(x){return Math.abs(x.duration-v.duration)<Math.max(8,v.duration*0.025);});
-            return match?match.url:'';
-          }
-          if(typeof window.fetch==='function'){
-            var originalFetch=window.fetch;
-            window.fetch=function(){return originalFetch.apply(this,arguments).then(function(response){
-              var type=response.headers&&response.headers.get('content-type')||'';
-              if(/mpegurl|m3u8/i.test(type+' '+response.url))try{response.clone().text().then(function(text){rememberManifest(response.url,text);}).catch(function(){});}catch(e){}
-              return response;
-            });};
-          }
-          if(window.XMLHttpRequest){
-            var originalOpen=XMLHttpRequest.prototype.open;
-            XMLHttpRequest.prototype.open=function(method,url){var requested=url;
-              this.addEventListener('load',function(){try{if((!this.responseType||this.responseType==='text')&&/mpegurl|m3u8/i.test((this.getResponseHeader('content-type')||'')+' '+this.responseURL+' '+requested))rememberManifest(this.responseURL||requested,this.responseText);}catch(e){}});
-              return originalOpen.apply(this,arguments);
-            };
-          }
+          var automaticPiP=false;
           function supportsPiP(v){
             if(!v)return false;
             try{return !!((v.webkitSetPresentationMode&&(!v.webkitSupportsPresentationMode||v.webkitSupportsPresentationMode('picture-in-picture')))||(v.requestPictureInPicture&&document.pictureInPictureEnabled&&!v.disablePictureInPicture));}catch(e){return false;}
           }
           function requestPiP(v){
-            if(!v||v.paused||isAdvertisement(v))return;
+            if(!v||v.paused||isAdvertisement(v)||pipActive(v)||pipPending(v))return;
             try{
-              if(v.webkitSetPresentationMode&&(!v.webkitSupportsPresentationMode||v.webkitSupportsPresentationMode('picture-in-picture')))v.webkitSetPresentationMode('picture-in-picture');
-              else if(v.requestPictureInPicture&&document.pictureInPictureEnabled){var p=v.requestPictureInPicture();if(p&&p.catch)p.catch(function(){});}
+              if(v.webkitSetPresentationMode&&(!v.webkitSupportsPresentationMode||v.webkitSupportsPresentationMode('picture-in-picture'))){v.__aaPiPRequestedAt=Date.now();v.webkitSetPresentationMode('picture-in-picture');}
+              else if(v.requestPictureInPicture&&document.pictureInPictureEnabled){v.__aaPiPRequestedAt=Date.now();var p=v.requestPictureInPicture();if(p&&p.catch)p.catch(function(){v.__aaPiPRequestedAt=0;state();});}
+            }catch(e){v.__aaPiPRequestedAt=0;}
+          }
+          function pipActive(v){return !!v&&(v.webkitPresentationMode==='picture-in-picture'||document.pictureInPictureElement===v);}
+          function pipPending(v){return !!v&&!pipActive(v)&&!!v.__aaPiPRequestedAt&&Date.now()-v.__aaPiPRequestedAt<1500;}
+          function stopPiP(v){
+            if(!v)return;v.__aaPiPRequestedAt=0;
+            try{
+              if(v.webkitPresentationMode==='picture-in-picture'&&v.webkitSetPresentationMode)v.webkitSetPresentationMode('inline');
+              else if(document.pictureInPictureElement===v&&document.exitPictureInPicture){var p=document.exitPictureInPicture();if(p&&p.catch)p.catch(function(){});}
             }catch(e){}
           }
-          document.addEventListener('visibilitychange',function(){if(document.hidden)requestPiP(activeVideo);});
           function hidePauseOverlays(root){
             function keepMedia(el){
               Array.from(el.children).forEach(function(child){
@@ -922,9 +1022,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             return /^https?:/i.test(s)&&!adURL(s)?s:'';
           }
           function reportSource(v){
-            if(needsWebsiteDecoder())return;
-            var s=manifestFor(v)||contentURL(v);
-            if(/^https?:/i.test(s)&&!reportedSources[s]){reportedSources[s]=true;send('videoFound',{url:s,referer:location.href});}
+            if(needsWebsiteDecoder()||pipActive(v)||pipPending(v))return;
+            var s=contentURL(v),provenance=s===mediaURL(v)&&v.readyState>=2&&v.videoWidth>0?'media':'playlist';
+            if(/^https?:/i.test(s)&&(!reportedSources[s]||(reportedSources[s]==='playlist'&&provenance==='media'))){reportedSources[s]=provenance;send('videoFound',{url:s,referer:location.href,provenance:provenance});}
           }
           function tryPlay(v){
             if(!v||v.__aaUserPaused||!v.paused)return;
@@ -980,7 +1080,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             reportSource(v);
             var now=Date.now();if(v.__aaLastTime!==v.currentTime){v.__aaLastTime=v.currentTime;v.__aaAdvancedAt=now;}
             var advancing=now-(v.__aaAdvancedAt||now)<1200;
-            send('mediaState',{pipSupported:supportsPiP(v),pipActive:v.webkitPresentationMode==='picture-in-picture'||document.pictureInPictureElement===v,time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3&&!advancing,ready:v.readyState>=2||(v.currentTime>0&&v.videoWidth>0),ended:v.ended,videoWidth:v.videoWidth||0,videoHeight:v.videoHeight||0,tracks:trackState(v)});
+            send('mediaState',{pipSupported:supportsPiP(v),pipActive:pipActive(v),pipPending:pipPending(v),time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3&&!advancing,ready:v.readyState>=2||(v.currentTime>0&&v.videoWidth>0),ended:v.ended,videoWidth:v.videoWidth||0,videoHeight:v.videoHeight||0,tracks:trackState(v)});
           }
           window.addEventListener('message',function(event){
             var c=event.data;if(!c||c.type!=='AnPinimeCommand')return;
@@ -990,6 +1090,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
               try{
                 switch(c.name){
                   case 'pip':requestPiP(v);break;
+                  case 'pipStop':stopPiP(v);break;
+                  case 'automaticPiP':automaticPiP=c.value===1;v.autoPictureInPicture=automaticPiP;break;
                   case 'track':chooseTrack(v,c.kind,c.id);break;
                   case 'subtitleStyle':styleSubtitles(v,c.style);break;
                   case 'play':v.__aaUserPaused=false;tryPlay(v);break;
@@ -1039,13 +1141,14 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           function watch(v){
             if(!v||isAdvertisement(v))return false;
             activeVideo=v;
+            if(pipActive(v)){state();return true;}
             var jw=v.closest('.jwplayer');
             if(jw){
               isolate(jw);hidePauseOverlays(jw);
               jw.querySelectorAll('.jw-controls,.jw-display,.jw-logo,.jw-overlays').forEach(function(el){if(!el.querySelector('.jw-captions'))important(el,'display','none');});
               important(v,'width','100%');important(v,'height','100%');important(v,'object-position','center');
             }else{isolate(v);}
-            important(v,'object-fit',v.__anpinimeFill?'cover':'contain'); v.setAttribute('playsinline','');v.controls=false;v.disablePictureInPicture=false;v.autoPictureInPicture=true;
+            important(v,'object-fit',v.__anpinimeFill?'cover':'contain'); v.setAttribute('playsinline','');v.controls=false;v.disablePictureInPicture=false;v.autoPictureInPicture=automaticPiP;
             if(!v.__aa){
               v.__aa=true;
               ['playing','loadedmetadata','loadeddata','canplay','pause','waiting','ended','durationchange','timeupdate','enterpictureinpicture','leavepictureinpicture','webkitpresentationmodechanged'].forEach(function(name){v.addEventListener(name,function(){if(v===activeVideo)state();});});
@@ -1063,13 +1166,14 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           }
           function focus(){
             if(!window.document||!document.documentElement)return false;
+            if(activeVideo&&pipActive(activeVideo)){state();return true;}
             if(challenge())return false;
             // Read the content playlist before filtering ad-marked video elements.
             // A preroll may use the same element, or the movie video may not exist yet.
             var api=playerAPI(null),sources=contentSources(api);
             var configured=sources.find(function(x){return /\\.m3u8(?:[?#]|$)/i.test(x);})||sources[0];
             if(!needsWebsiteDecoder()&&configured&&!reportedSources[configured]){
-              reportedSources[configured]=true;send('videoFound',{url:configured,referer:location.href});
+              reportedSources[configured]='playlist';send('videoFound',{url:configured,referer:location.href,provenance:'playlist'});
             }
             hideChrome();
             var videos=Array.prototype.filter.call(document.querySelectorAll('video'),function(v){

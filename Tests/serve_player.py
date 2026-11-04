@@ -6,15 +6,21 @@ import json
 import time
 import base64
 import sys
+import os
 
 SOURCE2_HLS = "--source2-hls" in sys.argv
 ANIME_PROVIDER = "--anime-provider" in sys.argv
+ANIME_NATIVE_FAILURE = "--anime-native-failure" in sys.argv
 
 VIDEO = Path(__file__).with_name("sample.mp4").read_bytes()
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==")
 
 class Handler(BaseHTTPRequestHandler):
     watch_requests = 0
+    fallback_embeds = 0
+    fallback_embeds_at_failure = 0
+    fallback_web_media = 0
+    fallback_native_rejected = 0
 
     def send_html(self, body):
         data = body.encode()
@@ -41,8 +47,26 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_error(404)
 
+    def do_HEAD(self):
+        if ANIME_NATIVE_FAILURE and urlsplit(self.path).path == "/native-unavailable.mp4":
+            self.do_GET()
+        else:
+            self.send_error(405)
+
     def do_GET(self):
         path = urlsplit(self.path).path
+        if ANIME_NATIVE_FAILURE and path == "/__smoke__/native-fallback":
+            self.send_json({"service": "anpinime-native-fallback", "pid": os.getpid(),
+                            "nativeRejectedRequests": Handler.fallback_native_rejected,
+                            "validWebMediaRequests": Handler.fallback_web_media,
+                            "embedRequests": Handler.fallback_embeds,
+                            "embedRequestsAtFailure": Handler.fallback_embeds_at_failure})
+            return
+        if ANIME_NATIVE_FAILURE and path == "/native-unavailable.mp4":
+            Handler.fallback_native_rejected += 1
+            Handler.fallback_embeds_at_failure = Handler.fallback_embeds
+            self.send_error(403, "Intentional native decoder failure; retained website must recover")
+            return
         if ANIME_PROVIDER:
             if path == "/":
                 self.send_html('''<!doctype html><html><head><title>Anime fixture</title></head><body>
@@ -156,6 +180,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/sample.mp4" and ("smoke_session=1" not in self.headers.get("Cookie", "") or "/embed.html" not in self.headers.get("Referer", "")):
                 self.send_error(403, "Fixture requires embed Referer and session cookie")
                 return
+            if ANIME_NATIVE_FAILURE and path == "/sample.mp4":
+                Handler.fallback_web_media += 1
             if path == "/provider.mp4" and (self.headers.get("X-F4K-PT") != "fixture-ticket" or "movie_session=1" not in self.headers.get("Cookie", "") or "/watch/fixture-movie" not in self.headers.get("Referer", "")):
                 self.send_error(403, "Movie fixture requires ticket, cookie and watch Referer")
                 return
@@ -174,8 +200,26 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(media[start:end + 1])
             return
-        if self.path == "/embed.html":
-            body = '<html><head><meta name="viewport" content="width=device-width"></head><body style="margin:0;background:black"><video playsinline autoplay preload="auto" src="/sample.mp4" style="width:100vw;height:100vh"></video></body></html>'
+        if path == "/embed.html":
+            if ANIME_NATIVE_FAILURE:
+                Handler.fallback_embeds += 1
+                # Deliberate fault injection through the real WK message bridge.
+                # The blob first decodes in WebKit; its stale native candidate
+                # fails, while this same document/video must remain recoverable.
+                body = '''<html><head><meta name="viewport" content="width=device-width"></head>
+                  <body style="margin:0;background:black"><video playsinline autoplay preload="auto"
+                    style="width:100vw;height:100vh"></video><script>
+                  const video=document.querySelector('video');
+                  fetch('/sample.mp4',{credentials:'include'}).then(r=>{if(!r.ok)throw Error(r.status);return r.blob();})
+                    .then(blob=>{video.src=URL.createObjectURL(blob);video.play();});
+                  video.addEventListener('timeupdate',function(){
+                    if(video.currentTime<2||video.dataset.nativeAttempt)return;
+                    video.dataset.nativeAttempt='1';
+                    window.webkit.messageHandlers.videoFound.postMessage({
+                      url:location.origin+'/native-unavailable.mp4',provenance:'media',referer:location.href});
+                  });</script></body></html>'''
+            else:
+                body = '<html><head><meta name="viewport" content="width=device-width"></head><body style="margin:0;background:black"><video playsinline autoplay preload="auto" src="/sample.mp4" style="width:100vw;height:100vh"></video></body></html>'
         else:
             body = '<html><head><meta name="viewport" content="width=device-width"></head><body><header>Fixture header</header><iframe src="/embed.html" width="640" height="360" allow="autoplay; fullscreen"></iframe></body></html>'
         data = body.encode()

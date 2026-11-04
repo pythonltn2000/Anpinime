@@ -97,15 +97,20 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private var possibility: NSKeyValueObservation?
     private var wantsStart = false
     private var starting = false
+    private var stopping = false
     private var stopped = false
+    private var restoreAfterStop = false
+    private var startTimeout: Task<Void, Never>?
+    private var stopTimeout: Task<Void, Never>?
     private var cleanupComplete = false
     private var stopCompletions: [() -> Void] = []
+    private var retainedUntilStopped: MPVPictureInPicture?
     private var prepared = false
     private var preparing = false
-    private var timeoutStarted = false
     var onSystemStart: (() -> Void)?
     var onEvent: ((String) -> Void)?
     var possible: Bool { controller?.isPictureInPicturePossible == true }
+    var transitioningOrActive: Bool { starting || stopping || controller?.isPictureInPictureActive == true }
     private let command: (String, Double) -> Void
     private let restoreVideo: () -> Void
     private let finished: () -> Void
@@ -129,7 +134,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     /// Arm AVKit while the app is still foreground, using a real decoded frame.
     /// GPU playback continues normally until background/explicit PiP requests CPU output.
     func arm(snapshot: CVPixelBuffer?, automatic: Bool) {
-        guard !stopped else { return }
+        guard !stopped, !stopping else { return }
         if controller == nil {
             let content = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: layer, playbackDelegate: self)
             controller = AVPictureInPictureController(contentSource: content)
@@ -159,36 +164,44 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     }
 
     func setAutomatic(_ enabled: Bool) {
-        controller?.canStartPictureInPictureAutomaticallyFromInline = enabled
+        controller?.canStartPictureInPictureAutomaticallyFromInline = enabled && !stopping && !stopped
     }
 
     func prepare(handle: OpaquePointer, size: CGSize, start: Bool) {
-        guard !stopped else { return }
+        guard !stopped, !stopping else { return }
         playback.pictureInPicturePending = true
-        if start { requestStart() }
-        guard !preparing, !prepared else { return }
-        preparing = true
-        output.prepare(handle: handle, size: size) { [weak self] success in
-            guard let self, !self.stopped else { return }
-            guard success else { self.fail("Thiết bị chưa khởi tạo được hình ảnh cho PiP."); return }
-            self.prepared = true
-            self.bootstrapTimer?.invalidate(); self.bootstrapTimer = nil; self.bootstrapFrame = nil
-            self.command("pipOutput", 1)
-            self.invalidatePlaybackState()
-            self.output.start()
+        if !preparing, !prepared {
+            preparing = true
+            output.prepare(handle: handle, size: size) { [weak self] success in
+                guard let self, !self.stopped, !self.stopping else { return }
+                guard success else { self.fail("Thiết bị chưa khởi tạo được hình ảnh cho PiP."); return }
+                self.prepared = true
+                self.bootstrapTimer?.invalidate(); self.bootstrapTimer = nil; self.bootstrapFrame = nil
+                self.command("pipOutput", 1)
+                self.invalidatePlaybackState()
+                self.output.start()
+            }
         }
+        if start { requestStart() }
     }
 
     func requestStart() {
-        guard !stopped else { return }
+        guard !stopped, !stopping else { return }
+        if controller?.isPictureInPictureActive == true {
+            playback.pictureInPicturePending = false
+            return
+        }
         wantsStart = true
         playback.pictureInPicturePending = true
         startIfPossible()
-        guard !timeoutStarted else { return }
-        timeoutStarted = true
-        Task { @MainActor [weak self] in
+        scheduleStartTimeout()
+    }
+
+    private func scheduleStartTimeout() {
+        guard startTimeout == nil else { return }
+        startTimeout = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 5_000_000_000)
-            guard let self, !self.stopped, !self.playback.pictureInPictureActive else { return }
+            guard !Task.isCancelled, let self, !self.stopped, !self.stopping, !self.playback.pictureInPictureActive else { return }
             self.fail("iOS chưa mở được cửa sổ PiP. Hãy thử nút cửa sổ nổi khi đang xem.")
         }
     }
@@ -229,7 +242,9 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     }
 
     private func startIfPossible() {
-        guard wantsStart, !starting, !stopped, controller?.isPictureInPicturePossible == true else { return }
+        guard wantsStart, !starting, !stopping, !stopped,
+              controller?.isPictureInPictureActive != true,
+              controller?.isPictureInPicturePossible == true else { return }
         starting = true; controller?.startPictureInPicture()
     }
 
@@ -244,23 +259,58 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     func stop(restore: Bool, completion: @escaping () -> Void = {}) {
         if cleanupComplete { completion(); return }
         stopCompletions.append(completion)
-        guard !stopped else { return }
-        stopped = true; wantsStart = false
+        restoreAfterStop = restoreAfterStop || restore
+        guard !stopped, !stopping else { return }
+        stopping = true; wantsStart = false
+        // The owning view/controller may disappear before AVKit's asynchronous
+        // didStop. Keep its delegate and render context alive until that handshake.
+        retainedUntilStopped = self
+        startTimeout?.cancel(); startTimeout = nil
         bootstrapTimer?.invalidate(); bootstrapTimer = nil; bootstrapFrame = nil
         possibility = nil
-        controller?.delegate = nil; controller?.stopPictureInPicture(); controller = nil
-        playback.pictureInPicturePending = false
-        // Do not synchronously publish during representable destruction.
-        Task { @MainActor [weak playback] in playback?.pictureInPictureActive = false }
+        controller?.canStartPictureInPictureAutomaticallyFromInline = false
+        if starting || controller?.isPictureInPictureActive == true {
+            // AVKit still owns this content source during its closing animation.
+            // Removing it here leaves a stale full-screen PiP placeholder behind.
+            controller?.stopPictureInPicture()
+            stopTimeout = Task { @MainActor [weak self] in
+                let requestedAt = Date()
+                var retriedAt = requestedAt
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    guard !Task.isCancelled, let self, !self.stopped else { return }
+                    let active = self.controller?.isPictureInPictureActive == true
+                    if !active, !self.starting || Date().timeIntervalSince(requestedAt) >= 5 {
+                        self.finishStop(); return
+                    }
+                    if Date().timeIntervalSince(retriedAt) >= 1 {
+                        self.controller?.stopPictureInPicture()
+                        retriedAt = Date()
+                    }
+                }
+            }
+        } else { finishStop() }
+    }
+
+    private func finishStop() {
+        guard !stopped else { return }
+        stopped = true; starting = false
+        stopTimeout?.cancel(); stopTimeout = nil
+        controller?.delegate = nil; controller = nil
         // A render context freed while libmpv still owns the VO calls kill_video_async.
         // Switch back while the render queue is still serving frames, then free it.
-        if restore, prepared { restoreVideo() }
+        if restoreAfterStop, prepared { restoreVideo() }
         output.frame = nil
         output.stop { [self] in
             layer.flushAndRemoveImage(); layer.removeFromSuperlayer()
             cleanupComplete = true
+            // Publish after renderer/AVKit cleanup, never during representable teardown.
+            // The session can now safely rebuild a viewport or release this decoder.
+            playback.pictureInPicturePending = false
+            playback.pictureInPictureActive = false
             let callbacks = stopCompletions; stopCompletions = []
             callbacks.forEach { $0() }
+            retainedUntilStopped = nil
         }
     }
 
@@ -271,26 +321,36 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     }
     func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         starting = true
+        if stopping { pictureInPictureController.stopPictureInPicture(); return }
         playback.pictureInPicturePending = true
+        scheduleStartTimeout()
         onSystemStart?()
         onEvent?("willStart")
     }
     func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        starting = false
+        startTimeout?.cancel(); startTimeout = nil
+        if stopping { pictureInPictureController.stopPictureInPicture(); return }
         playback.pictureInPictureActive = true; playback.pictureInPicturePending = false; playback.pictureInPictureError = nil
         onEvent?("didStart")
     }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
-        fail("Chưa mở được PiP: " + error.localizedDescription)
+        starting = false
+        if stopping { finishStop() }
+        else { fail("Chưa mở được PiP: " + error.localizedDescription) }
     }
     func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        starting = false
         onEvent?("didStop")
-        stop(restore: true) { [weak self] in self?.finished() }
+        if stopping { finishStop() }
+        else { stop(restore: true) { [weak self] in self?.finished() } }
     }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
                                     restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
         completionHandler(true)
     }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
+        guard !stopped, !stopping else { return }
         command(playing ? "play" : "pause", 0); pictureInPictureController.invalidatePlaybackState()
     }
     func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
@@ -300,6 +360,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, didTransitionToRenderSize newRenderSize: CMVideoDimensions) { }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, skipByInterval skipInterval: CMTime,
                                     completion: @escaping () -> Void) {
+        guard !stopped, !stopping else { completion(); return }
         command("seek", min(playback.duration, max(0, playback.currentTime + skipInterval.seconds))); completion()
     }
 }

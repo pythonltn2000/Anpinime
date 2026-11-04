@@ -24,8 +24,12 @@ final class AIDramaPlaybackSession: ObservableObject {
     private var generation = UUID()
     private var resolution: Task<Void, Never>?
     private var observations = Set<AnyCancellable>()
+    private var activityObservations = Set<AnyCancellable>()
+    private var backgroundTransition: Task<Void, Never>?
     private var presented = false
     private var sceneActive = false
+    private var applicationInBackground = false
+    private var sceneInBackground = false
     private var transitionGeneration: UUID?
     private var completedEpisode = false
     private var attached = false
@@ -44,6 +48,11 @@ final class AIDramaPlaybackSession: ObservableObject {
     private(set) var cancelledResolutions = 0
     private(set) var playerCreations = 0
     private(set) var maximumOwnedPlayers = 0
+    private var promotionStartedAt: TimeInterval?
+    private(set) var lastPromotionToPlaybackSeconds: Double?
+    var debugSceneActive: Bool { sceneActive }
+    var debugSceneInBackground: Bool { sceneInBackground }
+    var debugBackgroundTransitionPending: Bool { backgroundTransition != nil }
     #endif
 
     init(playlist: AIDramaPlaylist, provider: AIDramaProviding, initialEpisodeID: String? = nil,
@@ -59,36 +68,86 @@ final class AIDramaPlaybackSession: ObservableObject {
             && defaults.bool(forKey: "AnPinime.AIDrama.paused." + playlist.series.id)
         let requested = initialEpisodeID ?? storedSelection
         selectedEpisodeID = playlist.episodes.first(where: { $0.id == requested })?.id ?? playlist.episodes.first?.id
+        applicationInBackground = UIApplication.shared.applicationState == .background
+        sceneInBackground = applicationInBackground
+        NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard UIApplication.shared.applicationState == .background else { return }
+                    self?.applicationInBackground = true
+                    self?.setSceneActive(false)
+                }
+            }.store(in: &activityObservations)
+        NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.applicationInBackground = false
+                    self?.setSceneActive(false)
+                }
+            }.store(in: &activityObservations)
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.setSceneActive(true) }
+            }.store(in: &activityObservations)
     }
 
     var selectedIndex: Int? { playlist.episodes.firstIndex { $0.id == selectedEpisodeID } }
     var selectedEpisode: AIDramaEpisode? { selectedIndex.map { playlist.episodes[$0] } }
-    private var mayPlay: Bool { !preloading && presented && (sceneActive || playback?.pictureInPictureActive == true || playback?.pictureInPicturePending == true) && !transitioning && attached && !manuallyPaused }
+    private var pictureInPictureOwnsPlayback: Bool { playback?.pictureInPictureActive == true || playback?.pictureInPicturePending == true }
+    private var mayPlay: Bool { !preloading && presented && (!sceneInBackground || pictureInPictureOwnsPlayback) && !transitioning && (attached || pictureInPictureOwnsPlayback) && !manuallyPaused }
     private var mayResolve: Bool { presented && sceneActive && !transitioning }
 
     func setPresented(_ value: Bool, sceneActive: Bool) {
         presented = value
         self.sceneActive = sceneActive
+        if sceneActive { applicationInBackground = false }
+        sceneInBackground = !sceneActive && applicationInBackground
+        if !value || !sceneInBackground { backgroundTransition?.cancel(); backgroundTransition = nil }
         if !value || !sceneActive {
             transitioning = false; transitionGeneration = nil
             if playlist.episodes.count > 1 { Task { await mediaCache.stop() } }
         }
-        reconcile()
+        if value, sceneInBackground { scheduleBackgroundReconciliation() }
+        else { reconcile() }
     }
 
     func setSceneActive(_ value: Bool) {
-        if !value, !preloading, presented, !manuallyPaused,
-           defaults.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true { controller?.prepareAutomaticPictureInPicture() }
         sceneActive = value
+        if value { applicationInBackground = false }
+        // SwiftUI's .inactive/.background update can precede UIKit's background
+        // notification. Only the notification may authorize background teardown.
+        sceneInBackground = !value && applicationInBackground
+        if !sceneInBackground { backgroundTransition?.cancel(); backgroundTransition = nil }
         if !value {
             transitioning = false; transitionGeneration = nil
             if playlist.episodes.count > 1 { Task { await mediaCache.stop() } }
         }
-        reconcile()
+        if sceneInBackground { scheduleBackgroundReconciliation() }
+        else {
+            reconcile()
+            if value, playback?.loading == false { preparePlaylistWindow() }
+        }
+    }
+
+    private func scheduleBackgroundReconciliation() {
+        guard backgroundTransition == nil else { return }
+        backgroundTransition = Task { @MainActor [weak self] in
+            // MPV owns the AVKit transition. Let all didEnterBackground observers
+            // mark a pending PiP before deciding whether its decoder may be released.
+            await Task.yield()
+            guard !Task.isCancelled, let self else { return }
+            self.backgroundTransition = nil
+            guard self.sceneInBackground, !self.sceneActive else { return }
+            self.reconcile()
+        }
     }
 
     func promotePreloadedVideo() {
         guard preloading else { return }
+        #if DEBUG
+        promotionStartedAt = ProcessInfo.processInfo.systemUptime
+        lastPromotionToPlaybackSeconds = nil
+        #endif
         preloading = false
         manuallyPaused = false
         // A recommendation always starts at its first frame; warming never writes progress.
@@ -166,16 +225,27 @@ final class AIDramaPlaybackSession: ObservableObject {
     }
 
     func didDetach(_ player: MPVPlaybackController) {
-        player.perform("pause", value: 0)
-        guard controller === player else { return }
+        guard controller === player else { player.perform("pause", value: 0); return }
+        // Inline containment can change while AVKit owns the same decoder.
+        // Detaching that surface must not stop the PiP movie or change pause intent.
+        if !pictureInPictureOwnsPlayback { player.perform("pause", value: 0) }
         attached = false
         // Representable dismantling must not publish into SwiftUI's closing graph.
         savePosition(recordHistory: false)
     }
 
     private func reconcile() {
+        if presented, !sceneActive, !sceneInBackground {
+            // .inactive also means Control Center, a system sheet or an orientation
+            // transition. Retain the current owner and playback intent; starting or
+            // pausing PiP here races AVKit's actual background transition.
+            cancelResolution()
+            savePosition()
+            applyPlaybackIntent()
+            return
+        }
         guard mayResolve else {
-            if presented, playback?.pictureInPictureActive == true || playback?.pictureInPicturePending == true {
+            if presented, pictureInPictureOwnsPlayback {
                 savePosition(); applyPlaybackIntent(); return
             }
             invalidateCurrent()
@@ -210,12 +280,22 @@ final class AIDramaPlaybackSession: ObservableObject {
     }
 
     private func rebuildForViewport(_ size: CGSize) {
-        guard !preloading, presented, sceneActive, !transitioning,
+        guard !preloading, presented, sceneActive, !transitioning, !pictureInPictureOwnsPlayback,
               let episode = selectedEpisode, let stream = currentStream else { return }
         let resolvedAt = streamResolvedAt
         let fresh = Date().timeIntervalSince(resolvedAt) < 45
         pendingViewport = size
+        #if DEBUG
+        let promotionStart = promotionStartedAt
+        let promotionLatency = lastPromotionToPlaybackSeconds
+        #endif
         invalidateCurrent()
+        #if DEBUG
+        // A fresh rendering surface is still part of the same committed promotion.
+        // Include its cost in the metric rather than losing the pending measurement.
+        promotionStartedAt = promotionStart
+        lastPromotionToPlaybackSeconds = promotionLatency
+        #endif
         if fresh {
             install(stream, episode: episode, token: generation)
             streamResolvedAt = resolvedAt
@@ -295,10 +375,14 @@ final class AIDramaPlaybackSession: ObservableObject {
                 self.preparePlaylistWindow()
             }
         }.store(in: &observations)
-        state.$pictureInPictureActive.dropFirst().sink { [weak self] active in
+        Publishers.CombineLatest(state.$pictureInPictureActive, state.$pictureInPicturePending)
+            .dropFirst().sink { [weak self] active, pending in
             Task { @MainActor [weak self] in
                 guard let self, self.generation == token else { return }
-                if !active, !self.sceneActive { self.reconcile() }
+                // A failed start can clear pending without ever becoming active.
+                // Release that owner in background too, rather than leaving audio
+                // or a renderer alive indefinitely after the system rejected PiP.
+                if !active, !pending, self.sceneInBackground { self.reconcile() }
             }
         }.store(in: &observations)
         state.$duration.sink { [weak self, weak state, weak player] duration in
@@ -315,8 +399,15 @@ final class AIDramaPlaybackSession: ObservableObject {
                 state.userPaused = self.manuallyPaused
             }
         }.store(in: &observations)
-        state.$currentTime.sink { [weak self] time in
+        state.$currentTime.sink { [weak self, weak state] time in
             guard let self, self.generation == token, self.selectedEpisodeID == episode.id else { return }
+            #if DEBUG
+            if let started = self.promotionStartedAt, !self.preloading, self.presented,
+               !self.manuallyPaused, !self.transitioning, state?.playing == true, time > 0.1 {
+                self.lastPromotionToPlaybackSeconds = ProcessInfo.processInfo.systemUptime - started
+                self.promotionStartedAt = nil
+            }
+            #endif
             if let target = self.pendingResume {
                 guard let requestedAt = self.resumeSeekRequestedAt else { return }
                 // Do not persist startup frames while the asynchronous seek is pending.
@@ -375,6 +466,10 @@ final class AIDramaPlaybackSession: ObservableObject {
     }
 
     private func invalidateCurrent() {
+        #if DEBUG
+        promotionStartedAt = nil
+        lastPromotionToPlaybackSeconds = nil
+        #endif
         currentStream = nil
         generation = UUID()
         cancelResolution()
@@ -460,6 +555,7 @@ final class AIDramaPlaybackSession: ObservableObject {
     }
 
     deinit {
+        backgroundTransition?.cancel()
         resolution?.cancel()
         let player = teardownPlayer
         let idleTimer = previousIdleTimer

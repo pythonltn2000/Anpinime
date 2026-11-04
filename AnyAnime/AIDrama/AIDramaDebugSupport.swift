@@ -68,6 +68,16 @@ struct AIDramaDebugStateView: View {
             "piPPrepared": session.controller?.piPPrepared == true,
             "piPPossible": session.controller?.piPPossible == true,
             "piPActive": session.playback?.pictureInPictureActive == true,
+            "piPPending": session.playback?.pictureInPicturePending == true,
+            "sceneActive": session.debugSceneActive,
+            "sceneInBackground": session.debugSceneInBackground,
+            "backgroundTransitionPending": session.debugBackgroundTransitionPending,
+            "controllerIdentity": session.controller.map { String(describing: ObjectIdentifier($0)) } ?? "",
+            "nativeVideoOutput": session.controller?.nativeGeometry["videoOutput"] as? String ?? "",
+            "playing": session.playback?.playing == true,
+            "lastPromotionToPlaybackSeconds": session.lastPromotionToPlaybackSeconds as Any? ?? NSNull(),
+            "systemPiPStartCount": session.controller?.systemPiPStartCount ?? 0,
+            "systemPiPStopCount": session.controller?.systemPiPStopCount ?? 0,
             "automaticPiPRequests": session.controller?.automaticPiPRequests ?? 0,
             "currentTime": time, "mediaInfo": info, "ownedPlayers": session.controller == nil ? 0 : 1,
             "maximumOwnedPlayers": session.maximumOwnedPlayers,
@@ -75,8 +85,21 @@ struct AIDramaDebugStateView: View {
         ]
         let data = (try? JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])) ?? Data()
         let value = String(decoding: data, as: UTF8.self)
-        return AIDramaDebugLabel(identifier: "aidrama.debug.state", value: value)
-            .frame(width: 32, height: 20).padding(.top, 80).padding(.leading, 8)
+        return HStack(spacing: 4) {
+            AIDramaDebugLabel(identifier: "aidrama.debug.state", value: value)
+                .frame(width: 32, height: 20)
+            Button("I") {
+                NotificationCenter.default.post(name: UIApplication.willResignActiveNotification, object: nil)
+                session.setSceneActive(false)
+            }.frame(width: 24, height: 20).contentShape(Rectangle())
+                .accessibilityIdentifier("aidrama.debug.transientInactive")
+            Button("A") {
+                NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
+                session.setSceneActive(true)
+            }.frame(width: 24, height: 20).contentShape(Rectangle())
+                .accessibilityIdentifier("aidrama.debug.transientActive")
+        }.font(.system(size: 10)).foregroundColor(.white).buttonStyle(.plain)
+            .padding(.top, 80).padding(.leading, 8)
     }
 }
 

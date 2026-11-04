@@ -73,10 +73,13 @@ class FixtureState:
         self.events = deque(maxlen=512)
         self.started = time.monotonic()
         self.port = None
+        self.resolve_gate_armed = False
+        self.resolve_gate = threading.Event()
+        self.resolve_gate.set()
 
     def record(self, event, **fields):
         # Never log request queries, headers, cookies, or media contents.
-        row = {"event": event, "elapsed": round(time.monotonic() - self.started, 3), **fields}
+        row = {"event": event, "elapsed": round(time.monotonic() - self.started, 6), **fields}
         with self.lock:
             self.events.append(row)
         print(json.dumps(row, separators=(",", ":")), flush=True)
@@ -163,6 +166,16 @@ class Handler(BaseHTTPRequestHandler):
                     time.sleep(0.01)
             self.send_json(self.fixture.snapshot(), head=head)
             return
+        if path == "/__smoke__/arm-delayed-resolution" and self.command == "GET":
+            # Explicit test control: hold only the next fixture-series episode 2
+            # response until episode 3 reaches the server. XCTest/AX latency must
+            # not decide whether the stale-response race is actually exercised.
+            with self.fixture.lock:
+                self.fixture.resolve_gate_armed = True
+                self.fixture.resolve_gate.clear()
+            self.fixture.record("resolution_gate_armed")
+            self.send_json({"armed": True}, head=head)
+            return
         if path == "/tiktok/md/mini_drama/category_filter/v1" and self.command == "POST":
             self.send_categories()
             return
@@ -206,7 +219,20 @@ class Handler(BaseHTTPRequestHandler):
             number = int(raw_sequence)
             raw_id = str(base + number)
             self.fixture.record("resolve_started", episode=number, episodeID=raw_id)
-            if number == 2 or (number == 3 and raw_id == "7000000000000000203"):
+            if number == 3 and raw_id == str(EPISODE_BASE + 3) and not self.fixture.resolve_gate.is_set():
+                self.fixture.resolve_gate.set()
+                self.fixture.record("resolution_gate_released", episode=number, episodeID=raw_id)
+            if number == 2 and raw_id == str(EPISODE_BASE + 2):
+                with self.fixture.lock:
+                    gated = self.fixture.resolve_gate_armed
+                    self.fixture.resolve_gate_armed = False
+                if gated:
+                    self.fixture.record("resolution_gate_waiting", episode=number, episodeID=raw_id)
+                    if not self.fixture.resolve_gate.wait(timeout=20):
+                        self.fixture.record("resolution_gate_timeout", episode=number, episodeID=raw_id)
+                else:
+                    time.sleep(4)
+            elif number == 2 or (number == 3 and raw_id == "7000000000000000203"):
                 time.sleep(4)
             url = f"http://127.0.0.1:{self.fixture.port}/media/episode-{number:02d}.mp4?clip_id={raw_id}"
             payload = {"status_code": 0, "collection": {"collection_id": int(series)},

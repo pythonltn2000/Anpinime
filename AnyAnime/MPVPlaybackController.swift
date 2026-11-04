@@ -21,12 +21,18 @@ final class MPVPlaybackController: UIViewController {
     private var initialViewport: CGSize?
     var onViewportChange: ((CGSize) -> Void)?
     private var automaticPiPPrepared = false
+    private var wasInBackground = false
+    private var manuallyRequestedPiP = false
+    private var piPGeneration = UUID()
+    private var piPViewport = CGSize.zero
     private var snapshotPending = false
     private var snapshotReady = false
     private var snapshotAttempts = 0
-    private let snapshotReplyID: UInt64 = 0x504950
+    private var snapshotReplyID: UInt64 = 0x504950
     #if DEBUG
     private(set) var automaticPiPRequests = 0
+    private(set) var systemPiPStartCount = 0
+    private(set) var systemPiPStopCount = 0
     private let diagnosticID = UUID().uuidString
     var nativeGeometry: [String: Any] {
         ["view": String(describing: view.frame), "bounds": String(describing: view.bounds),
@@ -151,6 +157,12 @@ final class MPVPlaybackController: UIViewController {
         timer?.invalidate(); timer = nil
         NotificationCenter.default.removeObserver(self)
         guard let context = handle else { return }
+        piPGeneration = UUID()
+        if pictureInPicture != nil {
+            // Release libmpv's VO before freeing its render context, including a
+            // renderer that is still preparing while the view is being closed.
+            set("pause", "yes"); set("vo", "null")
+        }
         handle = nil
         // Network demuxers can take time to close. Keep the render surface alive until teardown finishes.
         let retainedSurface = surface
@@ -177,39 +189,59 @@ final class MPVPlaybackController: UIViewController {
 
     @objc private func prepareForBackground() { prepareAutomaticPictureInPicture() }
 
-    /// Ask while the foreground content source is still eligible; waiting for
-    /// didEnterBackground can miss iOS's first inline-to-PiP transition.
+    /// Inactive also means Control Center, an incoming call, or a sheet transition.
+    /// Arm the existing content source here without starting PiP or replacing the
+    /// foreground GPU renderer. AVKit owns its automatic transition; our explicit
+    /// fallback starts only after didEnterBackground.
     func prepareAutomaticPictureInPicture() {
-        guard automaticPiPEnabled, !userPaused else { return }
-        preparePictureInPicture(start: true)
+        guard automaticPiPEnabled, playback.pictureInPictureSupported, !userPaused, loaded,
+              string("idle-active") != "yes", viewIfLoaded?.window != nil,
+              !playback.pictureInPicturePending, !playback.pictureInPictureActive else { return }
+        armPictureInPicture()
         automaticPiPPrepared = pictureInPicture != nil
+        #if DEBUG
+        recordAutomaticPiP("armedForBackgroundWithoutStarting")
+        #endif
     }
 
     private func armPictureInPicture() {
         guard loaded, !preloading, handle != nil else { return }
         if pictureInPicture != nil { requestPiPSnapshot(); return }
+        let generation = UUID()
+        piPGeneration = generation
+        piPViewport = view.bounds.size
+        snapshotReplyID &+= 1
         snapshotReady = false; snapshotPending = false; snapshotAttempts = 0
         playback.pictureInPictureError = nil
         let pip = MPVPictureInPicture(playback: playback, command: { [weak self] name, value in
-            guard let self else { return }
+            guard let self, self.piPGeneration == generation else { return }
             if name == "pipOutput" {
                 self.set("hwdec", "videotoolbox-copy"); self.set("vo", "libmpv")
                 self.surface.isHidden = true
             } else { self.playback.send(name, value) }
         }, restoreVideo: { [weak self] in
-            self?.set("vo", "gpu-next"); self?.set("hwdec", "videotoolbox")
-            self?.surface.isHidden = false
+            guard let self, self.piPGeneration == generation else { return }
+            self.set("vo", "gpu-next"); self.set("hwdec", "videotoolbox")
+            self.surface.isHidden = false
+            self.view.setNeedsLayout()
         }, finished: { [weak self] in
-            guard let self else { return }
-            self.pictureInPicture = nil; self.automaticPiPPrepared = false
-            if UIApplication.shared.applicationState == .background { self.background() }
+            self?.finishedPictureInPicture(generation: generation)
         })
         pictureInPicture = pip
         pip.layer.frame = view.bounds
         view.layer.insertSublayer(pip.layer, below: surface)
-        pip.onSystemStart = { [weak self] in self?.preparePictureInPicture(start: false) }
+        pip.onSystemStart = { [weak self] in
+            guard let self, self.piPGeneration == generation else { return }
+            if !self.manuallyRequestedPiP { self.automaticPiPPrepared = true }
+            self.preparePictureInPicture(start: false)
+        }
         #if DEBUG
-        pip.onEvent = { [weak self] event in self?.recordAutomaticPiP(event) }
+        pip.onEvent = { [weak self] event in
+            guard let self, self.piPGeneration == generation else { return }
+            if event == "didStart" { self.systemPiPStartCount += 1 }
+            if event == "didStop" { self.systemPiPStopCount += 1 }
+            self.recordAutomaticPiP(event)
+        }
         #endif
         pip.arm(snapshot: nil, automatic: automaticPiPEnabled && !userPaused)
         requestPiPSnapshot()
@@ -230,7 +262,7 @@ final class MPVPlaybackController: UIViewController {
     }
 
     func preparePictureInPicture(start: Bool = true) {
-        guard loaded, !userPaused, !preloading, let handle else { return }
+        guard loaded, !userPaused, !preloading, string("idle-active") != "yes", let handle else { return }
         guard playback.pictureInPictureSupported || !start else { return }
         armPictureInPicture()
         let size = CGSize(width: max(1, number("video-params/w")), height: max(1, number("video-params/h")))
@@ -238,24 +270,42 @@ final class MPVPlaybackController: UIViewController {
     }
 
     @objc private func background() {
+        wasInBackground = true
         if automaticPiPPrepared, !userPaused {
             #if DEBUG
             automaticPiPRequests += 1
             recordAutomaticPiP("automaticBackgroundRequest")
             #endif
-            pictureInPicture?.requestStart()
+            preparePictureInPicture(start: true)
         }
         guard !playback.pictureInPictureActive, !playback.pictureInPicturePending else { return }
         backgroundPaused = !userPaused
         set("pause", "yes")
     }
     @objc private func foreground() {
-        if automaticPiPPrepared, let pip = pictureInPicture {
+        let returnedFromBackground = wasInBackground
+        wasInBackground = false
+        if (automaticPiPPrepared || returnedFromBackground), let pip = pictureInPicture {
+            let generation = piPGeneration
             automaticPiPPrepared = false
-            pip.stop(restore: true) { [weak self] in self?.pictureInPicture = nil }
+            // Keep AVKit's layer and software renderer until its didStop callback;
+            // an old completion may never clear a newly armed PiP instance.
+            pip.stop(restore: true) { [weak self] in self?.finishedPictureInPicture(generation: generation) }
         }
         if backgroundPaused && !userPaused { set("pause", "no") }
         backgroundPaused = false
+    }
+
+    private func finishedPictureInPicture(generation: UUID) {
+        guard piPGeneration == generation, pictureInPicture != nil else { return }
+        pictureInPicture = nil; automaticPiPPrepared = false; manuallyRequestedPiP = false
+        if UIApplication.shared.applicationState == .background { background() }
+        else if resizesEmbeddedSurface, piPViewport.width > 1, piPViewport.height > 1,
+                (piPViewport.width > piPViewport.height) != (view.bounds.width > view.bounds.height) {
+            // A Metal surface moved during PiP needs the same fresh-surface path
+            // as a normal portrait/landscape move, after PiP relinquishes ownership.
+            onViewportChange?(view.bounds.size)
+        }
     }
 
     /// mpv's own decoded frame arms sample-buffer PiP before iOS suspends the app.
@@ -298,7 +348,12 @@ final class MPVPlaybackController: UIViewController {
 
     func perform(_ name: String, value: Double) {
         switch name {
-        case "pip": preparePictureInPicture()
+        case "pip":
+            guard loaded, !userPaused, !preloading, playback.pictureInPictureSupported,
+                  string("idle-active") != "yes", viewIfLoaded?.window != nil else { return }
+            manuallyRequestedPiP = true
+            automaticPiPPrepared = false
+            preparePictureInPicture()
         case "play": userPaused = false; set("pause", "no")
         case "pause": userPaused = true; set("pause", "yes"); pictureInPicture?.setAutomatic(false)
         case "seek": command(["seek", String(max(0, min(value, playback.duration))), "absolute+exact"])
@@ -384,10 +439,11 @@ final class MPVPlaybackController: UIViewController {
         if loaded && (playback.currentTime > 0 || number("video-params/w") > 0) { playback.loading = false; playback.error = nil }
         if !loaded && Date().timeIntervalSince(startedAt) > 40 { fail("Máy chủ chưa trả dữ liệu video. Hãy thử lại hoặc chọn máy chủ khác.") }
         if loaded, playback.currentTime > 0.5, automaticPiPEnabled, !userPaused,
-           UIApplication.shared.applicationState == .active, playback.pictureInPictureSupported {
+           UIApplication.shared.applicationState == .active, viewIfLoaded?.window != nil,
+           playback.pictureInPictureSupported {
             armPictureInPicture()
         }
-        pictureInPicture?.setAutomatic(automaticPiPEnabled && !userPaused)
+        pictureInPicture?.setAutomatic(automaticPiPEnabled && !userPaused && loaded && string("idle-active") != "yes")
         pictureInPicture?.invalidatePlaybackState()
         playback.mediaInfo = [string("file-format"), string("video-codec"), "\(Int(number("video-params/w"))) × \(Int(number("video-params/h")))", string("audio-codec")].filter { !$0.isEmpty }.joined(separator: " · ")
         #if DEBUG

@@ -93,6 +93,9 @@ jobs:
       - name: Verify anime dynamic episode list and selected-episode playback
         run: bash Tests/anime-smoke.sh fixture
 
+      - name: Verify failed anime native handoff restores the same playing WebView
+        run: bash Tests/anime-fallback-smoke.sh
+
       - name: Check current AnimeVietsub episode list and playback
         continue-on-error: true
         run: bash Tests/anime-smoke.sh live

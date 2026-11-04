@@ -155,6 +155,7 @@ fi
 ANPINIME_UI_FILTERS=(
   -only-testing:AnyAnimeUI/AIDramaUITests/testShortFeedSwipeFullscreenAndFullPlaylist
   -only-testing:AnyAnimeUI/AIDramaUITests/testAutomaticPiPPreparationAndBackgroundTransition
+  -only-testing:AnyAnimeUI/AIDramaUITests/testTransientInactiveDoesNotStartPiPOrReplacePlayer
   -only-testing:AnyAnimeUI/MovieSearchUITests
   -only-testing:AnyAnimeUI/AIDramaUITests/testCatalogPagingFiltersAndLibraryChoices
   -only-testing:AnyAnimeUI/AIDramaUITests/testVerticalEpisodesPlaylistAndLifecycle

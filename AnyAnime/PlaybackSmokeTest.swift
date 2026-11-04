@@ -8,7 +8,8 @@ enum PlaybackSmokeTest {
     static var mpvFixture: Bool { ProcessInfo.processInfo.arguments.contains("--mpv-playback-smoke") && !source2Diagnostic && !animeSmoke }
     static var animeFixture: Bool { ProcessInfo.processInfo.arguments.contains("--anime-provider-smoke") }
     static var liveAnime: Bool { ProcessInfo.processInfo.arguments.contains("--anime-live-smoke") }
-    static var animeSmoke: Bool { animeFixture || liveAnime }
+    static var animeNativeFailure: Bool { ProcessInfo.processInfo.arguments.contains("--anime-native-failure-smoke") }
+    static var animeSmoke: Bool { animeFixture || liveAnime || animeNativeFailure }
     static var source2HLS: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-hls-smoke") }
     static var liveVIP: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-vip-smoke") }
     private static func smokeArgument(_ name: String, fallback: String, pattern: String) -> String {
@@ -32,6 +33,7 @@ enum PlaybackSmokeTest {
     static var liveMovie: Bool { ProcessInfo.processInfo.arguments.contains("--film4k-live-smoke") }
     static var liveSource2: Bool { ProcessInfo.processInfo.arguments.contains("--phim4k-live-smoke") }
     static var resultName: String? {
+        if animeNativeFailure { return "anime-native-fallback" }
         if animeFixture { return "anime-provider" }
         if liveAnime { return "anime-live" }
         if liveMovie { return "film4k-live" }
@@ -53,6 +55,7 @@ enum PlaybackSmokeTest {
     @MainActor private static var fileLoadedRecorded = false
     @MainActor private static var firstDecodedVideoElapsed: TimeInterval?
     @MainActor private static var fileLoadedElapsed: TimeInterval?
+    @MainActor private static var recoveredWebStartTime: Double?
     @MainActor static func diagnostic(_ event: String, fields: [String: Any]) {
         guard source2Diagnostic || animeSmoke || mpvFixture else { return }
         var entry = fields
@@ -126,6 +129,16 @@ enum PlaybackSmokeTest {
             }
             if source2Diagnostic || animeSmoke {
                 guard backend == "mpv" || (animeSmoke && backend == "web"), playback.playing, videoSize.width > 0, videoSize.height > 0 else { return }
+                if animeNativeFailure {
+                    guard backend == "web", events.contains(where: { $0["event"] as? String == "anime-native-failed" }),
+                          events.contains(where: { $0["event"] as? String == "anime-web-restored" && $0["reusedWebsite"] as? Bool == true }),
+                          !playback.loading, !playback.buffering, playback.error == nil else { return }
+                    if recoveredWebStartTime == nil { recoveredWebStartTime = time }
+                    guard time - recoveredWebStartTime! >= 1 else { return }
+                    result["nativeFailureRecoveryVerified"] = true
+                    result["sameWebsiteRestoredVerified"] = true
+                    result["loadingClearedVerified"] = true
+                }
                 if firstVideoTime == nil { firstVideoTime = time }
                 guard time - firstVideoTime! >= 1 else { return }
                 result["sample"] = liveSource2 ? "Phim4K Free1 / thuong-nguyen-do" : liveVIP ? "Core Wakanda / 10403 / 31937" : "Local source-2 HLS through relay"
@@ -157,7 +170,7 @@ enum PlaybackSmokeTest {
                     result["replayedCoreServerIDs"] = replayedCoreServerIDs
                 }
                 if animeSmoke {
-                    result["sample"] = liveAnime ? "AnimeVietsub .news / Bleach a5985" : "Local anime metadata → dynamic episodes → player"
+                    result["sample"] = animeNativeFailure ? "Decoded WebKit blob → native HTTP 403 → same WebKit video resumes" : liveAnime ? "AnimeVietsub .news / Bleach a5985" : "Local anime metadata → dynamic episodes → player"
                     result["episodeCount"] = animeEpisodeCount
                     result["selectedEpisodeNumber"] = selectedAnimeEpisodeNumber ?? 0
                     if animeFixture {
@@ -190,7 +203,14 @@ enum PlaybackSmokeTest {
 struct PlaybackSmokeView: View {
     private let episode = Episode(title: "Tập kiểm thử", url: URL(string: "http://127.0.0.1:8765/episode.html")!, number: 1, season: "Phần 1")
     var body: some View {
-        if PlaybackSmokeTest.animeSmoke { AnimeSmokeView() }
+        if PlaybackSmokeTest.animeNativeFailure {
+            PlayerView(episode: episode, title: "Khôi phục anime sau lỗi native", artworkURL: nil, episodes: [episode])
+                .onAppear {
+                    PlaybackSmokeTest.animeEpisodeCount = 1
+                    PlaybackSmokeTest.selectedAnimeEpisodeNumber = 1
+                }
+        }
+        else if PlaybackSmokeTest.animeSmoke { AnimeSmokeView() }
         else if PlaybackSmokeTest.mpvFixture {
             let media = URL(string: "http://127.0.0.1:8765/multitrack.mkv")!
             let item = Episode(title: "MKV · Hai âm thanh · Hai phụ đề", url: media, number: 1, season: "Kiểm thử", source: .kkphim,
