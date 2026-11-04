@@ -21,6 +21,12 @@ Free1 trả segment HTTP 404. Chưa xác nhận cửa sổ PiP hệ thống trê
 
 Chi tiết nguyên nhân và giới hạn: [PLAYER_REGRESSION_REPAIR.md](PLAYER_REGRESSION_REPAIR.md).
 
+Lượt [2aa3e39](https://github.com/letunam2k/anpinime/actions/runs/41802881152)
+đã qua toàn bộ job native và kiểm tra bảng trọn bộ 40 tập AI. Tiếp tục sửa dọn
+lớp hiệu ứng khi hủy chuyển thư viện, đồng thời phân biệt thao tác vuốt chưa
+chuyển tập với lỗi phát video trong kiểm tra live. Chưa giao Candidate khi
+kiểm tra chuyển thư viện/live chưa đạt.
+
 ---
 
 ## Lịch sử bản 2.9.0 (19) — sửa player và bộ đệm Phim AI

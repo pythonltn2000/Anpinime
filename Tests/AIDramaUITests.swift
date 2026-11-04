@@ -514,7 +514,7 @@ final class AIDramaUITests: XCTestCase {
         attachTelemetry(name: "live-episode-01-decoded-state")
         capture("live-pinedrama-episode-01-portrait-playing")
 
-        dragToNextEpisode()
+        try dragToLiveEpisode(id: second.id, from: first.id)
         try waitForLivePlaying(id: second.id, number: second.number, total: total)
         attachTelemetry(name: "live-episode-02-decoded-state")
         capture("live-pinedrama-episode-02-after-vertical-swipe")
@@ -738,13 +738,70 @@ final class AIDramaUITests: XCTestCase {
     }
 
     private func selectEpisodeGroup(number: Int) throws {
-        let target = app.buttons["aidrama.playlist.group.\((number - 1) / 24)"]
+        let wantedGroup = (number - 1) / 24
+        let target = app.buttons["aidrama.playlist.group.\(wantedGroup)"]
         let groups = app.scrollViews["aidrama.playlist.groups"]
+        var attempts: [String] = []
         for _ in 0..<12 {
             if target.isHittable { target.tap(); return }
-            groups.swipeLeft()
+            guard groups.exists else { break }
+            let viewport = groups.frame.intersection(app.frame)
+            guard !viewport.isNull, viewport.width > 40, viewport.height > 0 else { break }
+            let visible = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "aidrama.playlist.group."))
+                .allElementsBoundByIndex.filter { element in
+                    let frame = element.frame
+                    return !frame.isEmpty && viewport.contains(CGPoint(x: frame.midX, y: frame.midY)) && element.isHittable
+                }.sorted { $0.frame.minX < $1.frame.minX }
+            guard let anchor = visible.first else { break }
+            let indices = visible.compactMap { Int($0.identifier.split(separator: ".").last ?? "") }
+            let dragLeft = wantedGroup >= (indices.min() ?? 0)
+            // The horizontal ScrollView can be taller than its text row inside
+            // a medium sheet. Drag at a visible group button's Y, rather than
+            // XCUI's generic center which may hit transparent space below it.
+            let y = anchor.frame.midY
+            let startX = dragLeft ? viewport.maxX - viewport.width * 0.12 : viewport.minX + viewport.width * 0.12
+            let endX = dragLeft ? viewport.minX + viewport.width * 0.12 : viewport.maxX - viewport.width * 0.12
+            attempts.append("viewport=\(viewport) visible=\(indices) anchor=\(anchor.frame) left=\(dragLeft)")
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(dx: startX - app.frame.minX, dy: y - app.frame.minY))
+            let end = origin.withOffset(CGVector(dx: endX - app.frame.minX, dy: y - app.frame.minY))
+            start.press(forDuration: 0.05, thenDragTo: end)
         }
+        let geometry = XCTAttachment(string: attempts.joined(separator: "\n"))
+        geometry.name = "episode-group-horizontal-navigation"; geometry.lifetime = .keepAlways; add(geometry)
+        capture("missing-episode-group-\(wantedGroup)")
         throw HarnessError.failed("Missing episode group for \(number)")
+    }
+
+    private func dragToLiveEpisode(id: String, from originalID: String) throws {
+        for attempt in 0..<2 {
+            try requireLiveBudget()
+            if playerState()?.selectedEpisodeID == id { return }
+            guard playerState()?.selectedEpisodeID == originalID else {
+                throw HarnessError.failed("The live gesture started from an unexpected episode")
+            }
+            dragToNextEpisode()
+            var selected: String?
+            let committed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                selected = self.playerState()?.selectedEpisodeID
+                return selected != nil && selected != originalID
+            }, object: nil)
+            let result = XCTWaiter.wait(for: [committed], timeout: max(0.1, min(3, liveDeadline!.timeIntervalSinceNow)))
+            if result == .completed {
+                guard selected == id else { throw HarnessError.failed("The live gesture skipped to an unexpected episode") }
+                return
+            }
+            // Retry the same real gesture once only when it was canceled and
+            // the original page is still selected. Decoding is checked below
+            // with the unchanged advancement/dimensions/ownership assertions.
+            if playerState()?.selectedEpisodeID == id { return }
+            guard playerState()?.selectedEpisodeID == originalID else {
+                throw HarnessError.failed("The live gesture ended with an unknown selection")
+            }
+            if attempt == 0 { capture("live-episode-gesture-canceled-before-single-retry") }
+        }
+        capture("live-episode-gesture-did-not-commit")
+        throw HarnessError.failed("The real vertical gesture did not select the expected live episode")
     }
 
     private func dragToNextEpisode() {

@@ -93,7 +93,13 @@ struct RootView: View {
         .onChange(of: service.source) { source in
             if source.isMovie { selectedMovieSourceRaw = source.rawValue }
         }
-        .onDisappear { transitionTask?.cancel() }
+        .onDisappear {
+            transitionTask?.cancel()
+            transitionTask = nil
+            // A cancelled sleep returns before the task's normal cleanup. Never
+            // leave its animated, touch-blocking overlay mounted on reappearance.
+            transition = nil
+        }
         #if DEBUG
         .overlay(alignment: .topLeading) {
             if AIDramaDebugSupport.enabled { AIDramaDebugOwnerView() }

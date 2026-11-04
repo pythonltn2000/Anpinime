@@ -81,6 +81,33 @@ The follow-up also retains WebKit's automatic-PiP preference before a delayed
 video exists. JavaScript tests exercise both enabled and disabled preferences
 and require that configuring either never forces a PiP start.
 
+## Follow-up at 2aa3e39
+
+[Run 41802881152](https://github.com/letunam2k/anpinime/actions/runs/41802881152)
+again passed the complete native job, including actual native failure followed
+by advancing WebKit video with loading cleared. The 40-episode book-player
+fixture now passes the complete drawer, final episode, history and lifecycle
+checks. The glass-button hit-area repair is verified on iOS.
+
+Library selection again stalled after Movie was tapped. Independently of the
+unproven runtime trigger, RootView had a definite cancellation cleanup gap:
+its task could return after cancellation with a touch-blocking animated overlay
+still installed. Disappearance now cancels the task and clears that overlay.
+No provider or production transport change is used to mask this check.
+
+Live book telemetry shows the swipe remained on episode 1, with the same player
+and advancing HEVC video (34.3 to 36.9 seconds); it never selected episode 2.
+The harness now distinguishes gesture selection from decoding and permits one
+additional real swipe only if the original episode remains selected. Exact
+episode identity, decoded dimensions and advancing video remain required.
+The live shorts catalog supplied a 148-episode series. Its group selection uses
+a real horizontal pan along the visible group controls instead of the scroll
+view's potentially empty center. This is bounded navigation through the actual
+drawer, not a direct state or provider shortcut.
+
+The release gate remains closed until the follow-up full suite passes. Fresh
+anime live and physical-device PiP retain the verification limits above.
+
 ## Harness corrections
 
 The delayed episode response is explicitly gated until the next episode request,
