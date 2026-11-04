@@ -109,6 +109,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             return
         }
         #endif
+        NotificationCenter.default.addObserver(self, selector: #selector(prepareWebPictureInPicture), name: UIApplication.willResignActiveNotification, object: nil)
         if episode.source.isMovie { attemptProviderPlayer() }
         else { attemptDirectPlayer() }
     }
@@ -116,6 +117,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
     func shutdown() {
         guard active else { return }
         active = false
+        NotificationCenter.default.removeObserver(self)
         mpvController?.shutdown(); mpvController = nil
         requestTask?.cancel()
         filmRelay?.stop(); filmRelay = nil
@@ -135,6 +137,12 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 webView?.configuration.userContentController.removeScriptMessageHandler(forName: $0)
             }
         }
+    }
+
+    @objc private func prepareWebPictureInPicture() {
+        guard active, mpvController == nil, playerController == nil, playback.playing, !playback.userPaused,
+              UserDefaults.standard.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true else { return }
+        perform("pip", value: 1)
     }
 
     private func perform(_ name: String, value: Double) {
@@ -617,7 +625,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             if let time = state["time"] as? Double, time.isFinite { playback.currentTime = max(0, time) }
             if let duration = state["duration"] as? Double, duration.isFinite { playback.duration = max(0, duration) }
             playback.playing = (state["paused"] as? Bool) == false && (state["ready"] as? Bool) == true
-            playback.buffering = (state["buffering"] as? Bool) == true
+            playback.buffering = !playback.userPaused && (state["buffering"] as? Bool) == true
             if let tracks = state["tracks"] as? [String: Any] {
                 func choices(_ name: String) -> [PlaybackChoice] {
                     (tracks[name] as? [[String: String]] ?? []).compactMap { row in
@@ -630,7 +638,12 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 playback.audioTrack = tracks["audioID"] as? String ?? ""
                 playback.subtitleTrack = tracks["subtitleID"] as? String ?? "off"
             }
-            if (state["ready"] as? Bool) == true {
+            playback.videoWidth = (state["videoWidth"] as? Double) ?? 0
+            playback.videoHeight = (state["videoHeight"] as? Double) ?? 0
+            playback.engine = "WebKit"
+            playback.pictureInPictureSupported = (state["pipSupported"] as? Bool) == true
+            if let pipActive = state["pipActive"] as? Bool, playback.pictureInPictureActive != pipActive { playback.pictureInPictureActive = pipActive }
+            if (state["ready"] as? Bool) == true || playback.currentTime > 0 && playback.duration > 0 {
                 let wasLoading = playback.loading
                 playback.loading = false; playback.verification = false; playback.error = nil
                 revealTimer?.invalidate()
@@ -812,6 +825,47 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           var reportedFrames={};
           var activeVideo=null;
           var reportedSources={};
+          var manifests=[];
+          function rememberManifest(url,text){
+            if(needsWebsiteDecoder()||!url||adURL(url)||typeof text!=='string'||text.length>524288||text.indexOf('#EXTM3U')!==0||text.indexOf('#EXT-X-ENDLIST')<0)return;
+            var duration=0;text.split('\\n').forEach(function(line){if(line.indexOf('#EXTINF:')===0)duration+=parseFloat(line.slice(8))||0;});
+            if(duration<45)return;
+            try{url=new URL(url,location.href).href;}catch(e){return;}
+            manifests=manifests.filter(function(x){return x.url!==url;});manifests.push({url:url,duration:duration});if(manifests.length>12)manifests.shift();
+          }
+          function manifestFor(v){
+            if(!v||isAdvertisement(v)||!isFinite(v.duration)||v.duration<45)return '';
+            var match=manifests.find(function(x){return Math.abs(x.duration-v.duration)<Math.max(8,v.duration*0.025);});
+            return match?match.url:'';
+          }
+          if(typeof window.fetch==='function'){
+            var originalFetch=window.fetch;
+            window.fetch=function(){return originalFetch.apply(this,arguments).then(function(response){
+              var type=response.headers&&response.headers.get('content-type')||'';
+              if(/mpegurl|m3u8/i.test(type+' '+response.url))try{response.clone().text().then(function(text){rememberManifest(response.url,text);}).catch(function(){});}catch(e){}
+              return response;
+            });};
+          }
+          if(window.XMLHttpRequest){
+            var originalOpen=XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open=function(method,url){var requested=url;
+              this.addEventListener('load',function(){try{if((!this.responseType||this.responseType==='text')&&/mpegurl|m3u8/i.test((this.getResponseHeader('content-type')||'')+' '+this.responseURL+' '+requested))rememberManifest(this.responseURL||requested,this.responseText);}catch(e){}});
+              return originalOpen.apply(this,arguments);
+            };
+          }
+          function requestPiP(v){
+            if(!v||v.paused||isAdvertisement(v))return;
+            try{
+              if(v.webkitSetPresentationMode&&(!v.webkitSupportsPresentationMode||v.webkitSupportsPresentationMode('picture-in-picture')))v.webkitSetPresentationMode('picture-in-picture');
+              else if(v.requestPictureInPicture&&document.pictureInPictureEnabled){var p=v.requestPictureInPicture();if(p&&p.catch)p.catch(function(){});}
+            }catch(e){}
+          }
+          document.addEventListener('visibilitychange',function(){if(document.hidden)requestPiP(activeVideo);});
+          function hidePauseOverlays(root){
+            root.querySelectorAll('.jw-overlays > *,[class*="pause-ad"],[class*="pauseAd"],[id*="pause-ad"],.jw-ad-container,.vast-blocker').forEach(function(el){
+              if(!el.matches('.jw-captions')&&!el.querySelector('.jw-captions')&&!el.querySelector('video'))important(el,'display','none');
+            });
+          }
           var playerSelectors='#media-player,.player-container,.watching_player,#player,.jwplayer,[class*="video-player"],[class*="player-wrap"]';
           var adSelectors='.ad,.ads,.advertisement,.video-ad,.ima-ad-container,.jw-ad,.jw-flag-ads,.vjs-ad-playing,[data-ad="true"]';
           function send(name,value){try{window.webkit.messageHandlers[name].postMessage(value);}catch(e){}}
@@ -857,7 +911,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           }
           function reportSource(v){
             if(needsWebsiteDecoder())return;
-            var s=contentURL(v);
+            var s=manifestFor(v)||contentURL(v);
             if(/^https?:/i.test(s)&&!reportedSources[s]){reportedSources[s]=true;send('videoFound',{url:s,referer:location.href});}
           }
           function tryPlay(v){
@@ -913,8 +967,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             var v=activeVideo;if(!v||isAdvertisement(v))return;
             reportSource(v);
             var api=playerAPI(v),sources=contentSources(api),current=mediaURL(v);
-            if(api&&/^https?:/i.test(current)&&sources.indexOf(current)<0)return;
-            send('mediaState',{time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3,ready:v.readyState>=2,ended:v.ended,videoWidth:v.videoWidth||0,videoHeight:v.videoHeight||0,tracks:trackState(v)});
+            var now=Date.now();if(v.__aaLastTime!==v.currentTime){v.__aaLastTime=v.currentTime;v.__aaAdvancedAt=now;}
+            var advancing=now-(v.__aaAdvancedAt||now)<1200;
+            send('mediaState',{pipSupported:!!(v.webkitSetPresentationMode||v.requestPictureInPicture),pipActive:v.webkitPresentationMode==='picture-in-picture'||document.pictureInPictureElement===v,time:isFinite(v.currentTime)?v.currentTime:0,duration:isFinite(v.duration)?v.duration:0,paused:v.paused,buffering:!v.paused&&v.readyState<3&&!advancing,ready:v.readyState>=2||(v.currentTime>0&&v.videoWidth>0),ended:v.ended,videoWidth:v.videoWidth||0,videoHeight:v.videoHeight||0,tracks:trackState(v)});
           }
           window.addEventListener('message',function(event){
             var c=event.data;if(!c||c.type!=='AnPinimeCommand')return;
@@ -923,6 +978,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             if(v){
               try{
                 switch(c.name){
+                  case 'pip':requestPiP(v);break;
                   case 'track':chooseTrack(v,c.kind,c.id);break;
                   case 'subtitleStyle':styleSubtitles(v,c.style);break;
                   case 'play':v.__aaUserPaused=false;tryPlay(v);break;
@@ -974,14 +1030,14 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             activeVideo=v;
             var jw=v.closest('.jwplayer');
             if(jw){
-              isolate(jw);
+              isolate(jw);hidePauseOverlays(jw);
               jw.querySelectorAll('.jw-controls,.jw-display,.jw-logo,.jw-overlays').forEach(function(el){if(!el.querySelector('.jw-captions'))important(el,'display','none');});
               important(v,'width','100%');important(v,'height','100%');important(v,'object-position','center');
             }else{isolate(v);}
-            important(v,'object-fit',v.__anpinimeFill?'cover':'contain'); v.setAttribute('playsinline','');v.controls=false;
+            important(v,'object-fit',v.__anpinimeFill?'cover':'contain'); v.setAttribute('playsinline','');v.controls=false;v.disablePictureInPicture=false;v.autoPictureInPicture=true;
             if(!v.__aa){
               v.__aa=true;
-              ['playing','loadedmetadata','loadeddata','canplay','pause','waiting','ended','durationchange'].forEach(function(name){v.addEventListener(name,function(){if(v===activeVideo)state();});});
+              ['playing','loadedmetadata','loadeddata','canplay','pause','waiting','ended','durationchange','timeupdate','enterpictureinpicture','leavepictureinpicture','webkitpresentationmodechanged'].forEach(function(name){v.addEventListener(name,function(){if(v===activeVideo)state();});});
               ['loadedmetadata','canplay'].forEach(function(name){v.addEventListener(name,function(){tryPlay(v);});});
               tryPlay(v);
             }

@@ -9,6 +9,7 @@ struct AIDramaPlayerView: View {
     @StateObject private var session: AIDramaPlaybackSession
     @State private var playlistPresented = false
     @State private var settingsPresented = false
+    @State private var fullscreen = false
 
     init(playlist: AIDramaPlaylist, provider: AIDramaProviding, initialEpisodeID: String? = nil) {
         _session = StateObject(wrappedValue: AIDramaPlaybackSession(playlist: playlist, provider: provider,
@@ -18,7 +19,7 @@ struct AIDramaPlayerView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            AIDramaVerticalPager(session: session).ignoresSafeArea()
+            if !fullscreen { AIDramaVerticalPager(session: session).ignoresSafeArea() }
             VStack(spacing: 0) {
                 header
                 Spacer(minLength: 16)
@@ -50,14 +51,15 @@ struct AIDramaPlayerView: View {
                 PlayerSettingsPanel(playback: playback, initialTab: "audio", title: session.playlist.series.title,
                                     source: "Phim AI", close: { settingsPresented = false },
                                     reload: { settingsPresented = false; session.retry() })
-                    .preferredColorScheme(.dark)
+                    .preferredColorScheme(.dark).modifier(AIDramaHalfSheet())
             }
         }
+        .background(AIDramaShortsFullscreenPresenter(session: session, presented: $fullscreen).frame(width: 0, height: 0))
         .sheet(isPresented: $playlistPresented) { playlistDrawer }
         .onAppear { session.setPresented(true, sceneActive: scenePhase == .active) }
         .onChange(of: scenePhase) { session.setSceneActive($0 == .active) }
         .onDisappear {
-            session.setPresented(false, sceneActive: false)
+            if !fullscreen { session.setPresented(false, sceneActive: false) }
         }
     }
 
@@ -86,85 +88,51 @@ struct AIDramaPlayerView: View {
             }
             .padding(.top, 6)
             Spacer(minLength: 0)
+            Button { settingsPresented = true } label: {
+                Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).contentShape(Rectangle())
+                    .cinemaGlass(cornerRadius: 22, interactive: true)
+            }.accessibilityLabel("Cài đặt phát")
         }
         .foregroundColor(.white).padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 28)
         .background(LinearGradient(colors: [.black.opacity(0.75), .clear], startPoint: .top, endPoint: .bottom))
     }
 
     private var footer: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 16) {
+        VStack(spacing: 10) {
+            if let playback = session.playback {
+                AIDramaTimeline(playback: playback) { seconds in session.seek(seconds) }
+                    .id(ObjectIdentifier(playback))
+            }
+            HStack(spacing: 10) {
                 Button { session.togglePause() } label: {
                     Image(systemName: session.manuallyPaused ? "play.fill" : "pause.fill")
-                        .font(.title2).frame(width: 48, height: 48)
-                }
-                .accessibilityLabel(session.manuallyPaused ? "Phát" : "Tạm dừng")
-                .accessibilityIdentifier("aidrama.playpause")
-                Spacer()
-                Button { settingsPresented = true } label: {
-                    Image(systemName: "gearshape").frame(width: 44, height: 44).contentShape(Rectangle())
-                }.accessibilityLabel("Cài đặt phát")
+                        .frame(width: 40, height: 44).contentShape(Rectangle())
+                }.accessibilityLabel(session.manuallyPaused ? "Phát" : "Tạm dừng").accessibilityIdentifier("aidrama.playpause")
                 Button { playlistPresented = true } label: {
-                    Label("Danh sách tập (\(session.playlist.episodes.count))", systemImage: "list.bullet.rectangle")
-                        .font(.subheadline.weight(.semibold)).padding(.vertical, 12).padding(.horizontal, 14)
-                        .background(Color.white.opacity(0.16)).cornerRadius(12)
+                    HStack(spacing: 8) {
+                        Image(systemName: "list.bullet.rectangle")
+                        Text("Tập \(session.selectedEpisode?.number ?? 1)/\(session.playlist.episodes.count)").font(.subheadline.bold())
+                        Spacer(minLength: 0); Image(systemName: "chevron.up").font(.caption.bold())
+                    }.padding(12).cinemaGlass(cornerRadius: 24, interactive: true)
+                }.accessibilityIdentifier("aidrama.playlist.open")
+                if let playback = session.playback {
+                    AIDramaSpeedControl(playback: playback)
+                    if playback.videoWidth > playback.videoHeight && playback.videoHeight > 0 {
+                        Button { fullscreen = true } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right").frame(width: 44, height: 44).contentShape(Rectangle())
+                                .cinemaGlass(cornerRadius: 22, interactive: true)
+                        }.accessibilityLabel("Xem toàn màn hình").accessibilityIdentifier("aidrama.fullscreen")
+                    }
                 }
-                .accessibilityIdentifier("aidrama.playlist.open")
-            }
-            if let playback = session.playback {
-                AIDramaTimeline(playback: playback) { seconds in
-                    guard session.playback === playback else { return }
-                    session.seek(seconds)
-                }
-                .id(ObjectIdentifier(playback))
-            } else {
-                Color.white.opacity(0.25).frame(height: 3).padding(.vertical, 12)
-            }
+            }.buttonStyle(.plain)
         }
-        .foregroundColor(.white).padding(.horizontal, 20).padding(.top, 28).padding(.bottom, 16)
+        .foregroundColor(.white).padding(.horizontal, 16).padding(.top, 28).padding(.bottom, 12)
         .background(LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom))
     }
 
     private var playlistDrawer: some View {
-        NavigationView {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 12)], spacing: 12) {
-                        ForEach(session.playlist.episodes) { episode in
-                            Button {
-                                session.selectEpisode(episode.id)
-                                playlistPresented = false
-                            } label: {
-                                VStack(spacing: 6) {
-                                    Text("Tập \(episode.number)").font(.subheadline.weight(.semibold))
-                                    if episode.isLocked { Image(systemName: "lock.fill").font(.caption) }
-                                }
-                                .frame(maxWidth: .infinity, minHeight: 50)
-                                .padding(.vertical, 8)
-                                .foregroundColor(.white)
-                                .background(session.selectedEpisodeID == episode.id ? Color.accentColor : Color.white.opacity(0.12))
-                                .cornerRadius(10)
-                            }
-                            .id(episode.id)
-                            .accessibilityLabel("Tập \(episode.number)" + (episode.isLocked ? ", đã khóa" : ""))
-                            .accessibilityValue(session.selectedEpisodeID == episode.id ? "Đang chọn" : "")
-                            .accessibilityIdentifier("aidrama.playlist.episode." + episode.id)
-                        }
-                    }
-                    .padding(20)
-                }
-                .onAppear { if let id = session.selectedEpisodeID { proxy.scrollTo(id, anchor: .center) } }
-            }
-            .navigationTitle("Danh sách tập (\(session.playlist.episodes.count))")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Xong") { playlistPresented = false }
-                        .accessibilityIdentifier("aidrama.playlist.close")
-                }
-            }
-        }
-        .navigationViewStyle(.stack).preferredColorScheme(.dark)
+        AIDramaEpisodeSheet(playlist: session.playlist, selectedID: session.selectedEpisodeID,
+                           select: { session.selectEpisode($0) }, close: { playlistPresented = false })
     }
 }
 
@@ -172,7 +140,7 @@ private struct AIDramaLoadingState: View {
     @ObservedObject var playback: PlaybackState
     var body: some View {
         Group {
-            if playback.loading || playback.buffering {
+            if playback.loading && !playback.playing || playback.buffering && !playback.userPaused {
                 ProgressView().tint(.white).accessibilityLabel("Đang tải video")
             }
         }
@@ -221,11 +189,13 @@ private struct AIDramaEpisodePage: View {
     var body: some View {
         ZStack {
             Color.black
-            if session.selectedEpisodeID == episode.id, let controller = session.controller {
-                AIDramaNativeSurface(player: controller, session: session).id(ObjectIdentifier(controller))
-            } else if let cover = episode.coverURL ?? session.playlist.series.coverURL {
-                AsyncImage(url: cover) { image in image.resizable().scaledToFit() }
-                    placeholder: { Color.black }
+            if session.selectedEpisodeID == episode.id {
+                AIDramaVideoCanvas(session: session, cover: episode.coverURL ?? session.playlist.series.coverURL)
+            } else {
+                GeometryReader { geometry in
+                    AsyncImage(url: episode.coverURL ?? session.playlist.series.coverURL) { image in image.resizable().scaledToFill() }
+                        placeholder: { Color.black }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                }
             }
         }
         .clipped().accessibilityIdentifier("aidrama.page." + episode.id)

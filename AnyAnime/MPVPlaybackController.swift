@@ -177,11 +177,11 @@ final class MPVPlaybackController: UIViewController {
 
     @objc private func prepareForBackground() { prepareAutomaticPictureInPicture() }
 
-    /// Begin preparing frames at resign-active, but let the system's inline transition
-    /// start PiP. An explicit fallback request follows only on actual background entry.
+    /// Ask while the foreground content source is still eligible; waiting for
+    /// didEnterBackground can miss iOS's first inline-to-PiP transition.
     func prepareAutomaticPictureInPicture() {
         guard automaticPiPEnabled, !userPaused else { return }
-        preparePictureInPicture(start: false)
+        preparePictureInPicture(start: true)
         automaticPiPPrepared = pictureInPicture != nil
     }
 
@@ -374,6 +374,9 @@ final class MPVPlaybackController: UIViewController {
             }
         }
         guard handle != nil else { return }
+        let width = number("video-params/w"), height = number("video-params/h")
+        if playback.videoWidth != width { playback.videoWidth = width }
+        if playback.videoHeight != height { playback.videoHeight = height }
         playback.currentTime = number("time-pos")
         playback.duration = number("duration")
         playback.buffering = string("paused-for-cache") == "yes"

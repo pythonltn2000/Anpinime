@@ -8,6 +8,7 @@ import UIKit
 final class AIDramaPlaybackSession: ObservableObject {
     let playlist: AIDramaPlaylist
     private let provider: AIDramaProviding
+    private let mediaCache: AIDramaMediaCache
     @Published private(set) var selectedEpisodeID: String?
     @Published private(set) var controller: MPVPlaybackController?
     // A direct stored reference remains readable during nonisolated deinit;
@@ -48,7 +49,8 @@ final class AIDramaPlaybackSession: ObservableObject {
     init(playlist: AIDramaPlaylist, provider: AIDramaProviding, initialEpisodeID: String? = nil,
          defaults: UserDefaults = .standard, preloading: Bool = false) {
         self.playlist = playlist
-        self.provider = provider
+        let cache = (provider as? AIDramaMediaCache) ?? AIDramaMediaCache(provider: provider)
+        self.provider = cache; self.mediaCache = cache
         self.defaults = defaults
         self.preloading = preloading
         positions = defaults.dictionary(forKey: "AnPinime.AIDrama.positions." + playlist.series.id) as? [String: Double] ?? [:]
@@ -67,7 +69,10 @@ final class AIDramaPlaybackSession: ObservableObject {
     func setPresented(_ value: Bool, sceneActive: Bool) {
         presented = value
         self.sceneActive = sceneActive
-        if !value || !sceneActive { transitioning = false; transitionGeneration = nil }
+        if !value || !sceneActive {
+            transitioning = false; transitionGeneration = nil
+            if playlist.episodes.count > 1 { Task { await mediaCache.stop() } }
+        }
         reconcile()
     }
 
@@ -75,7 +80,10 @@ final class AIDramaPlaybackSession: ObservableObject {
         if !value, !preloading, presented, !manuallyPaused,
            defaults.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true { controller?.prepareAutomaticPictureInPicture() }
         sceneActive = value
-        if !value { transitioning = false; transitionGeneration = nil }
+        if !value {
+            transitioning = false; transitionGeneration = nil
+            if playlist.episodes.count > 1 { Task { await mediaCache.stop() } }
+        }
         reconcile()
     }
 
@@ -214,6 +222,18 @@ final class AIDramaPlaybackSession: ObservableObject {
         } else { error = nil; reconcile() }
     }
 
+    private func preparePlaylistWindow() {
+        guard !preloading, presented, sceneActive, playlist.episodes.count > 1, let index = selectedIndex else { return }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ai-disable-prefetch") { return }
+        #endif
+        let count = defaults.integer(forKey: "AnPinime.AIDrama.preloadCount") == 10 ? 10 : 5
+        let next = Array(playlist.episodes.dropFirst(index + 1).prefix(count))
+        let previous = Array(playlist.episodes.prefix(index).suffix(3))
+        let current = selectedEpisodeID
+        Task { await mediaCache.prepare(next: next, previous: previous, current: current) }
+    }
+
     private func install(_ stream: AIDramaStream, episode: AIDramaEpisode, token: UUID) {
         currentStream = stream
         streamResolvedAt = Date()
@@ -268,6 +288,13 @@ final class AIDramaPlaybackSession: ObservableObject {
         // Logical session ownership only; asynchronous native teardown is not counted.
         maximumOwnedPlayers = max(maximumOwnedPlayers, controller == nil ? 0 : 1)
         #endif
+        state.$loading.removeDuplicates().sink { [weak self] loading in
+            guard !loading else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.generation == token else { return }
+                self.preparePlaylistWindow()
+            }
+        }.store(in: &observations)
         state.$pictureInPictureActive.dropFirst().sink { [weak self] active in
             Task { @MainActor [weak self] in
                 guard let self, self.generation == token else { return }

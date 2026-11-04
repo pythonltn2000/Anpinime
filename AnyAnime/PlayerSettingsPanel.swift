@@ -48,8 +48,7 @@ struct PlayerSettingsPanel: View {
         }
 
         .foregroundColor(.white).tint(.anpinimeAccent)
-        .background(Color(white: 0.075).opacity(0.98), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .cinemaGlass(cornerRadius: 24, interactive: true)
         .onAppear { tab = tabs.contains(where: { $0.0 == initialTab }) ? initialTab : "audio" }
         .onChange(of: playback.subtitleStyle) { style in style.save(); playback.send("subtitleStyle") }
         .fileImporter(isPresented: $importing, allowedContentTypes: ["srt", "ass", "ssa", "vtt"].compactMap { UTType(filenameExtension: $0) } + [.data]) { result in

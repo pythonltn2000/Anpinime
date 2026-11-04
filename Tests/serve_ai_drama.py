@@ -208,7 +208,7 @@ class Handler(BaseHTTPRequestHandler):
             self.fixture.record("resolve_started", episode=number, episodeID=raw_id)
             if number == 2 or (number == 3 and raw_id == "7000000000000000203"):
                 time.sleep(4)
-            url = f"http://127.0.0.1:{self.fixture.port}/media/episode-{number:02d}.mp4"
+            url = f"http://127.0.0.1:{self.fixture.port}/media/episode-{number:02d}.mp4?clip_id={raw_id}"
             payload = {"status_code": 0, "collection": {"collection_id": int(series)},
                        "num_videos": EPISODE_COUNT, "paid_videos": [{
                            "paid_video_id": int(raw_id), "seq_id": number,
@@ -243,16 +243,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_short_feed(self, query):
         loaded = query.get("drama_current_items", [""])[0]
-        first_ids = [str(EPISODE_BASE + number + index * 100) for index, number in enumerate((5, 3, 40))]
+        first_ids = [str(EPISODE_BASE + number + index * 100) for index, number in enumerate((5, 3, 40, 1, 3, 1))]
         page = 1 if not loaded else 2
         if (query.get("count") != ["6"] or loaded not in ("", ",".join(first_ids))
                 or query.get("drama_request_type") != ["init_fetch" if page == 1 else "load_more"]
-                or query.get("item_count_in_session") != ["0" if page == 1 else "3"]):
+                or query.get("item_count_in_session") != ["0" if page == 1 else "6"]):
             self.bad_catalog_request()
             return
         self.fixture.record("short_feed", page=page)
         rows = []
-        for index, number in (list(enumerate((5, 3, 40))) if page == 1 else [(3, 1)]):
+        for index, number in (list(enumerate((5, 3, 40, 1, 3, 1))) if page == 1 else [(6, 40), (7, 1), (8, 3), (9, 1), (10, 40), (11, 3)]):
             series = SERIES_ID + index
             video = EPISODE_BASE + index * 100 + number
             paid = (pb_field(1, series) + pb_field(3, number) + pb_field(13, f"Short Feed Fixture {index + 1}")
@@ -381,7 +381,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         self.end_headers()
         self.fixture.record("media", episode=episode, clip=clip, method=self.command,
-                            partial=bool(range_header))
+                            partial=bool(range_header), episodeID=parse_qs(urlsplit(self.path).query).get("clip_id", [""])[0])
         if not head:
             with media.open("rb") as stream:
                 stream.seek(start)
@@ -392,6 +392,7 @@ class Handler(BaseHTTPRequestHandler):
                         break
                     self.wfile.write(chunk)
                     remaining -= len(chunk)
+            self.fixture.record("media_complete", episode=episode, episodeID=parse_qs(urlsplit(self.path).query).get("clip_id", [""])[0], complete=start == 0 and end == size - 1)
 
     def send_range_error(self, size):
         self.send_response(416)

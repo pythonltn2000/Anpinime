@@ -15,6 +15,7 @@ final class AIDramaShortsStore: ObservableObject {
     @Published private(set) var error: String?
     @Published private(set) var hasMore = true
     private let provider: AIDramaProviding
+    private let mediaCache: AIDramaMediaCache
     private var request: Task<AIDramaShortFeedPage, Error>?
     private var warming: Task<Void, Never>?
     private var memoryWarning: AnyCancellable?
@@ -24,9 +25,13 @@ final class AIDramaShortsStore: ObservableObject {
     var selected: AIDramaShortVideo? { videos.first { $0.id == selectedID } }
 
     init(provider: AIDramaProviding) {
-        self.provider = provider
+        let cache = AIDramaMediaCache(provider: provider)
+        self.provider = cache; self.mediaCache = cache
         memoryWarning = NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)
-            .sink { [weak self] _ in self?.discardWarmVideo() }
+            .sink { [weak self] _ in
+                self?.discardWarmVideo()
+                if let cache = self?.mediaCache { Task { await cache.stop(purge: true) } }
+            }
     }
 
     func setActive(_ value: Bool, sceneActive: Bool) {
@@ -35,12 +40,14 @@ final class AIDramaShortsStore: ObservableObject {
         if !value {
             request?.cancel(); request = nil; generation = UUID(); loading = false
             discardWarmVideo()
-        } else { scheduleWarmVideo() }
+            Task { await mediaCache.stop() }
+        } else { scheduleWarmVideo(); prepareWindow() }
     }
 
     func setSceneActive(_ value: Bool) {
         sceneActive = value; session?.setSceneActive(value)
-        if value { scheduleWarmVideo() } else { discardWarmVideo() }
+        if value { scheduleWarmVideo(); prepareWindow() }
+        else { discardWarmVideo(); Task { await mediaCache.stop() } }
     }
 
     func select(_ id: String) {
@@ -61,9 +68,20 @@ final class AIDramaShortsStore: ObservableObject {
         }
         session?.setPresented(active, sceneActive: sceneActive)
         scheduleWarmVideo()
-        if let index = videos.firstIndex(where: { $0.id == id }), index >= videos.count - 2, error == nil {
+        prepareWindow()
+        if let index = videos.firstIndex(where: { $0.id == id }), index >= videos.count - preloadCount - 1, error == nil {
             Task { await loadMore() }
         }
+    }
+
+    private var preloadCount: Int { UserDefaults.standard.integer(forKey: "AnPinime.AIDrama.preloadCount") == 10 ? 10 : 5 }
+    private func prepareWindow() {
+        guard active, sceneActive, let index = videos.firstIndex(where: { $0.id == selectedID }) else { return }
+        let next = Array(videos.dropFirst(index + 1).prefix(preloadCount).map(\.episode))
+        let previous = Array(videos.prefix(index).suffix(3).map(\.episode))
+        let current = selectedID
+        Task { await mediaCache.prepare(next: next, previous: previous, current: current) }
+        if next.count < preloadCount, hasMore, !loading, error == nil { Task { await loadMore() } }
     }
 
     private func makeSession(_ video: AIDramaShortVideo, preloading: Bool) -> AIDramaPlaybackSession {
@@ -104,6 +122,8 @@ final class AIDramaShortsStore: ObservableObject {
         }
     }
 
+    func playlist(for series: AIDramaSeries) async throws -> AIDramaPlaylist { try await mediaCache.playlist(for: series) }
+
     func loadMore() async {
         guard active, !loading, hasMore else { return }
         loading = true; error = nil
@@ -121,7 +141,7 @@ final class AIDramaShortsStore: ObservableObject {
             videos.append(contentsOf: additions)
             hasMore = page.hasMore && !additions.isEmpty
             if selectedID == nil, let first = videos.first { select(first.id) }
-            else { scheduleWarmVideo() }
+            else { scheduleWarmVideo(); prepareWindow() }
         } catch {
             guard generation == token, !(error is CancellationError), (error as? URLError)?.code != .cancelled else { return }
             self.error = error.localizedDescription
@@ -135,6 +155,11 @@ struct AIDramaShortsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var feed: AIDramaShortsStore
     @State private var fullscreen = false
+    @State private var episodePlaylist: AIDramaPlaylist?
+    @State private var openingEpisodes = false
+    @State private var episodeError: String?
+    @State private var pendingEpisode: (AIDramaSeries, String)?
+    @State private var episodeTask: Task<Void, Never>?
     let active: Bool
     let openAll: (AIDramaSeries, String, @escaping () -> Void) -> Void
 
@@ -163,6 +188,21 @@ struct AIDramaShortsView: View {
             }
         }
         .foregroundColor(.white).preferredColorScheme(.dark)
+        .overlay { if openingEpisodes { ProgressView().tint(.white).padding(20).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18)) } }
+        .sheet(isPresented: Binding(get: { episodePlaylist != nil }, set: { if !$0 { episodePlaylist = nil } }), onDismiss: {
+            if let pending = pendingEpisode {
+                pendingEpisode = nil
+                openEpisode(pending.0, pending.1)
+            }
+        }) {
+            if let playlist = episodePlaylist {
+                AIDramaEpisodeSheet(playlist: playlist, selectedID: feed.selected?.episode.id,
+                    select: { pendingEpisode = (playlist.series, $0) }, close: { episodePlaylist = nil })
+            }
+        }
+        .alert("Chưa tải được danh sách tập", isPresented: Binding(get: { episodeError != nil }, set: { if !$0 { episodeError = nil } })) {
+            Button("Đóng") { episodeError = nil }
+        } message: { Text(episodeError ?? "") }
         .background(AIDramaShortsFullscreenPresenter(session: feed.session, presented: $fullscreen).frame(width: 0, height: 0))
         .task(id: active) {
             feed.setActive(active, sceneActive: scenePhase == .active)
@@ -171,13 +211,26 @@ struct AIDramaShortsView: View {
         .onChange(of: scenePhase) { feed.setSceneActive($0 == .active) }
         .onChange(of: active) { if !$0 { fullscreen = false } }
         .onDisappear {
+            if !fullscreen, episodePlaylist == nil { episodeTask?.cancel() }
             // A full-screen cover hides this view without leaving the feed.
             if !fullscreen { feed.setActive(false, sceneActive: false) }
         }
     }
 
     private func playAll(_ item: AIDramaShortVideo) {
-        openAll(item.series, item.episode.id) {
+        episodeTask?.cancel(); openingEpisodes = true
+        episodeTask = Task { @MainActor in
+            defer { openingEpisodes = false }
+            do {
+                let playlist = try await feed.playlist(for: item.series)
+                try Task.checkCancellation()
+                episodePlaylist = playlist
+            } catch { if !Task.isCancelled { episodeError = error.localizedDescription } }
+        }
+    }
+
+    private func openEpisode(_ series: AIDramaSeries, _ id: String) {
+        openAll(series, id) {
             feed.session?.setPaused(false)
             feed.setActive(false, sceneActive: false)
         }
@@ -203,17 +256,18 @@ private struct AIDramaShortsControls: View {
                 Text(item.series.title).font(.title3.bold()).lineLimit(2)
                     .accessibilityIdentifier("aidrama.shorts.title")
                 Text("Tập \(item.episode.number)").font(.subheadline).foregroundColor(.white.opacity(0.8))
-                HStack(spacing: 16) {
+                HStack(spacing: 10) {
                     Button { session.togglePause() } label: {
                         Image(systemName: session.manuallyPaused ? "play.fill" : "pause.fill").frame(width: 44, height: 44).contentShape(Rectangle())
                     }.accessibilityLabel(session.manuallyPaused ? "Phát" : "Tạm dừng")
                     Button(action: openAll) {
-                        Label("Phát tất cả" + (item.series.episodeCount.map { " · \($0) tập" } ?? ""), systemImage: "list.bullet.rectangle")
-                            .font(.subheadline.bold()).padding(12).background(.white.opacity(0.16), in: Capsule())
+                        Label("Tập \(item.episode.number)" + (item.series.episodeCount.map { "/\($0)" } ?? "") + " ⌃", systemImage: "list.bullet.rectangle")
+                            .font(.subheadline.bold()).lineLimit(1).minimumScaleFactor(0.8).padding(12).cinemaGlass(cornerRadius: 24, interactive: true)
                     }.accessibilityIdentifier("aidrama.shorts.all")
                     #if DEBUG
                     .accessibilityValue(AIDramaDebugSupport.enabled ? "\(item.series.id)|\(item.episode.id)|\(item.episode.number)|\(item.series.episodeCount ?? 0)" : "")
                     #endif
+                    if let playback = session.playback { AIDramaSpeedControl(playback: playback) }
                     Spacer(minLength: 0)
                     if item.isLandscape {
                         Button(action: fullscreen) {
@@ -240,7 +294,7 @@ private struct AIDramaShortsPage: View {
             Color.black
             if feed.selectedID == item.id, let session = feed.session {
                 if !fullscreen {
-                    AIDramaShortsSurface(session: session)
+                    AIDramaVideoCanvas(session: session, cover: item.series.coverURL)
                     AIDramaShortsControls(session: session, item: item, fullscreen: showFullscreen) { openAll(item) }
                 }
                 #if DEBUG
@@ -249,9 +303,9 @@ private struct AIDramaShortsPage: View {
                 }
                 #endif
             } else if feed.warmID == item.id, let prepared = feed.warmSession {
-                AIDramaShortsSurface(session: prepared)
+                AIDramaVideoCanvas(session: prepared, cover: item.series.coverURL)
             } else {
-                AsyncImage(url: item.series.coverURL) { image in image.resizable().scaledToFit() } placeholder: { Color.black }
+                AsyncImage(url: item.series.coverURL) { image in image.resizable().scaledToFill() } placeholder: { Color.black }
                     .allowsHitTesting(false)
             }
         }.clipped()
@@ -272,7 +326,7 @@ private struct AIDramaShortsSurface: View {
 /// A native full-screen controller owns orientation and containment independently
 /// of SwiftUI's tab/page layout. It borrows the same player for this presentation.
 @MainActor
-private struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
+struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
     let session: AIDramaPlaybackSession?
     @Binding var presented: Bool
     func makeUIViewController(context: Context) -> Anchor { Anchor() }
@@ -293,7 +347,12 @@ private struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
             if !wanted { finish(animated: true); return }
             guard isViewLoaded, view.window != nil else { return }
             if fullscreen == nil, presentedViewController == nil, let session {
-                let player = Fullscreen(session: session, close: { [weak self] in self?.close?() })
+                let player = Fullscreen(session: session, close: { [weak self] in
+                    guard let self else { return }
+                    self.wanted = false
+                    self.finish(animated: true)
+                    self.close?()
+                })
                 player.modalPresentationStyle = .fullScreen
                 fullscreen = player
                 AnPinimeAppDelegate.orientationMask = .landscape

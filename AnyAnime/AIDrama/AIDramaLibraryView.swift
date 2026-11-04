@@ -109,6 +109,7 @@ private struct AIDramaSettingsView: View {
     @ObservedObject var store: AIDramaCatalogStore
     @ObservedObject private var history = AIDramaHistoryStore.shared
     let onChooseLibrary: () -> Void
+    @AppStorage("AnPinime.AIDrama.preloadCount") private var preloadCount = 5
     @State private var confirmingHistoryClear = false
 
     var body: some View {
@@ -139,6 +140,14 @@ private struct AIDramaSettingsView: View {
                 }
                 Button("Xóa lịch sử xem", role: .destructive) { confirmingHistoryClear = true }
                     .disabled(history.entries.isEmpty)
+            }
+            Section("Xem phim") {
+                Picker("Nạp trước video", selection: $preloadCount) {
+                    Text("5 video").tag(5)
+                    Text("10 video").tag(10)
+                }
+                Text("Chuẩn bị media của các video kế tiếp. Cache tạm giới hạn 256 MB, không ghi vào lịch sử phim chưa xem.")
+                    .font(.footnote).foregroundColor(.secondary)
             }
             Section("Giới thiệu") {
                 HStack {

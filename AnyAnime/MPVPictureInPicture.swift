@@ -92,6 +92,8 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private let playback: PlaybackState
     private var controller: AVPictureInPictureController?
     private var timebase: CMTimebase?
+    private var bootstrapFrame: CVPixelBuffer?
+    private var bootstrapTimer: Timer?
     private var possibility: NSKeyValueObservation?
     private var wantsStart = false
     private var starting = false
@@ -141,7 +143,19 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         }
         setAutomatic(automatic)
         invalidatePlaybackState()
-        if let snapshot { enqueue(snapshot, rendered: false) }
+        if let snapshot, !prepared {
+            bootstrapFrame = snapshot
+            enqueue(snapshot, rendered: false)
+            if bootstrapTimer == nil {
+                bootstrapTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        guard let self, !self.stopped, !self.prepared, let frame = self.bootstrapFrame else { return }
+                        self.invalidatePlaybackState()
+                        self.enqueue(frame, rendered: false)
+                    }
+                }
+            }
+        }
     }
 
     func setAutomatic(_ enabled: Bool) {
@@ -158,6 +172,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
             guard let self, !self.stopped else { return }
             guard success else { self.fail("Thiết bị chưa khởi tạo được hình ảnh cho PiP."); return }
             self.prepared = true
+            self.bootstrapTimer?.invalidate(); self.bootstrapTimer = nil; self.bootstrapFrame = nil
             self.command("pipOutput", 1)
             self.invalidatePlaybackState()
             self.output.start()
@@ -190,6 +205,10 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         var sample: CMSampleBuffer?
         guard CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
             formatDescription: description, sampleTiming: &timing, sampleBufferOut: &sample) == noErr, let sample else { return }
+        if !rendered, let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true), CFArrayGetCount(attachments) > 0 {
+            let values = unsafeBitCast(CFArrayGetValueAtIndex(attachments, 0), to: CFMutableDictionary.self)
+            CFDictionarySetValue(values, Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(), Unmanaged.passUnretained(kCFBooleanTrue).toOpaque())
+        }
         layer.enqueue(sample)
         #if DEBUG
         if rendered { frameCount += 1 }
@@ -227,6 +246,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         stopCompletions.append(completion)
         guard !stopped else { return }
         stopped = true; wantsStart = false
+        bootstrapTimer?.invalidate(); bootstrapTimer = nil; bootstrapFrame = nil
         possibility = nil
         controller?.delegate = nil; controller?.stopPictureInPicture(); controller = nil
         playback.pictureInPicturePending = false

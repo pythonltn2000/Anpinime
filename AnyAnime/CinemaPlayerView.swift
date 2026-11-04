@@ -35,6 +35,8 @@ final class PlaybackState: ObservableObject {
     @Published var subtitleBackground = false
     @Published var engine = "WebKit"
     @Published var mediaInfo = ""
+    @Published var videoWidth = 0.0
+    @Published var videoHeight = 0.0
     @Published var supportsAdvancedSubtitles = false
     @Published var secondarySubtitleTrack = "off"
     @Published var subtitleStyle = SubtitleStyle.load()
@@ -99,7 +101,7 @@ struct PlayerView: View {
                     .id(current.id + "-\(attempt)")
                     .ignoresSafeArea()
 
-                if playback.loading && !playback.verification {
+                if playback.loading && !playback.playing && !playback.verification {
                     loadingBackdrop(size: geometry.size)
                 }
 
@@ -123,7 +125,7 @@ struct PlayerView: View {
                             }
                         }.padding(24)
                     }
-                    if playback.buffering && !playback.loading && panel == nil {
+                    if playback.buffering && !playback.userPaused && !playback.loading && panel == nil {
                         ProgressView().tint(.white).scaleEffect(1.5).allowsHitTesting(false)
                     }
                     if let error = playback.error {
@@ -146,7 +148,7 @@ struct PlayerView: View {
                             if ["settings", "audio", "subtitles", "display", "speed", "general", "info"].contains(panel) {
                                 PlayerSettingsPanel(playback: playback, initialTab: panel, title: title, source: ContentDisplayText.sourceLabels(current.season),
                                                     close: closePanel, reload: { closePanel(); retry() })
-                                    .frame(width: min(720, geometry.size.width - 24), height: min(geometry.size.height - 24, 620)).padding(12)
+                                    .frame(width: geometry.size.width > geometry.size.height ? geometry.size.width * 0.5 : geometry.size.width - 24, height: min(geometry.size.height - 24, 620)).padding(12)
                             } else {
                                 playerPanel(panel)
                                     .frame(width: min(360, geometry.size.width - 24))

@@ -50,6 +50,7 @@ final class AIDramaUITests: XCTestCase {
             initialNewPageOneRequests = eventCount(try fixtureJSON("/__smoke__/stats"), "catalog_started", feed: "new", page: 1)
         }
         app.launchArguments = [isLiveTest ? "--ai-drama-live-smoke" : "--ai-drama-smoke"]
+        if name.contains("testVerticalEpisodes") || name.contains("testAutomaticPiP") { app.launchArguments.append("--ai-disable-prefetch") }
         app.launch()
     }
 
@@ -165,7 +166,8 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertTrue(playlist.label.contains("40"), "The full series has 40 episodes")
         playlist.tap()
         try waitFor("The complete episode drawer opens") { self.app.buttons["aidrama.playlist.close"].isHittable }
-        XCTAssertTrue(app.navigationBars["Danh sách tập (40)"].exists)
+        XCTAssertTrue(app.buttons["aidrama.playlist.group.0"].exists)
+        try selectEpisodeGroup(number: 40)
         let last = app.buttons["aidrama.playlist.episode." + episodeID(40)]
         let episodeList = app.scrollViews["aidrama.playlist.episodes"]
         for _ in 0..<12 {
@@ -246,6 +248,12 @@ final class AIDramaUITests: XCTestCase {
             return events.contains { $0["event"] as? String == "resolve_finished" && $0["episodeID"] as? String == secondID }
                 && events.contains { $0["event"] as? String == "media" && $0["episode"] as? Int == 3 }
         }
+        try waitFor("Five following movies have actually downloaded", timeout: 25) {
+            guard let stats = try? self.fixtureJSON("/__smoke__/stats"), let events = stats["events"] as? [[String: Any]] else { return false }
+            let expected = Set([203, 340, 401, 503, 601].map { String(Int64(7_000_000_000_000_000_000) + Int64($0)) })
+            let complete = Set(events.filter { $0["event"] as? String == "media_complete" && $0["complete"] as? Bool == true }.compactMap { $0["episodeID"] as? String })
+            return expected.isSubset(of: complete)
+        }
         let before = try requirePlayerState().currentTime
         app.buttons["aidrama.shorts.fullscreen"].tap()
         try waitFor("Fullscreen rotates the same short video") { self.app.frame.width > self.app.frame.height }
@@ -282,8 +290,17 @@ final class AIDramaUITests: XCTestCase {
             guard let stats = try? self.fixtureJSON("/__smoke__/stats"), let events = stats["events"] as? [[String: Any]] else { return false }
             return events.contains { $0["event"] as? String == "short_feed" && $0["page"] as? Int == 2 }
         }
+        let nextMovieID = String(Int64(7_000_000_000_000_000_000) + 340)
+        dragToNextEpisode()
+        try waitFor("The third cached recommendation plays") { self.playerState()?.selectedEpisodeID == nextMovieID && (self.playerState()?.currentTime ?? 0) > 0.5 }
+        let reverseFrom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+        let reverseTo = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+        reverseFrom.press(forDuration: 0.1, thenDragTo: reverseTo)
+        try waitFor("Downward scrolling returns to the movie just seen") { self.playerState()?.selectedEpisodeID == secondID && (self.playerState()?.currentTime ?? 0) > 0.5 }
         capture("short-feed-next-recommendation")
         app.buttons["aidrama.shorts.all"].tap()
+        try waitFor("The feed opens a 24-episode grouped drawer") { self.app.buttons["aidrama.playlist.close"].isHittable }
+        app.buttons["aidrama.playlist.episode." + secondID].tap()
         try waitFor("Play all opens the exact recommendation episode in its full playlist", timeout: 25) {
             self.app.buttons["aidrama.playlist.open"].exists && self.playerState()?.selectedEpisodeID == secondID
         }
@@ -436,7 +453,7 @@ final class AIDramaUITests: XCTestCase {
         let displayedTitle = app.staticTexts["aidrama.series.title"].label
         XCTAssertFalse(displayedTitle.isEmpty)
         XCTAssertTrue(cardLabel.contains(displayedTitle))
-        XCTAssertTrue(app.buttons["aidrama.playlist.open"].label.contains("(\(total))"))
+        XCTAssertTrue(app.buttons["aidrama.playlist.open"].label.contains("\(total)"))
         assertNoSocialControls()
         attachTelemetry(name: "live-episode-01-decoded-state")
         capture("live-pinedrama-episode-01-portrait-playing")
@@ -450,7 +467,7 @@ final class AIDramaUITests: XCTestCase {
         try waitForLive("The complete live episode drawer opens", timeout: 5) {
             self.app.buttons["aidrama.playlist.close"].isHittable
         }
-        XCTAssertTrue(app.navigationBars["Danh sách tập (\(total))"].exists)
+        try selectEpisodeGroup(number: final.number)
         let last = app.buttons["aidrama.playlist.episode." + final.id]
         let episodes = app.scrollViews["aidrama.playlist.episodes"]
         for _ in 0..<8 {
@@ -497,12 +514,11 @@ final class AIDramaUITests: XCTestCase {
             XCTAssertLessThan(app.frame.width, app.frame.height, "Portrait recommendations stay portrait")
         }
         all.tap()
-        try waitForLivePlaying(id: fields[1], number: number, total: total, portraitOnly: false)
-        app.buttons["aidrama.playlist.open"].tap()
         try waitForLive("The live feed opens its independently verified complete playlist", timeout: 5) {
             self.app.buttons["aidrama.playlist.close"].isHittable
         }
         let final = episodes.last!
+        try selectEpisodeGroup(number: final.number)
         let last = app.buttons["aidrama.playlist.episode." + final.id]
         for _ in 0..<10 {
             try requireLiveBudget()
@@ -652,6 +668,16 @@ final class AIDramaUITests: XCTestCase {
         for label in ["Thích", "Bình luận", "Chia sẻ", "Like", "Comment", "Share"] {
             XCTAssertFalse(app.buttons[label].exists)
         }
+    }
+
+    private func selectEpisodeGroup(number: Int) throws {
+        let target = app.buttons["aidrama.playlist.group.\((number - 1) / 24)"]
+        let groups = app.scrollViews["aidrama.playlist.groups"]
+        for _ in 0..<12 {
+            if target.isHittable { target.tap(); return }
+            groups.swipeLeft()
+        }
+        throw HarnessError.failed("Missing episode group for \(number)")
     }
 
     private func dragToNextEpisode() {

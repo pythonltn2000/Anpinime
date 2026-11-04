@@ -16,7 +16,7 @@ function fixture(html, setup = () => {}) {
   let paused = true, plays = 0;
   for (const video of w.document.querySelectorAll('video')) {
     Object.defineProperties(video, {
-      paused: {get: () => paused}, duration: {get: () => 180}, readyState: {get: () => 4},
+      paused: {get: () => paused}, duration: {get: () => 180}, readyState: {get: () => 4, configurable: true},
       videoWidth: {get: () => 640}, videoHeight: {get: () => 360}
     });
     video.play = () => { paused = false; plays++; return Promise.resolve(); };
@@ -159,3 +159,28 @@ assert.notEqual(trackFixture.w.document.querySelector('.jw-captions').style.disp
 trackFixture.command('rate',3);assert.equal(trackFixture.video.playbackRate,3);
 trackFixture.dom.window.close();
 console.log('PASS: actual JW audio/caption selection, off, caption visibility and 3x speed');
+
+const lowReady = fixture('<div id="player"><video src="https://cdn.example/movie.mp4"></video></div>', w => {
+  Object.defineProperty(w.document.querySelector('video'), 'readyState', {get: () => 2});
+});
+lowReady.video.currentTime = 12;
+lowReady.intervals.forEach(fn => fn());
+assert(lowReady.messages.some(m => m.name === 'mediaState' && m.value.time === 12 && !m.value.buffering));
+lowReady.dom.window.close();
+const pauseOverlay = fixture('<div class="jwplayer"><video src="https://cdn.example/movie.mp4"></video><div class="jw-overlays"><div class="jw-captions">Subtitle</div><div class="pause-ad"><button>Đóng quảng cáo</button></div></div></div>');
+pauseOverlay.command('pause'); pauseOverlay.w.__anyanimeFocusPlayer();
+assert.equal(pauseOverlay.w.document.querySelector('.pause-ad').style.display, 'none');
+assert.notEqual(pauseOverlay.w.document.querySelector('.jw-captions').style.display, 'none');
+pauseOverlay.dom.window.close();
+(async () => {
+  const manifest = '#EXTM3U\n#EXT-X-TARGETDURATION:60\n#EXTINF:60,\na.ts\n#EXTINF:60,\nb.ts\n#EXTINF:60,\nc.ts\n#EXT-X-ENDLIST';
+  const blob = fixture('<div id="player"><video src="blob:https://animevietsub.example/movie"></video></div>', w => {
+    w.fetch = async () => ({url:'https://cdn.example/episode.m3u8',headers:{get:()=> 'application/vnd.apple.mpegurl'},clone:()=>({text:async()=>manifest})});
+  });
+  await blob.w.fetch('https://cdn.example/episode.m3u8');
+  await Promise.resolve(); await Promise.resolve();
+  blob.intervals.forEach(fn => fn());
+  assert(blob.messages.some(m => m.name === 'videoFound' && m.value.url === 'https://cdn.example/episode.m3u8'), 'A duration-matched VOD manifest behind a blob can hand off to native');
+  blob.dom.window.close();
+  console.log('PASS: progressing readyState=2, pause-ad isolation and matched blob HLS handoff');
+})().catch(error => { console.error(error); process.exitCode = 1; });
