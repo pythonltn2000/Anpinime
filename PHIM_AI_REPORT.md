@@ -27,6 +27,11 @@ lớp hiệu ứng khi hủy chuyển thư viện, đồng thời phân biệt t
 chuyển tập với lỗi phát video trong kiểm tra live. Chưa giao Candidate khi
 kiểm tra chuyển thư viện/live chưa đạt.
 
+Chẩn đoán hệ thống ghi nhận XCTest chờ accessibility khi WebKit ẩn đang khởi tạo,
+không phải luồng chính của app bị nghẽn. Movie giờ không gắn trình duyệt xác minh
+của Anime; trình duyệt ẩn Anime đặt rõ trạng thái accessibility ở UIKit và vẫn
+bật lại tương tác khi mở trang xác minh. Đang chờ kiểm tra điều hướng trên iOS.
+
 ---
 
 ## Lịch sử bản 2.9.0 (19) — sửa player và bộ đệm Phim AI

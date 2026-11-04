@@ -108,6 +108,25 @@ drawer, not a direct state or provider shortcut.
 The release gate remains closed until the follow-up full suite passes. Fresh
 anime live and physical-device PiP retain the verification limits above.
 
+## Hidden verification browser and accessibility
+
+The catalog timeout's system spindump provides a more specific lead than a
+network timeout. During the 4.99-second sample, the app main thread was idle
+(0.005 seconds total CPU). Testmanagerd was waiting for an accessibility window
+snapshot. A WebContent worker was loading its accessibility bundle under I/O
+throttling; WebContent viewport setup was also delayed. This does not prove the
+exact IPC target, and does not establish a provider or MainActor deadlock.
+
+RootView attached the anime verification WebKit view to Movie as well. Movie
+providers never use WebsiteSession, so this unnecessary attachment is removed.
+The hidden anime browser now sets native `accessibilityElementsHidden` and
+disables native interaction in addition to SwiftUI's accessibility modifier.
+The visible challenge resets those properties. Host updates are guarded against
+the current interaction state so an outgoing host cannot overwrite the new one.
+Provider/network behavior and the ability to complete a visible anime challenge
+are preserved. The next CI must establish the navigation result; the change is
+not presented as proof of fresh AnimeVietsub playback.
+
 ## Harness corrections
 
 The delayed episode response is explicitly gated until the next episode request,

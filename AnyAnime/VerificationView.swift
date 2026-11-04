@@ -170,7 +170,7 @@ struct VerificationGate: View {
     var body: some View {
         Group {
             if !browser.needsInteraction {
-                VerificationWebView(browser: browser)
+                VerificationWebView(browser: browser, interactive: false)
                     .frame(width: 390, height: 720)
                     .frame(width: 1, height: 1).clipped().opacity(0.001)
                     .allowsHitTesting(false).accessibilityHidden(true)
@@ -180,7 +180,8 @@ struct VerificationGate: View {
         }
             .sheet(isPresented: $browser.needsInteraction) {
                 NavigationView {
-                    VerificationWebView(browser: browser)
+                    VerificationWebView(browser: browser, interactive: true)
+                        .accessibilityHidden(false)
                         .navigationTitle("Xác minh kết nối")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
@@ -196,6 +197,22 @@ struct VerificationGate: View {
 
 private struct VerificationWebView: UIViewRepresentable {
     let browser: WebsiteSession
-    func makeUIView(context: Context) -> WKWebView { browser.webView }
-    func updateUIView(_ uiView: WKWebView, context: Context) { }
+    let interactive: Bool
+
+    func makeUIView(context: Context) -> WKWebView {
+        let view = browser.webView
+        configureInteraction(view)
+        return view
+    }
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        configureInteraction(uiView)
+    }
+
+    private func configureInteraction(_ view: WKWebView) {
+        // Both hosts share this browser. An outgoing host must not overwrite
+        // the accessibility state of the newly presented or hidden host.
+        guard interactive == browser.needsInteraction else { return }
+        view.accessibilityElementsHidden = !interactive
+        view.isUserInteractionEnabled = interactive
+    }
 }

@@ -1,0 +1,23 @@
+{
+  "runID": 41802881152,
+  "applicationCommit": "2aa3e39de216cee1436676fb76481c533115dea5",
+  "sourceArtifactID": 13309483269,
+  "diagnosticArtifactID": 13311060058,
+  "diagnosticHelperRunID": 41807103372,
+  "sampleDurationSeconds": 4.99,
+  "sampleCount": 441,
+  "appCPUSeconds": 0.005,
+  "appMainIdleSamples": 440,
+  "observations": [
+    "Application main thread was idle in RunLoop/mach_msg during the sample.",
+    "UI test runner was obtaining app.screenshot from the failure capture after waiting for Movie tabs.",
+    "testmanagerd waited in mainWindowForElement/error, AXUIElementCopyAttributeValueRecursive and mach_msg for an accessibility reply.",
+    "WebContent accessibility bundle loading and viewport setup were delayed by I/O throttling.",
+    "Movie had attached an unused hidden anime verification WKWebView."
+  ],
+  "limits": [
+    "The exact accessibility IPC target is not identified in the spindump.",
+    "This sample does not establish the visual UI state or the cause of the earlier first timeout.",
+    "The follow-up navigation test must verify the result of removing unused browser attachment and marking the hidden native view."
+  ]
+}

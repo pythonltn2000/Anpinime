@@ -79,7 +79,7 @@ struct RootView: View {
         }
         .tint(.anpinimeAccent)
         .background {
-            if enteredLibrary && selectedLibrary != .aiDrama {
+            if enteredLibrary && selectedLibrary == .anime {
                 VerificationGate(browser: service.website)
             }
         }
