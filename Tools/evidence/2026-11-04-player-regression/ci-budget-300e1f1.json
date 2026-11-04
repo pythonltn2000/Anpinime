@@ -1,0 +1,21 @@
+{
+  "runID": 41808275769,
+  "applicationCommit": "300e1f14f5452f7a82b631583d2660e52509ff2a",
+  "nativeJob": "success",
+  "fixtureUITests": {"executed": 6, "passed": 5, "skipped": 1, "failures": 0},
+  "skipReason": "System PiP unsupported on Simulator; physical iPhone remains unverified",
+  "liveObservations": {
+    "firstEpisodeDecodedAttachmentAtSeconds": 80.26,
+    "secondEpisodeDecodedAttachmentAtSeconds": 90.77,
+    "lastEpisodeNumber": 56,
+    "lastEpisodeTapAtSeconds": 104.07,
+    "originalOverallDeadlineSeconds": 108,
+    "normalPerVideoDecodeTimeoutSeconds": 25,
+    "finalEpisodeSuccessVerified": false,
+    "secondLiveCaseCancelledByJobCeiling": true
+  },
+  "originalJobCeilingMinutes": 25,
+  "sourceArtifactID": 13311943253,
+  "sourceArtifactSHA256": "af6c01109d09ffac5e3bd82df59fa2953950c3df9a9611bf88a4b2e4c390ff79",
+  "followUp": "Increase only aggregate test/job budgets; keep exact-ID, decoded-video, advancing-time and ownership assertions."
+}

@@ -77,7 +77,7 @@ xcodebuild test -project AnyAnime.xcodeproj -scheme AnyAnime -configuration Debu
   -only-testing:AnyAnimeUI/AIDramaUITests/testLivePineDramaShortFeedAndPlaylist \
   -only-testing:AnyAnimeUI/AIDramaUITests/testLivePineDramaPlaylistAndVideo \
   -parallel-testing-enabled NO -test-timeouts-enabled YES \
-  -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 120 \
+  -default-test-execution-time-allowance 200 -maximum-test-execution-time-allowance 200 \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 2>&1 | \
   python3 -u -c 'import re, sys
 for line in sys.stdin:

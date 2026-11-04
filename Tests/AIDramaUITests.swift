@@ -51,8 +51,11 @@ final class AIDramaUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app = XCUIApplication()
         if isLiveTest {
-            executionTimeAllowance = 115
-            liveDeadline = Date().addingTimeInterval(108)
+            // Three independent video checks plus native UI/AX navigation need
+            // their own overall budget. Per-video decode/advance bounds remain
+            // unchanged; a slow first snapshot must not leave the last video 4s.
+            executionTimeAllowance = 195
+            liveDeadline = Date().addingTimeInterval(180)
         } else {
             executionTimeAllowance = 240
         }
@@ -856,7 +859,7 @@ final class AIDramaUITests: XCTestCase {
     private func requireLiveBudget() throws {
         guard let liveDeadline, liveDeadline.timeIntervalSinceNow > 0 else {
             XCTFail("The bounded live playback check exhausted its time budget")
-            throw HarnessError.failed("Live test exceeded its 108-second action budget")
+            throw HarnessError.failed("Live test exhausted its bounded action budget")
         }
     }
 

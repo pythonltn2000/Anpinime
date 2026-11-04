@@ -1,5 +1,12 @@
 # AnPinime 2.9.1 (20) — khắc phục hồi quy anime và PiP
 
+**Cập nhật kiểm tra:** [300e1f1 / run 41808275769](https://github.com/letunam2k/anpinime/actions/runs/41808275769)
+đã qua toàn bộ job native và sáu ca giao diện (năm PASS, một SKIP PiP hệ thống
+không hỗ trợ trên Simulator). Chuyển ba thư viện đã qua. Bài live bấm tập cuối
+ở giây 104 nhưng ngân sách hết ở giây 108; job sau đó chạm giới hạn 25 phút.
+Đang tăng ngân sách toàn bài/job, giữ nguyên kiểm tra giải mã, ID tập và video
+tiến. Mã ứng dụng không đổi; chưa phát hành IPA qua toàn bộ cổng kiểm tra.
+
 Kho hiện tại: `letunam2k/anpinime`, nhánh `feature/ai-drama`,
 [PR #1](https://github.com/letunam2k/anpinime/pull/1). Bản 2.9.0 người dùng đã
 báo lỗi nghiêm trọng; không dùng Candidate của bản đó làm bản đã xác minh.

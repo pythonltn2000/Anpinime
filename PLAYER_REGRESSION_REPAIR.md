@@ -127,6 +127,27 @@ Provider/network behavior and the ability to complete a visible anime challenge
 are preserved. The next CI must establish the navigation result; the change is
 not presented as proof of fresh AnimeVietsub playback.
 
+## Navigation verified at 300e1f1; live test budget
+
+[Run 41808275769](https://github.com/letunam2k/anpinime/actions/runs/41808275769)
+passed the full native job and all six UI cases (five passed, one explicit
+unsupported-system-PiP skip). Movie/Anime/AI switching now passed, together with
+the complete episode drawer, shorts/fullscreen, transient inactivity and movie
+result hit testing. The hidden-browser change has native navigation evidence.
+
+The live book check decoded its exact first and second episodes and selected
+the independently verified final episode 56. Host accessibility queries took
+longer in this run: the last-episode tap occurred at 104 seconds, while the entire
+live test's deadline was 108 seconds. Its normal 25-second decode check therefore
+received only about four seconds. The job's separate 25-minute ceiling then
+canceled the second live case before completion. No verified IPA was released.
+
+Only harness/CI budgets change in the follow-up: the live case has a 180-second
+overall budget, XCTest has 195 seconds with a 200-second runner ceiling, and the
+whole AI job has 40 minutes for compilation, fixture and both live cases. The
+per-video decode and advancement bounds, exact identity, dimensions and single
+owner checks remain unchanged. Application sources are identical to 300e1f1.
+
 ## Harness corrections
 
 The delayed episode response is explicitly gated until the next episode request,

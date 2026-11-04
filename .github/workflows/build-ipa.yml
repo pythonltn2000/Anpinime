@@ -277,7 +277,7 @@ jobs:
   ai-drama:
     if: ${{ !inputs.gateway_frame_only }}
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       ANPINIME_AI_DERIVED_DATA: ${{ github.workspace }}/build-ai-simulator
       ANPINIME_AI_SHORTS_ONLY: ${{ inputs.shorts_only }}
