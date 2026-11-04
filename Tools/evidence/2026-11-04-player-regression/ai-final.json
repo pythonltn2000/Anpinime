@@ -1,0 +1,204 @@
+{
+  "runID": 41842672583,
+  "jobID": 126618058202,
+  "applicationCommit": "477b0c31ecfa7a2ba6396b93b88f41bc45312557",
+  "artifactID": 13332310186,
+  "artifactSHA256": "a49b3f5a4b6566138d2640976ddb1ea27163a15a61ae89aa3e562b8b74c3e8b8",
+  "downloadedArtifactSHA256Verified": true,
+  "uiResults": {
+    "passed": 7,
+    "skipped": 1,
+    "failed": 0,
+    "fixture": [
+      {
+        "test": "AIDramaUITests testAutomaticPiPPreparationAndBackgroundTransition",
+        "status": "skipped",
+        "durationSeconds": 79.666
+      },
+      {
+        "test": "AIDramaUITests testCatalogPagingFiltersAndLibraryChoices",
+        "status": "passed",
+        "durationSeconds": 147.413
+      },
+      {
+        "test": "AIDramaUITests testShortFeedSwipeFullscreenAndFullPlaylist",
+        "status": "passed",
+        "durationSeconds": 90.713
+      },
+      {
+        "test": "AIDramaUITests testTransientInactiveDoesNotStartPiPOrReplacePlayer",
+        "status": "passed",
+        "durationSeconds": 44.282
+      },
+      {
+        "test": "AIDramaUITests testVerticalEpisodesPlaylistAndLifecycle",
+        "status": "passed",
+        "durationSeconds": 94.875
+      },
+      {
+        "test": "MovieSearchUITests testEachPartOfAResultSelectsThatExactRow",
+        "status": "passed",
+        "durationSeconds": 17.631
+      }
+    ],
+    "live": [
+      {
+        "test": "AIDramaUITests testLivePineDramaPlaylistAndVideo",
+        "status": "passed",
+        "durationSeconds": 96.535
+      },
+      {
+        "test": "AIDramaUITests testLivePineDramaShortFeedAndPlaylist",
+        "status": "passed",
+        "durationSeconds": 68.629
+      }
+    ],
+    "skipReason": "AVKit system PiP unsupported in Simulator; physical iPhone automatic PiP not verified."
+  },
+  "fixture": {
+    "episodeCount": 40,
+    "mediaCacheAssertionsPassed": 18,
+    "mediaCacheChecks": [
+      "Five actual movie files are ready, not only metadata",
+      "Concurrent active/cache resolution coalesces for clip-1",
+      "Concurrent active/cache resolution coalesces for clip-2",
+      "Concurrent active/cache resolution coalesces for clip-3",
+      "Concurrent active/cache resolution coalesces for clip-4",
+      "Concurrent active/cache resolution coalesces for clip-5",
+      "Cached data contains the complete MP4 fixture",
+      "All ten upcoming videos can be cached in the same window",
+      "A reverse swipe reuses the previous exact movie file",
+      "The ten-video window can prepare later recommendations",
+      "Memory cleanup preserves the currently playing local file",
+      "Cleanup removes unpinned previous movie data",
+      "An HTTP/HTML failure is never handed to the player as a cached video",
+      "A failed preload does not enter an automatic retry loop",
+      "A partial oversized movie never becomes a local playback URL",
+      "An HTML body with HTTP 200 is never cached as MP4",
+      "Leaving cancels an unfinished resolution",
+      "Returning after cancellation starts a fresh usable resolution"
+    ]
+  },
+  "liveBook": {
+    "seriesID": "7694507828756894772",
+    "catalogLabel": "Bí Mật Của Alpha Hạng S Của Tôi, 352,122 lượt xem, 56 tập",
+    "episodeCount": 56,
+    "panelEpisodeCount": 56,
+    "oracleRequestCount": 1,
+    "selectionPolicy": "First actual fresh catalog card, fixed before the single panel request",
+    "targets": [
+      {
+        "number": 1,
+        "currentTime": 10.1,
+        "manuallyPaused": false,
+        "maximumOwnedPlayers": 1,
+        "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+        "nativeVideoOutput": "gpu-next",
+        "ownedPlayers": 1,
+        "piPActive": false,
+        "piPPending": false,
+        "piPSupported": false,
+        "playerCreations": 1,
+        "playing": true,
+        "resolving": false,
+        "selectedEpisodeID": "7694507884486413589",
+        "systemPiPStartCount": 0,
+        "systemPiPStopCount": 0,
+        "videoWidth": 540,
+        "videoHeight": 960
+      },
+      {
+        "number": 2,
+        "currentTime": 5.566666666666666,
+        "manuallyPaused": false,
+        "maximumOwnedPlayers": 1,
+        "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+        "nativeVideoOutput": "gpu-next",
+        "ownedPlayers": 1,
+        "piPActive": false,
+        "piPPending": false,
+        "piPSupported": false,
+        "playerCreations": 2,
+        "playing": true,
+        "resolving": false,
+        "selectedEpisodeID": "7694507868585790740",
+        "systemPiPStartCount": 0,
+        "systemPiPStopCount": 0,
+        "videoWidth": 540,
+        "videoHeight": 960
+      },
+      {
+        "number": 56,
+        "currentTime": 4.766666666666667,
+        "manuallyPaused": false,
+        "maximumOwnedPlayers": 1,
+        "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 540 × 960 · AAC (Advanced Audio Coding)",
+        "nativeVideoOutput": "gpu-next",
+        "ownedPlayers": 1,
+        "piPActive": false,
+        "piPPending": false,
+        "piPSupported": false,
+        "playerCreations": 3,
+        "playing": true,
+        "resolving": false,
+        "selectedEpisodeID": "7694507942434884916",
+        "systemPiPStartCount": 0,
+        "systemPiPStopCount": 0,
+        "videoWidth": 540,
+        "videoHeight": 960
+      }
+    ]
+  },
+  "liveShorts": {
+    "title": "Long Vương Tái Xuất",
+    "episodeCount": 113,
+    "episodeCountEvidence": "Current-run accessibility label Tập 1/113; passing live test checks complete panel and selected last number/index.",
+    "exactSeriesIDRecorded": false,
+    "first": {
+      "currentTime": 4.033333333333333,
+      "manuallyPaused": false,
+      "maximumOwnedPlayers": 1,
+      "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 960 × 540 · AAC (Advanced Audio Coding)",
+      "nativeVideoOutput": "gpu-next",
+      "ownedPlayers": 1,
+      "piPActive": false,
+      "piPPending": false,
+      "piPSupported": false,
+      "playerCreations": 1,
+      "playing": true,
+      "resolving": false,
+      "selectedEpisodeID": "7676596649946369301",
+      "systemPiPStartCount": 0,
+      "systemPiPStopCount": 0,
+      "videoWidth": 960,
+      "videoHeight": 540
+    },
+    "final": {
+      "number": 113,
+      "currentTime": 4.733333333333333,
+      "manuallyPaused": false,
+      "maximumOwnedPlayers": 1,
+      "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.265 / HEVC (High Efficiency Video Coding) · 960 × 540 · AAC (Advanced Audio Coding)",
+      "nativeVideoOutput": "gpu-next",
+      "ownedPlayers": 1,
+      "piPActive": false,
+      "piPPending": false,
+      "piPSupported": false,
+      "playerCreations": 1,
+      "playing": true,
+      "resolving": false,
+      "selectedEpisodeID": "7676596803499789589",
+      "systemPiPStartCount": 0,
+      "systemPiPStopCount": 0,
+      "videoWidth": 960,
+      "videoHeight": 540
+    }
+  },
+  "relatedNativeArtifactID": 13331172014,
+  "limits": [
+    "Simulator observations do not verify physical iPhone automatic PiP windows or geometry.",
+    "First/second/final book episodes and first/final shorts episodes were verified, not all titles or every episode.",
+    "The shorts series ID is truncated in exported AX and is not inferred.",
+    "Fresh AnimeVietsub live and Free1 failures remain documented separately in native evidence."
+  ]
+}

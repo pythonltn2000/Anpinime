@@ -1,5 +1,38 @@
 # AnPinime 2.9.1 (20) — khắc phục hồi quy anime và PiP
 
+**Bản đã qua cổng kiểm tra:** [IPA unsigned 2.9.1 (20)](https://github.com/letunam2k/anpinime/actions/runs/41842672583/artifacts/13332345272).
+[CI 41842672583](https://github.com/letunam2k/anpinime/actions/runs/41842672583)
+đã hoàn tất thành công trên mã `477b0c31ecfa7a2ba6396b93b88f41bc45312557`.
+
+- Anime giữ bộ giải mã WebKit khi video cần trang web xử lý; thử native thất bại
+  quay về cùng video, vị trí và trạng thái pause. Đã kiểm tra HTTP 403 thật,
+  video tiếp tục tiến và loading tắt. Iframe quảng cáo không chiếm trạng thái player.
+- Sửa vòng đời PiP: inactive chỉ chuẩn bị, giữ owner/layer đến khi dừng xong rồi
+  phục hồi GPU; WebKit nhớ lựa chọn PiP trước khi video được tạo và giữ bố cục
+  trong lúc chuyển. Kiểm tra inactive, frame phần mềm và phục hồi hình ảnh đạt.
+- Bảng tập AI nhận thao tác trên toàn nút. Chuyển ba thư viện đã qua; Movie không
+  gắn WebKit xác minh Anime. Kiểm tra lướt, fullscreen, lịch sử, tải trước 5/10
+  video, trọn bộ 40 tập và vùng bấm ảnh/tên Movie đều đạt.
+- **7 XCTest PASS, 0 lỗi, 1 SKIP.** Hai bài live PineDrama đều đạt: đúng tập đầu,
+  hai, cuối của bộ được chọn; feed Phim ngắn mở đúng danh sách và phát tập cuối.
+  SKIP là cửa sổ PiP hệ thống không hỗ trợ trên Simulator.
+
+Đã mở kiểm tra IPA: 2.9.1 (20), iOS 15+, background audio, unsigned; file phát hành
+khớp từng byte với Candidate đã kiểm tra. [Danh tính artifact](Tools/evidence/2026-11-04-player-regression/release-artifact.json).
+
+**Giới hạn:** chưa xác nhận PiP mở ngay lần thoát đầu trên iPhone thật. Anime
+live trong CI còn bị xác minh website; Free1 vẫn trả segment HTTP 404. Kết quả
+fixture và trạng thái xanh của các bước optional không chứng minh hai nguồn live
+này đã sửa xong. Chín file nguồn 1/3 được bảo vệ vẫn trùng baseline.
+
+[Báo cáo sửa lỗi](PLAYER_REGRESSION_REPAIR.md) ·
+[Bằng chứng native](Tools/evidence/2026-11-04-player-regression/native-final.json) ·
+[Bằng chứng AI live](Tools/evidence/2026-11-04-player-regression/ai-final.json).
+
+---
+
+## Diễn biến trước lượt xác minh cuối
+
 **Cập nhật kiểm tra:** [300e1f1 / run 41808275769](https://github.com/letunam2k/anpinime/actions/runs/41808275769)
 đã qua toàn bộ job native và sáu ca giao diện (năm PASS, một SKIP PiP hệ thống
 không hỗ trợ trên Simulator). Chuyển ba thư viện đã qua. Bài live bấm tập cuối

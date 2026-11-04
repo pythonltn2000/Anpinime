@@ -1,5 +1,21 @@
 # Player regression repair — 2.9.1 (20)
 
+**Final automated verification passed.**
+[Run 41842672583](https://github.com/letunam2k/anpinime/actions/runs/41842672583),
+application revision `477b0c31ecfa7a2ba6396b93b88f41bc45312557`, passed both native
+and AI jobs plus the publication gate. The
+[published unsigned IPA](https://github.com/letunam2k/anpinime/actions/runs/41842672583/artifacts/13332345272)
+was downloaded, digest checked, inspected as 2.9.1 (20), and confirmed byte-identical
+to the tested candidate. Application subtree: `fab1073297653919baba71e5c4534c4acd6a0a3e`.
+Later evidence/report updates do not change application or test sources.
+
+Eight XCTest cases ran: seven passed, zero failed, one explicitly skipped because
+AVKit system PiP is unsupported on Simulator. Both fresh PineDrama live tests
+passed. Native anime failure recovery, MKV software PiP pause/seek/GPU restore,
+HLS relay and three exact Core live servers also passed. Physical iPhone PiP and
+fresh AnimeVietsub access remain unverified; Free1 segments still returned 404.
+The sections below retain the investigation history and its earlier pending states.
+
 This repair addresses the severe anime/PiP regression reported against the 2.9.0
 candidate. Repository: `letunam2k/anpinime`, branch `feature/ai-drama`, draft PR #1.
 The previous candidate is not evidence that these issues are fixed.
@@ -147,6 +163,27 @@ overall budget, XCTest has 195 seconds with a 200-second runner ceiling, and the
 whole AI job has 40 minutes for compilation, fixture and both live cases. The
 per-video decode and advancement bounds, exact identity, dimensions and single
 owner checks remain unchanged. Application sources are identical to 300e1f1.
+
+## Final result
+
+The revised overall budget allowed both live cases to finish, with their original
+25-second combined decoded-video/advancement checks retained. The catalog series
+test passed in 96.5 seconds and the short-feed complete-playlist test in 68.6 seconds.
+The fixture suite passed navigation among all three libraries, a complete 40-episode
+drawer and history, native shorts/fullscreen, transient inactivity without PiP or
+owner replacement, and exact movie artwork/title selection.
+
+Native failure recovery advanced the retained WebKit video to 7.255 seconds with
+loading cleared and no reload after failure. The MKV test produced ten visible
+software PiP frames and restored pause/seek/GPU state. These are controlled and
+Simulator results, not proof of an iPhone system PiP window. Fresh anime remained
+behind website verification; Free1 failed with 22 HTTP 404 segment observations.
+Their missing success artifacts remain failures despite optional-step status.
+
+Final artifact identity and publication requirements are recorded in
+[release-artifact.json](Tools/evidence/2026-11-04-player-regression/release-artifact.json).
+The nine protected provider/parser/transport files remain byte-identical to
+`a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a`; ordinary mpv options are unchanged.
 
 ## Harness corrections
 

@@ -1,0 +1,39 @@
+{
+  "artifactZipSHA256": "ac1efbf824900eb4754c01a4dd29cde1552e49ed75741f35f61e311e7b5f8be9",
+  "ipaSHA256": "2ee4c0ba97fc67c809392e3fa9f04441c690cd8d35a24910347732b6e8ad284e",
+  "ipaBytes": 30677960,
+  "version": "2.9.1",
+  "build": "20",
+  "bundleID": "com.xemphim.aipinime",
+  "minimumOS": "15.0",
+  "backgroundModes": [
+    "audio"
+  ],
+  "unsigned": true,
+  "run": 41842672583,
+  "applicationCommit": "477b0c31ecfa7a2ba6396b93b88f41bc45312557",
+  "applicationSourceSubtree": "fab1073297653919baba71e5c4534c4acd6a0a3e",
+  "artifactID": 13332345272,
+  "artifactName": "AnPinime_UNSIGNED",
+  "artifactURL": "https://github.com/letunam2k/anpinime/actions/runs/41842672583/artifacts/13332345272",
+  "candidateArtifactID": 13331147004,
+  "candidateIPAMatchesPublished": true,
+  "publicationJob": 126632841399,
+  "publicationRequires": [
+    "build-ios success",
+    "ai-drama success including both live PineDrama cases"
+  ],
+  "xctest": {
+    "executed": 8,
+    "passed": 7,
+    "failures": 0,
+    "skipped": 1,
+    "skipReason": "AVKit system PiP unsupported on Simulator"
+  },
+  "limits": {
+    "physicalIPhonePiPVerified": false,
+    "freshAnimeVietsubPlaybackVerified": false,
+    "free1LivePlaybackVerified": false
+  },
+  "protectedBaseline": "a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a"
+}
