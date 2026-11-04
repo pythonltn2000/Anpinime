@@ -194,7 +194,12 @@ final class MPVPlaybackController: UIViewController {
     /// foreground GPU renderer. AVKit owns its automatic transition; our explicit
     /// fallback starts only after didEnterBackground.
     func prepareAutomaticPictureInPicture() {
-        guard automaticPiPEnabled, playback.pictureInPictureSupported, !userPaused, loaded,
+        let automatic = automaticPiPEnabled
+        // A preference change can arrive between the last poll and resign-active.
+        // Update AVKit before it evaluates its automatic inline transition.
+        pictureInPicture?.setAutomatic(automatic && !userPaused && loaded && string("idle-active") != "yes")
+        if !automatic { automaticPiPPrepared = false }
+        guard automatic, playback.pictureInPictureSupported, !userPaused, loaded,
               string("idle-active") != "yes", viewIfLoaded?.window != nil,
               !playback.pictureInPicturePending, !playback.pictureInPictureActive else { return }
         armPictureInPicture()
@@ -232,6 +237,15 @@ final class MPVPlaybackController: UIViewController {
         view.layer.insertSublayer(pip.layer, below: surface)
         pip.onSystemStart = { [weak self] in
             guard let self, self.piPGeneration == generation else { return }
+            if !self.manuallyRequestedPiP, !self.automaticPiPEnabled {
+                self.automaticPiPPrepared = false
+                // AVKit may have queued this callback before the preference was
+                // disabled. Cancel it without starting a software renderer.
+                self.pictureInPicture?.stop(restore: true) { [weak self] in
+                    self?.finishedPictureInPicture(generation: generation)
+                }
+                return
+            }
             if !self.manuallyRequestedPiP { self.automaticPiPPrepared = true }
             self.preparePictureInPicture(start: false)
         }
@@ -271,7 +285,12 @@ final class MPVPlaybackController: UIViewController {
 
     @objc private func background() {
         wasInBackground = true
-        if automaticPiPPrepared, !userPaused {
+        let automatic = automaticPiPEnabled
+        if !automatic {
+            automaticPiPPrepared = false
+            pictureInPicture?.setAutomatic(false)
+        }
+        if automatic, automaticPiPPrepared, !userPaused {
             #if DEBUG
             automaticPiPRequests += 1
             recordAutomaticPiP("automaticBackgroundRequest")

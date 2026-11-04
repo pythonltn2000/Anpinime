@@ -93,6 +93,7 @@ assert failed < restored, events
 with build_opener(ProxyHandler({})).open('http://127.0.0.1:8765/__smoke__/native-fallback', timeout=2) as response:
     stats = json.load(response)
 assert stats['nativeRejectedRequests'] >= 1 and stats['validWebMediaRequests'] >= 1, stats
+assert stats['nestedAdFrameRequests'] >= 1, stats
 assert stats['embedRequests'] == stats['embedRequestsAtFailure'], ('The website was reloaded instead of restored', stats)
 print(json.dumps({'result': result, 'fixture': stats}, sort_keys=True))
 PY

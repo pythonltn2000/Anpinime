@@ -693,6 +693,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard active else { return }
+        // The selected embed is navigated into the main WebView by iframeFound.
+        // An advertisement nested inside it must not own the movie or PiP state.
+        if episode.source == .anime, message.webView === fallbackWebView, !message.frameInfo.isMainFrame { return }
         switch message.name {
         case "videoFound":
             #if DEBUG

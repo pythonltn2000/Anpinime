@@ -59,6 +59,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"service": "anpinime-native-fallback", "pid": os.getpid(),
                             "nativeRejectedRequests": Handler.fallback_native_rejected,
                             "validWebMediaRequests": Handler.fallback_web_media,
+                            "nestedAdFrameRequests": getattr(Handler, "fallback_nested_ads", 0),
                             "embedRequests": Handler.fallback_embeds,
                             "embedRequestsAtFailure": Handler.fallback_embeds_at_failure})
             return
@@ -66,6 +67,13 @@ class Handler(BaseHTTPRequestHandler):
             Handler.fallback_native_rejected += 1
             Handler.fallback_embeds_at_failure = Handler.fallback_embeds
             self.send_error(403, "Intentional native decoder failure; retained website must recover")
+            return
+        if ANIME_NATIVE_FAILURE and path == "/nested-ad.html":
+            Handler.fallback_nested_ads = getattr(Handler, "fallback_nested_ads", 0) + 1
+            self.send_html('''<html><body><script>
+              window.webkit.messageHandlers.videoFound.postMessage({url:location.origin+'/child-ad.mp4',provenance:'media',referer:location.href});
+              window.webkit.messageHandlers.mediaState.postMessage({time:60,duration:1000,ready:true,paused:false,pipActive:true,videoWidth:640,videoHeight:360});
+              </script></body></html>''')
             return
         if ANIME_PROVIDER:
             if path == "/":
@@ -213,6 +221,10 @@ class Handler(BaseHTTPRequestHandler):
                   fetch('/sample.mp4',{credentials:'include'}).then(r=>{if(!r.ok)throw Error(r.status);return r.blob();})
                     .then(blob=>{video.src=URL.createObjectURL(blob);video.play();});
                   video.addEventListener('timeupdate',function(){
+                    if(video.currentTime>=1&&!video.dataset.childAd){
+                      video.dataset.childAd='1';const ad=document.createElement('iframe');
+                      ad.style.display='none';ad.src='/nested-ad.html';document.body.appendChild(ad);
+                    }
                     if(video.currentTime<2||video.dataset.nativeAttempt)return;
                     video.dataset.nativeAttempt='1';
                     window.webkit.messageHandlers.videoFound.postMessage({
