@@ -42,6 +42,12 @@ final class MPVPlaybackController: UIViewController {
     }
     var piPPrepared: Bool { pictureInPicture != nil }
     var piPPossible: Bool { pictureInPicture?.possible == true }
+    @discardableResult
+    func debugSimulateArmedPiPPlaybackCommand(playing: Bool) -> Bool {
+        guard loaded, !preloading else { return false }
+        armPictureInPicture()
+        return pictureInPicture?.debugSimulateArmedPlaybackCommand(playing: playing) == true
+    }
     #endif
     private var loaded = false
     private var userPaused = false
@@ -210,8 +216,12 @@ final class MPVPlaybackController: UIViewController {
     }
 
     private func armPictureInPicture() {
-        guard loaded, !preloading, handle != nil else { return }
-        if pictureInPicture != nil { requestPiPSnapshot(); return }
+        guard loaded, !preloading, let handle else { return }
+        if let pictureInPicture {
+            pictureInPicture.primeOutput(handle: handle, size: decodedVideoSize)
+            requestPiPSnapshot()
+            return
+        }
         let generation = UUID()
         piPGeneration = generation
         piPViewport = view.bounds.size
@@ -258,7 +268,14 @@ final class MPVPlaybackController: UIViewController {
         }
         #endif
         pip.arm(snapshot: nil, automatic: automaticPiPEnabled && !userPaused)
+        // Prime the renderer now rather than first allocating it after iOS has
+        // backgrounded the app. GPU playback remains the visible inline output.
+        pip.primeOutput(handle: handle, size: decodedVideoSize)
         requestPiPSnapshot()
+    }
+
+    private var decodedVideoSize: CGSize {
+        CGSize(width: max(1, number("video-params/w")), height: max(1, number("video-params/h")))
     }
 
     private func requestPiPSnapshot() {
@@ -279,8 +296,7 @@ final class MPVPlaybackController: UIViewController {
         guard loaded, !userPaused, !preloading, string("idle-active") != "yes", let handle else { return }
         guard playback.pictureInPictureSupported || !start else { return }
         armPictureInPicture()
-        let size = CGSize(width: max(1, number("video-params/w")), height: max(1, number("video-params/h")))
-        pictureInPicture?.prepare(handle: handle, size: size, start: start)
+        pictureInPicture?.prepare(handle: handle, size: decodedVideoSize, start: start)
     }
 
     @objc private func background() {
@@ -457,10 +473,13 @@ final class MPVPlaybackController: UIViewController {
         playback.playing = loaded && string("pause") == "no" && !playback.buffering && string("idle-active") != "yes"
         if loaded && (playback.currentTime > 0 || number("video-params/w") > 0) { playback.loading = false; playback.error = nil }
         if !loaded && Date().timeIntervalSince(startedAt) > 40 { fail("Máy chủ chưa trả dữ liệu video. Hãy thử lại hoặc chọn máy chủ khác.") }
-        if loaded, playback.currentTime > 0.5, automaticPiPEnabled, !userPaused,
+        if loaded, width > 0, height > 0, automaticPiPEnabled, !userPaused,
            UIApplication.shared.applicationState == .active, viewIfLoaded?.window != nil,
            playback.pictureInPictureSupported {
             armPictureInPicture()
+            // Keep eligibility ready before the lifecycle notification. The
+            // first Home gesture must not depend on observer ordering.
+            automaticPiPPrepared = pictureInPicture != nil
         }
         pictureInPicture?.setAutomatic(automaticPiPEnabled && !userPaused && loaded && string("idle-active") != "yes")
         pictureInPicture?.invalidatePlaybackState()

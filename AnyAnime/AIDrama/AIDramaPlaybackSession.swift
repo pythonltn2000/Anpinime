@@ -48,11 +48,16 @@ final class AIDramaPlaybackSession: ObservableObject {
     private(set) var cancelledResolutions = 0
     private(set) var playerCreations = 0
     private(set) var maximumOwnedPlayers = 0
+    @Published private(set) var debugInlinePiPCommands = 0
     private var promotionStartedAt: TimeInterval?
     private(set) var lastPromotionToPlaybackSeconds: Double?
     var debugSceneActive: Bool { sceneActive }
     var debugSceneInBackground: Bool { sceneInBackground }
     var debugBackgroundTransitionPending: Bool { backgroundTransition != nil }
+    func debugSimulateInlinePiPCommand(playing: Bool) {
+        guard controller?.debugSimulateArmedPiPPlaybackCommand(playing: playing) == true else { return }
+        debugInlinePiPCommands += 1
+    }
     #endif
 
     init(playlist: AIDramaPlaylist, provider: AIDramaProviding, initialEpisodeID: String? = nil,

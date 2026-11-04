@@ -64,6 +64,9 @@ jobs:
           "$RUNNER_TEMP/anpinime-range-tests"
           python3 Tests/range_virtual_test.py
 
+      - name: Verify anime Home first content, cache and domain recovery
+        run: bash Tests/anime-home-smoke.sh
+
       - name: Install XcodeGen
         run: brew install xcodegen
 

@@ -37,6 +37,7 @@ final class AIDramaUITests: XCTestCase {
         let lastPromotionToPlaybackSeconds: Double?
         let systemPiPStartCount: Int?
         let systemPiPStopCount: Int?
+        let inlinePiPCommands: Int?
     }
 
     private enum HarnessError: Error { case failed(String) }
@@ -370,6 +371,43 @@ final class AIDramaUITests: XCTestCase {
             let owner = self.app.buttons["aidrama.debug.ownedPlayers"]
             return owner.exists && (owner.value as? String) == "0"
         }
+    }
+
+    func testShortFeedSustainedPlaybackThroughPiPArmingAndSwipes() throws {
+        try assertAITabs()
+        app.tabBars.buttons["Phim ngắn"].tap()
+        let firstID = episodeID(5)
+        let secondID = String(Int64(7_000_000_000_000_000_000) + 203)
+        let thirdID = String(Int64(7_000_000_000_000_000_000) + 340)
+        try waitForShortPlaying(id: firstID)
+        try assertShortPlaybackSurvivesArmedPiP(id: firstID)
+
+        // Real prefetch remains enabled. Check the visible owner while its silent
+        // neighbor is being prepared, then exercise promotion and reverse paging.
+        dragToNextEpisode()
+        try waitForShortPlaying(id: secondID)
+        try assertShortPlaybackSurvivesArmedPiP(id: secondID)
+        dragToNextEpisode()
+        try waitForShortPlaying(id: thirdID)
+        try assertShortPlaybackSurvivesArmedPiP(id: thirdID)
+        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+        let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+        from.press(forDuration: 0.1, thenDragTo: to)
+        try waitForShortPlaying(id: secondID)
+        try assertShortPlaybackSurvivesArmedPiP(id: secondID)
+
+        let pause = app.buttons["aidrama.shorts.playpause"]
+        pause.tap()
+        try waitFor("Manual short-video pause is committed") { self.playerState()?.manuallyPaused == true }
+        let ignoredPlay = app.buttons["aidrama.debug.inlinePiPPlay"]
+        XCTAssertTrue(ignoredPlay.isHittable)
+        let injectionsBefore = try requirePlayerState().inlinePiPCommands ?? 0
+        ignoredPlay.tap()
+        XCTAssertEqual(try requirePlayerState().inlinePiPCommands, injectionsBefore + 1,
+                       "The production PiP command handler was exercised while inline and paused")
+        try assertPausedTimeStable(duration: 2)
+        capture("short-feed-sustained-forward-reverse-and-inline-pip-intent")
+        app.tabBars.buttons["Trang chủ"].tap()
     }
 
     func testCatalogPagingFiltersAndLibraryChoices() throws {
@@ -877,6 +915,43 @@ final class AIDramaUITests: XCTestCase {
             return Date() >= deadline
         }
         XCTAssertFalse(changed, "A stale resolution replaced the committed episode")
+    }
+
+    private func waitForShortPlaying(id: String) throws {
+        try waitFor("The exact short video starts decoded playback", timeout: 25) {
+            guard let state = self.playerState() else { return false }
+            return state.selectedEpisodeID == id && !state.resolving && !state.manuallyPaused
+                && state.currentTime > 1 && state.playing == true && state.ownedPlayers == 1
+                && self.isDecodedVideo(state.mediaInfo, portraitOnly: false)
+        }
+    }
+
+    private func assertShortPlaybackSurvivesArmedPiP(id: String) throws {
+        // Exercise the production PiP command handler while merely armed, including
+        // when AVKit cannot create a controller on this simulator. Preparing PiP
+        // must preserve both user intent and foreground GPU output.
+        let injection = app.buttons["aidrama.debug.inlinePiPPause"]
+        XCTAssertTrue(injection.isHittable)
+        let injectionsBefore = try requirePlayerState().inlinePiPCommands ?? 0
+        injection.tap()
+        let before = try requirePlayerState()
+        XCTAssertEqual(before.inlinePiPCommands, injectionsBefore + 1,
+                       "The production PiP command handler was exercised while merely armed")
+        let deadline = Date().addingTimeInterval(5.5)
+        var unexpectedPauseOrSelection = false
+        try waitFor("The short keeps playing beyond the first second without play/pause taps", timeout: 13) {
+            guard let state = self.playerState() else { return false }
+            if state.selectedEpisodeID != id || state.manuallyPaused || state.ownedPlayers != 1
+                || state.nativeVideoOutput != "gpu-next" || state.piPActive != false || state.piPPending != false {
+                unexpectedPauseOrSelection = true
+                return true
+            }
+            return Date() >= deadline && state.playing == true && state.currentTime > before.currentTime + 4.5
+        }
+        XCTAssertFalse(unexpectedPauseOrSelection,
+                       "Inline PiP preparation changed pause intent, decoder ownership or foreground GPU output")
+        XCTAssertEqual(try requirePlayerState().controllerIdentity, before.controllerIdentity,
+                       "Preparing an inline PiP source retains the visible decoder")
     }
 
     private func assertPausedTimeStable(duration: TimeInterval) throws {

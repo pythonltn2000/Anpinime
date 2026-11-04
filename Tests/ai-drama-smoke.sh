@@ -154,6 +154,7 @@ fi
 
 ANPINIME_UI_FILTERS=(
   -only-testing:AnyAnimeUI/AIDramaUITests/testShortFeedSwipeFullscreenAndFullPlaylist
+  -only-testing:AnyAnimeUI/AIDramaUITests/testShortFeedSustainedPlaybackThroughPiPArmingAndSwipes
   -only-testing:AnyAnimeUI/AIDramaUITests/testAutomaticPiPPreparationAndBackgroundTransition
   -only-testing:AnyAnimeUI/AIDramaUITests/testTransientInactiveDoesNotStartPiPOrReplacePlayer
   -only-testing:AnyAnimeUI/MovieSearchUITests
@@ -161,7 +162,10 @@ ANPINIME_UI_FILTERS=(
   -only-testing:AnyAnimeUI/AIDramaUITests/testVerticalEpisodesPlaylistAndLifecycle
 )
 if [ "${ANPINIME_AI_SHORTS_ONLY:-false}" = true ]; then
-  ANPINIME_UI_FILTERS=(-only-testing:AnyAnimeUI/AIDramaUITests/testShortFeedSwipeFullscreenAndFullPlaylist)
+  ANPINIME_UI_FILTERS=(
+    -only-testing:AnyAnimeUI/AIDramaUITests/testShortFeedSwipeFullscreenAndFullPlaylist
+    -only-testing:AnyAnimeUI/AIDramaUITests/testShortFeedSustainedPlaybackThroughPiPArmingAndSwipes
+  )
 fi
 
 set +e

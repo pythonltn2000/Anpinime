@@ -158,7 +158,10 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
         guard playback.playing, !playback.userPaused, !playback.pictureInPictureActive,
               !playback.pictureInPicturePending,
               UserDefaults.standard.object(forKey: "AnPinime.automaticPiP") as? Bool ?? true else { return }
-        perform("pip", value: 1)
+        // Public WKWebView API has no AVKit-style automatic-inline PiP flag.
+        // This is a best-effort request on actual background, separate from the
+        // manual command; it must never run merely because the app is inactive.
+        perform("pipAutomatically", value: 1)
     }
 
     @objc private func restoreWebForeground() {
@@ -1096,8 +1099,8 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
               try{
                 switch(c.name){
                   case 'pip':requestPiP(v);break;
+                  case 'pipAutomatically':if(automaticPiP)requestPiP(v);break;
                   case 'pipStop':stopPiP(v);break;
-                  case 'automaticPiP':v.autoPictureInPicture=automaticPiP;break;
                   case 'track':chooseTrack(v,c.kind,c.id);break;
                   case 'subtitleStyle':styleSubtitles(v,c.style);break;
                   case 'play':v.__aaUserPaused=false;tryPlay(v);break;
@@ -1154,7 +1157,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
               jw.querySelectorAll('.jw-controls,.jw-display,.jw-logo,.jw-overlays').forEach(function(el){if(!el.querySelector('.jw-captions'))important(el,'display','none');});
               important(v,'width','100%');important(v,'height','100%');important(v,'object-position','center');
             }else{isolate(v);}
-            important(v,'object-fit',v.__anpinimeFill?'cover':'contain'); v.setAttribute('playsinline','');v.controls=false;v.disablePictureInPicture=false;v.autoPictureInPicture=automaticPiP;
+            important(v,'object-fit',v.__anpinimeFill?'cover':'contain'); v.setAttribute('playsinline','');v.controls=false;v.disablePictureInPicture=false;
             if(!v.__aa){
               v.__aa=true;
               ['playing','loadedmetadata','loadeddata','canplay','pause','waiting','ended','durationchange','timeupdate','enterpictureinpicture','leavepictureinpicture','webkitpresentationmodechanged'].forEach(function(name){v.addEventListener(name,function(){if(v===activeVideo)state();});});

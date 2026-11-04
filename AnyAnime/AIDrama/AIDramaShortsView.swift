@@ -271,6 +271,7 @@ private struct AIDramaShortsControls: View {
                     Button { session.togglePause() } label: {
                         Image(systemName: session.manuallyPaused ? "play.fill" : "pause.fill").frame(width: 44, height: 44).contentShape(Rectangle())
                     }.accessibilityLabel(session.manuallyPaused ? "Phát" : "Tạm dừng")
+                        .accessibilityIdentifier("aidrama.shorts.playpause")
                     Button(action: openAll) {
                         Label("Tập \(item.episode.number)" + (item.series.episodeCount.map { "/\($0)" } ?? "") + " ⌃", systemImage: "list.bullet.rectangle")
                             .font(.subheadline.bold()).lineLimit(1).minimumScaleFactor(0.8).padding(12).cinemaGlass(cornerRadius: 24, interactive: true)

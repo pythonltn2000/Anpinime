@@ -189,11 +189,16 @@ const webPiP = fixture('<div id="player"><video src="blob:movie"></video></div>'
   v.webkitSetPresentationMode = mode => { w.presentationCalls.push(mode); v.webkitPresentationMode = mode; };
 });
 assert(webPiP.messages.some(m => m.name === 'mediaState' && m.value.pipSupported));
-assert.equal(webPiP.video.autoPictureInPicture, false, 'The browser waits for the app automatic-PiP preference');
+webPiP.command('pipAutomatically');
+assert.equal(webPiP.w.presentationCalls.length, 0, 'Automatic requests wait for the app preference');
 webPiP.command('automaticPiP', 1);
-assert.equal(webPiP.video.autoPictureInPicture, true);
+webPiP.command('pipAutomatically');
+assert.equal(webPiP.video.webkitPresentationMode, 'picture-in-picture', 'An enabled background request reaches the actual video');
+webPiP.command('pipStop');
+webPiP.w.presentationCalls.length = 0;
 webPiP.command('automaticPiP', 0);
-assert.equal(webPiP.video.autoPictureInPicture, false, 'Turning automatic PiP off is respected');
+webPiP.command('pipAutomatically');
+assert.equal(webPiP.w.presentationCalls.length, 0, 'Turning automatic PiP off blocks background requests');
 Object.defineProperty(webPiP.w.document, 'hidden', {value: true});
 webPiP.w.document.dispatchEvent(new webPiP.w.Event('visibilitychange'));
 assert.equal(webPiP.w.presentationCalls.length, 0, 'Document visibility alone cannot force a presentation transition');
@@ -257,8 +262,9 @@ for (const enabled of [true, false]) {
   v.webkitSetPresentationMode = () => { presentations++; };
   delayedVideo.w.document.querySelector('#player').appendChild(v);
   delayedVideo.w.__anyanimeFocusPlayer();
-  assert.equal(v.autoPictureInPicture, enabled, 'A video created after readiness inherits the app automatic-PiP preference');
   assert.equal(presentations, 0, 'Retaining the preference never forces a PiP start');
+  delayedVideo.command('pipAutomatically');
+  assert.equal(presentations, enabled ? 1 : 0, 'A video created after readiness applies the retained preference to an actual background request');
   delayedVideo.dom.window.close();
 }
 console.log('PASS: WebKit PiP single ownership, actual commands, preference, pause, pending retry and inline layout');

@@ -79,6 +79,7 @@ struct AIDramaDebugStateView: View {
             "systemPiPStartCount": session.controller?.systemPiPStartCount ?? 0,
             "systemPiPStopCount": session.controller?.systemPiPStopCount ?? 0,
             "automaticPiPRequests": session.controller?.automaticPiPRequests ?? 0,
+            "inlinePiPCommands": session.debugInlinePiPCommands,
             "currentTime": time, "mediaInfo": info, "ownedPlayers": session.controller == nil ? 0 : 1,
             "maximumOwnedPlayers": session.maximumOwnedPlayers,
             "playerCreations": session.playerCreations, "cancelledResolutions": session.cancelledResolutions
@@ -98,6 +99,12 @@ struct AIDramaDebugStateView: View {
                 session.setSceneActive(true)
             }.frame(width: 24, height: 20).contentShape(Rectangle())
                 .accessibilityIdentifier("aidrama.debug.transientActive")
+            Button("P") { session.debugSimulateInlinePiPCommand(playing: false) }
+                .frame(width: 24, height: 20).contentShape(Rectangle())
+                .accessibilityIdentifier("aidrama.debug.inlinePiPPause")
+            Button("R") { session.debugSimulateInlinePiPCommand(playing: true) }
+                .frame(width: 24, height: 20).contentShape(Rectangle())
+                .accessibilityIdentifier("aidrama.debug.inlinePiPPlay")
         }.font(.system(size: 10)).foregroundColor(.white).buttonStyle(.plain)
             .padding(.top, 80).padding(.leading, 8)
     }

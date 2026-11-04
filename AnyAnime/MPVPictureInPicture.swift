@@ -105,7 +105,10 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private var cleanupComplete = false
     private var stopCompletions: [() -> Void] = []
     private var retainedUntilStopped: MPVPictureInPicture?
-    private var prepared = false
+    private var outputReady = false
+    private var outputActivated = false
+    private var wantsOutput = false
+    private var outputPreparationFailed = false
     private var preparing = false
     var onSystemStart: (() -> Void)?
     var onEvent: ((String) -> Void)?
@@ -148,13 +151,13 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         }
         setAutomatic(automatic)
         invalidatePlaybackState()
-        if let snapshot, !prepared {
+        if let snapshot, !outputActivated {
             bootstrapFrame = snapshot
             enqueue(snapshot, rendered: false)
             if bootstrapTimer == nil {
                 bootstrapTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in
-                        guard let self, !self.stopped, !self.prepared, let frame = self.bootstrapFrame else { return }
+                        guard let self, !self.stopped, !self.outputActivated, let frame = self.bootstrapFrame else { return }
                         self.invalidatePlaybackState()
                         self.enqueue(frame, rendered: false)
                     }
@@ -167,22 +170,47 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         controller?.canStartPictureInPictureAutomaticallyFromInline = enabled && !stopping && !stopped
     }
 
-    func prepare(handle: OpaquePointer, size: CGSize, start: Bool) {
+    /// Allocate the CPU rendering backend before Home, while leaving the active
+    /// Metal VO, audio and pause intent untouched. Creating a render context does
+    /// not select libmpv's VO; that switch belongs to the actual PiP transition.
+    func primeOutput(handle: OpaquePointer, size: CGSize) {
         guard !stopped, !stopping else { return }
-        playback.pictureInPicturePending = true
-        if !preparing, !prepared {
+        if !preparing, !outputReady, !outputPreparationFailed {
             preparing = true
             output.prepare(handle: handle, size: size) { [weak self] success in
                 guard let self, !self.stopped, !self.stopping else { return }
-                guard success else { self.fail("Thiết bị chưa khởi tạo được hình ảnh cho PiP."); return }
-                self.prepared = true
-                self.bootstrapTimer?.invalidate(); self.bootstrapTimer = nil; self.bootstrapFrame = nil
-                self.command("pipOutput", 1)
-                self.invalidatePlaybackState()
-                self.output.start()
+                self.preparing = false
+                guard success else {
+                    self.outputPreparationFailed = true
+                    if self.wantsOutput { self.fail("Thiết bị chưa khởi tạo được hình ảnh cho PiP.") }
+                    return
+                }
+                self.outputReady = true
+                self.onEvent?("outputPrimed")
+                self.activateOutputIfRequested()
             }
         }
+    }
+
+    func prepare(handle: OpaquePointer, size: CGSize, start: Bool) {
+        guard !stopped, !stopping else { return }
+        playback.pictureInPicturePending = true
+        wantsOutput = true
+        // A failed speculative prime may be retried by a real PiP request.
+        outputPreparationFailed = false
+        primeOutput(handle: handle, size: size)
+        activateOutputIfRequested()
         if start { requestStart() }
+    }
+
+    private func activateOutputIfRequested() {
+        guard wantsOutput, outputReady, !outputActivated, !stopped, !stopping else { return }
+        outputActivated = true
+        bootstrapTimer?.invalidate(); bootstrapTimer = nil; bootstrapFrame = nil
+        command("pipOutput", 1)
+        invalidatePlaybackState()
+        output.start()
+        onEvent?("outputActivated")
     }
 
     func requestStart() {
@@ -299,7 +327,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         controller?.delegate = nil; controller = nil
         // A render context freed while libmpv still owns the VO calls kill_video_async.
         // Switch back while the render queue is still serving frames, then free it.
-        if restoreAfterStop, prepared { restoreVideo() }
+        if restoreAfterStop, outputActivated { restoreVideo() }
         output.frame = nil
         output.stop { [self] in
             layer.flushAndRemoveImage(); layer.removeFromSuperlayer()
@@ -350,17 +378,51 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         completionHandler(true)
     }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
-        guard !stopped, !stopping else { return }
-        command(playing ? "play" : "pause", 0); pictureInPictureController.invalidatePlaybackState()
+        handlePlaybackCommand(playing: playing, sourceMatchesController: pictureInPictureController === controller,
+                              sourceIsActive: pictureInPictureController.isPictureInPictureActive)
+    }
+
+    private func handlePlaybackCommand(playing: Bool, sourceMatchesController: Bool, sourceIsActive: Bool) {
+        // A source stays armed inline before any PiP window exists. A callback
+        // during setup/invalidation is not a Play/Pause action from a PiP user.
+        // Only a live PiP window owns user controls. Forwarding an inline pause
+        // overwrote the app's user intent and disabled automatic PiP eligibility.
+        guard acceptsControls(sourceMatchesController: sourceMatchesController, sourceIsActive: sourceIsActive) else {
+            onEvent?(playing ? "ignoredInlinePlay" : "ignoredInlinePause")
+            return
+        }
+        command(playing ? "play" : "pause", 0); controller?.invalidatePlaybackState()
     }
     func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
-        CMTimeRange(start: .zero, duration: CMTime(seconds: max(1, playback.duration), preferredTimescale: 600))
+        // AVKit requires a finite range to contain the display layer's current
+        // time. Streams may advance before their duration becomes available.
+        guard playback.duration > 0 else { return CMTimeRange(start: .zero, duration: .positiveInfinity) }
+        return CMTimeRange(start: .zero, duration: CMTime(seconds: max(playback.duration, playback.currentTime + 0.1), preferredTimescale: 600))
     }
     func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool { playback.userPaused }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, didTransitionToRenderSize newRenderSize: CMVideoDimensions) { }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, skipByInterval skipInterval: CMTime,
                                     completion: @escaping () -> Void) {
-        guard !stopped, !stopping else { completion(); return }
+        guard acceptsControls(sourceMatchesController: pictureInPictureController === controller,
+                              sourceIsActive: pictureInPictureController.isPictureInPictureActive) else { completion(); return }
         command("seek", min(playback.duration, max(0, playback.currentTime + skipInterval.seconds))); completion()
     }
+
+    private func acceptsControls(sourceMatchesController: Bool, sourceIsActive: Bool) -> Bool {
+        !stopped && !stopping && sourceMatchesController && sourceIsActive
+    }
+
+    #if DEBUG
+    /// Exercise the production delegate handler even without a system PiP window.
+    /// Unsupported devices return nil from AVKit's initializer. Inject the armed
+    /// source's inactive state into the same policy; never manufacture an active
+    /// AVKit controller or claim that a system PiP window has been tested.
+    @discardableResult
+    func debugSimulateArmedPlaybackCommand(playing: Bool) -> Bool {
+        guard !transitioningOrActive, !stopped, !stopping else { return false }
+        if let controller { pictureInPictureController(controller, setPlaying: playing) }
+        else { handlePlaybackCommand(playing: playing, sourceMatchesController: true, sourceIsActive: false) }
+        return true
+    }
+    #endif
 }

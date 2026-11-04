@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 @MainActor
 final class AnimeService: ObservableObject {
@@ -28,7 +31,7 @@ final class AnimeService: ObservableObject {
         let complete: Bool
     }
     private var homeCache: [ContentSource: HomeSnapshot] = [:]
-    private var htmlCache: [URL: (Date, String)] = [:]
+    private var htmlCache: [URL: (Date, String, URL)] = [:]
     private var htmlRequests: [URL: (UUID, Task<String, Error>)] = [:]
     private var detailCache: [String: (Date, AnimeDetail)] = [:]
     private var scheduleCache: [DayOfWeek: [AnimeScheduleItem]] = [:]
@@ -63,7 +66,8 @@ final class AnimeService: ObservableObject {
         .init(title: "Seinen", path: "/the-loai/seinen/")
     ]
 
-    private let resolver = DomainResolver.shared
+    private let resolver: DomainResolver
+    private let homeStore: AnimeHomeStore
     private let session: URLSession
 
     func selectSource(_ value: ContentSource) {
@@ -99,6 +103,8 @@ final class AnimeService: ObservableObject {
         guard source == .anime else { return }
         homeRequestID = UUID()
         homeCache[.anime] = nil
+        await homeStore.invalidate()
+        guard source == .anime else { return }
         homeSections = []
         for (_, task) in htmlRequests.values { task.cancel() }
         htmlRequests.removeAll(); htmlCache.removeAll(); detailCache.removeAll()
@@ -123,7 +129,9 @@ final class AnimeService: ObservableObject {
         try await provider(episode.source).resolve(episode, refresh: refresh)
     }
 
-    init() {
+    init(session suppliedSession: URLSession? = nil, resolver: DomainResolver = .shared, homeStore: AnimeHomeStore = .shared) {
+        self.resolver = resolver
+        self.homeStore = homeStore
         AnimeSiteConfiguration.migrateMisplacedURL()
         if let custom = AnimeSiteConfiguration.selectedURL() { baseURL = custom }
         let configuration = URLSessionConfiguration.default
@@ -137,7 +145,7 @@ final class AnimeService: ObservableObject {
             "Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         ]
-        session = URLSession(configuration: configuration)
+        session = suppliedSession ?? URLSession(configuration: configuration)
     }
 
     func loadHome(forceDomainRefresh: Bool = false) async {
@@ -204,23 +212,83 @@ final class AnimeService: ObservableObject {
             return
         }
 
-        let resolved = await resolver.resolve(force: forceDomainRefresh)
-        guard homeRequestID == generation else { return }
+        let start = Date()
+        let configuration = AnimeSiteConfiguration.selectedURL()
+        if !forceDomainRefresh, homeSections.isEmpty,
+           let snapshot = await homeStore.load(configuration: configuration) {
+            guard homeRequestID == generation, !Task.isCancelled else { return }
+            homeSections = snapshot.sections
+            baseURL = snapshot.baseURL
+            homeLoading = false
+            status = ""
+            homeCache[.anime] = HomeSnapshot(sections: snapshot.sections, categories: [], baseURL: snapshot.baseURL,
+                                             date: snapshot.date, notice: "", complete: false)
+            #if DEBUG
+            print("[AnimeHome] first_content_ms=\(Int(Date().timeIntervalSince(start) * 1000)) disk_cache=true items=\(snapshot.sections.reduce(0) { $0 + $1.items.count })")
+            #endif
+        }
+        guard homeRequestID == generation, !Task.isCancelled else { return }
+        let resolved = forceDomainRefresh ? await resolver.resolve(force: true) : await resolver.homeCandidate()
+        guard homeRequestID == generation, !Task.isCancelled else { return }
         baseURL = resolved
         do {
-            let html = try await fetchHTML(url: baseURL)
+            let result: (sections: [AnimeSection], url: URL)
+            do {
+                result = try await fetchAnimeHome(at: resolved)
+            } catch {
+                try Task.checkCancellation()
+                // An obsolete host can answer 404/410 or an empty landing page.
+                // Keep manual choices and the interactive verification flow intact.
+                let needsDiscovery: Bool
+                switch error {
+                case AnimeServiceError.emptyData: needsDiscovery = true
+                case AnimeServiceError.http(let code): needsDiscovery = [404, 410].contains(code)
+                default: needsDiscovery = false
+                }
+                guard !forceDomainRefresh, configuration == nil, needsDiscovery else { throw error }
+                let discovered = await resolver.resolve(force: true)
+                try Task.checkCancellation()
+                guard homeRequestID == generation else { return }
+                result = try await fetchAnimeHome(at: discovered)
+            }
+            try Task.checkCancellation()
             guard homeRequestID == generation else { return }
-            let parsed = HTMLParser.sections(from: html, baseURL: baseURL)
-
-            guard !parsed.isEmpty else { throw AnimeServiceError.emptyData }
-            homeSections = parsed
+            baseURL = result.url
+            homeSections = result.sections
+            homeLoading = false
             imageGeneration += 1
             status = ""
+            _ = await resolver.acceptHomeURL(result.url, sections: result.sections)
+            guard homeRequestID == generation, !Task.isCancelled else { return }
             saveHome(selectedSource)
+            await homeStore.save(sections: result.sections, baseURL: result.url, configuration: configuration)
+            #if DEBUG
+            print("[AnimeHome] network_content_ms=\(Int(Date().timeIntervalSince(start) * 1000)) items=\(result.sections.reduce(0) { $0 + $1.items.count })")
+            #endif
         } catch {
             guard homeRequestID == generation else { return }
             register(error)
         }
+    }
+
+    private func fetchAnimeHome(at url: URL) async throws -> (sections: [AnimeSection], url: URL) {
+        let html = try await fetchHTML(url: url)
+        try Task.checkCancellation()
+        let responseURL = htmlCache[url]?.2 ?? url
+        let pageBase = URL(string: "/", relativeTo: responseURL)?.absoluteURL ?? url
+        guard AnimeSiteConfiguration.allows(pageBase, baseURL: url) else { throw AnimeServiceError.invalidResponse }
+        if let selected = AnimeSiteConfiguration.selectedURL(),
+           selected.scheme != pageBase.scheme || selected.host != pageBase.host || selected.port != pageBase.port {
+            throw AnimeServiceError.invalidResponse
+        }
+        let parse = Task.detached(priority: .userInitiated) { HTMLParser.sections(from: html, baseURL: pageBase) }
+        let sections = try await withTaskCancellationHandler(operation: {
+            let result = await parse.value
+            try Task.checkCancellation()
+            return result
+        }, onCancel: { parse.cancel() })
+        guard !sections.isEmpty else { throw AnimeServiceError.emptyData }
+        return (sections, pageBase)
     }
 
     func list(path: String, page: Int = 1) async throws -> [Anime] {
@@ -417,7 +485,7 @@ final class AnimeService: ObservableObject {
     }
 
     func cachedHTML(for url: URL) -> String? {
-        guard let (date, html) = htmlCache[url], Date().timeIntervalSince(date) < 120 else { return nil }
+        guard let (date, html, _) = htmlCache[url], Date().timeIntervalSince(date) < 120 else { return nil }
         return html
     }
 
@@ -459,7 +527,10 @@ final class AnimeService: ObservableObject {
                 let resolved = await resolver.resolve(force: true)
                 try Task.checkCancellation()
                 if source == .anime { baseURL = resolved }
-                return try await fetchHTMLOnce(url: HTMLParser.rebasedAnimeURL(url, baseURL: resolved))
+                let rebased = HTMLParser.rebasedAnimeURL(url, baseURL: resolved)
+                let html = try await fetchHTMLOnce(url: rebased)
+                cacheHTML(html, for: url, responseURL: htmlCache[rebased]?.2 ?? rebased)
+                return html
             }
             if case AnimeServiceError.http(let code) = error, (500...599).contains(code) {
                 try await Task.sleep(nanoseconds: 400_000_000)
@@ -471,7 +542,7 @@ final class AnimeService: ObservableObject {
 
     private func fetchHTMLOnce(url: URL) async throws -> String {
         try Task.checkCancellation()
-        if let (date, html) = htmlCache[url], Date().timeIntervalSince(date) < 120 { return html }
+        if let (date, html, _) = htmlCache[url], Date().timeIntervalSince(date) < 120 { return html }
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 15)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         var origin = URLComponents(url: url, resolvingAgainstBaseURL: true)
@@ -494,7 +565,7 @@ final class AnimeService: ObservableObject {
             if let accepted = await resolver.acceptResolvedURL(browserURL, html: browserHTML), source == .anime { baseURL = accepted }
             if source == .anime { imageGeneration += 1 }
             try Task.checkCancellation()
-            cacheHTML(browserHTML, for: url)
+            cacheHTML(browserHTML, for: url, responseURL: browserURL)
             return browserHTML
         }
         guard (200..<400).contains(http.statusCode) else { throw AnimeServiceError.http(http.statusCode) }
@@ -503,13 +574,13 @@ final class AnimeService: ObservableObject {
         if let accepted = await resolver.acceptResolvedURL(responseURL, html: html), source == .anime, accepted.host != baseURL.host {
             baseURL = accepted
         }
-        cacheHTML(html, for: url)
+        cacheHTML(html, for: url, responseURL: responseURL)
         return html
     }
 
-    private func cacheHTML(_ html: String, for url: URL) {
+    private func cacheHTML(_ html: String, for url: URL, responseURL: URL? = nil) {
         if htmlCache.count >= 60 { htmlCache.removeAll() }
-        htmlCache[url] = (Date(), html)
+        htmlCache[url] = (Date(), html, responseURL ?? url)
     }
 
     private func makeURL(_ path: String) throws -> URL {
