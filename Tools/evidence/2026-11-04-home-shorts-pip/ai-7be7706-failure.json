@@ -1,0 +1,71 @@
+{
+  "runID": 41866403728,
+  "jobID": 126701596599,
+  "applicationCommit": "7be77069a4041df0ab8eba63bab87a2115a65561",
+  "artifactID": 13345420276,
+  "artifactSHA256": "1ee66c8251e23c3e069e28ef7ba966f6c115391454bf96173c592a7f68041a14",
+  "downloadedArtifactSHA256Verified": true,
+  "fixtureResults": {
+    "passed": 4,
+    "skipped": 1,
+    "failed": 2
+  },
+  "liveResults": {
+    "passed": 1,
+    "failed": 1
+  },
+  "verifiedReleasePublished": false,
+  "failures": [
+    {
+      "test": "testShortFeedSustainedPlaybackThroughPiPArmingAndSwipes",
+      "failure": "Second recommendation diagnostic pause button was not hittable; first recommendation sustained check completed.",
+      "failureState": {
+        "selectedEpisodeID": "7000000000000000203",
+        "currentTime": 7,
+        "playing": true,
+        "manuallyPaused": false,
+        "ownedPlayers": 1,
+        "nativeVideoOutput": "gpu-next",
+        "piPActive": false,
+        "piPPending": false,
+        "inlinePiPCommands": 0
+      }
+    },
+    {
+      "test": "testShortFeedSwipeFullscreenAndFullPlaylist",
+      "failure": "Shared fixture resolve_started count was 2 rather than 1 after preceding sustained test; it counted prior test events."
+    },
+    {
+      "test": "testLivePineDramaPlaylistAndVideo",
+      "failure": "First selected episode did not complete the unchanged 25-second decode/advancement check.",
+      "failureState": {
+        "selectedEpisodeID": "7694507884486413589",
+        "currentTime": 0,
+        "resolving": true,
+        "ownedPlayers": 0
+      },
+      "laterTeardownState": {
+        "selectedEpisodeID": "7694507884486413589",
+        "currentTime": 3.1666666666666665,
+        "resolving": false,
+        "playing": true,
+        "ownedPlayers": 1,
+        "videoWidth": 540,
+        "videoHeight": 960,
+        "nativeVideoOutput": "gpu-next"
+      },
+      "status": "Test failed despite later decoded playback; no first/second/final success claimed."
+    }
+  ],
+  "correctionsForNextRun": [
+    "Move DEBUG controls away from the library header and retain fullscreen telemetry.",
+    "Scope all prefetch statistics to the current test by monotonic event time.",
+    "Record start/end media samples and clean up explicit pause state.",
+    "Use exact Button telemetry queries.",
+    "Create the unrelated anime verification browser lazily; live playback bounds and selected-title policy unchanged."
+  ],
+  "limits": [
+    "Software PiP output is distinct from a physical iPhone automatic system PiP window.",
+    "Fixture results and optional workflow step success do not verify blocked AnimeVietsub/Free1 live playback."
+  ]
+}

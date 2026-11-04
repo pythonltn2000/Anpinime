@@ -293,6 +293,11 @@ final class AIDramaUITests: XCTestCase {
     func testShortFeedSwipeFullscreenAndFullPlaylist() throws {
         try assertAITabs()
         XCTAssertFalse(app.buttons["Làm mới Phim AI"].exists)
+        let secondID = String(Int64(7_000_000_000_000_000_100) + 100 + 3)
+        let initialEvents = try fixtureJSON("/__smoke__/stats")["events"] as? [[String: Any]] ?? []
+        // The loopback fixture is shared by all cases and retains a bounded
+        // deque. Its monotonic event time scopes this test even if old rows trim.
+        let initialEventTime = initialEvents.compactMap { $0["elapsed"] as? Double }.max() ?? -1
         app.tabBars.buttons["Phim ngắn"].tap()
         try waitFor("Native short feed decodes its landscape recommendation", timeout: 25) {
             guard let state = self.playerState() else { return false }
@@ -301,16 +306,17 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["aidrama.shorts.title"].label, "Short Feed Fixture 1")
         assertNoSocialControls()
         capture("short-feed-landscape-in-portrait")
-        let secondID = String(Int64(7_000_000_000_000_000_100) + 100 + 3)
         try waitFor("The next recommendation resolves and fetches media before a swipe", timeout: 15) {
             guard let stats = try? self.fixtureJSON("/__smoke__/stats"), let events = stats["events"] as? [[String: Any]] else { return false }
-            return events.contains { $0["event"] as? String == "resolve_finished" && $0["episodeID"] as? String == secondID }
-                && events.contains { $0["event"] as? String == "media" && $0["episode"] as? Int == 3 }
+            let current = events.filter { ($0["elapsed"] as? Double ?? -1) > initialEventTime }
+            return current.contains { $0["event"] as? String == "resolve_finished" && $0["episodeID"] as? String == secondID }
+                && current.contains { $0["event"] as? String == "media" && $0["episode"] as? Int == 3 }
         }
         try waitFor("Five following movies have actually downloaded", timeout: 25) {
             guard let stats = try? self.fixtureJSON("/__smoke__/stats"), let events = stats["events"] as? [[String: Any]] else { return false }
             let expected = Set([203, 340, 401, 503, 601].map { String(Int64(7_000_000_000_000_000_000) + Int64($0)) })
-            let complete = Set(events.filter { $0["event"] as? String == "media_complete" && $0["complete"] as? Bool == true }.compactMap { $0["episodeID"] as? String })
+            let current = events.filter { ($0["elapsed"] as? Double ?? -1) > initialEventTime }
+            let complete = Set(current.filter { $0["event"] as? String == "media_complete" && $0["complete"] as? Bool == true }.compactMap { $0["episodeID"] as? String })
             return expected.isSubset(of: complete)
         }
         let before = try requirePlayerState().currentTime
@@ -344,11 +350,12 @@ final class AIDramaUITests: XCTestCase {
         XCTAssertLessThan(promotionLatency, 5, "Prepared video starts within five seconds of the committed page, excluding XCTest gesture/AX overhead")
         XCTAssertFalse(app.buttons["aidrama.shorts.fullscreen"].exists, "Portrait videos stay portrait")
         let warmedStats = try fixtureJSON("/__smoke__/stats")
-        let warmedEvents = warmedStats["events"] as? [[String: Any]] ?? []
-        XCTAssertEqual(warmedEvents.filter { $0["event"] as? String == "resolve_started" && $0["episodeID"] as? String == secondID }.count, 1)
+        let warmedEvents = (warmedStats["events"] as? [[String: Any]] ?? []).filter { ($0["elapsed"] as? Double ?? -1) > initialEventTime }
+        XCTAssertEqual(warmedEvents.filter { $0["event"] as? String == "resolve_started" && $0["episodeID"] as? String == secondID }.count,
+                       1, "This test resolves the prepared recommendation exactly once")
         try waitFor("Near the feed end loads the next native page") {
             guard let stats = try? self.fixtureJSON("/__smoke__/stats"), let events = stats["events"] as? [[String: Any]] else { return false }
-            return events.contains { $0["event"] as? String == "short_feed" && $0["page"] as? Int == 2 }
+            return events.contains { ($0["elapsed"] as? Double ?? -1) > initialEventTime && $0["event"] as? String == "short_feed" && $0["page"] as? Int == 2 }
         }
         let nextMovieID = String(Int64(7_000_000_000_000_000_000) + 340)
         dragToNextEpisode()
@@ -400,13 +407,15 @@ final class AIDramaUITests: XCTestCase {
         pause.tap()
         try waitFor("Manual short-video pause is committed") { self.playerState()?.manuallyPaused == true }
         let ignoredPlay = app.buttons["aidrama.debug.inlinePiPPlay"]
-        XCTAssertTrue(ignoredPlay.isHittable)
+        try waitFor("The inline PiP play diagnostic is unobscured") { ignoredPlay.isHittable }
         let injectionsBefore = try requirePlayerState().inlinePiPCommands ?? 0
         ignoredPlay.tap()
         XCTAssertEqual(try requirePlayerState().inlinePiPCommands, injectionsBefore + 1,
                        "The production PiP command handler was exercised while inline and paused")
         try assertPausedTimeStable(duration: 2)
         capture("short-feed-sustained-forward-reverse-and-inline-pip-intent")
+        pause.tap()
+        try waitForShortPlaying(id: secondID)
         app.tabBars.buttons["Trang chủ"].tap()
     }
 
@@ -931,12 +940,13 @@ final class AIDramaUITests: XCTestCase {
         // when AVKit cannot create a controller on this simulator. Preparing PiP
         // must preserve both user intent and foreground GPU output.
         let injection = app.buttons["aidrama.debug.inlinePiPPause"]
-        XCTAssertTrue(injection.isHittable)
+        try waitFor("The inline PiP pause diagnostic is unobscured") { injection.isHittable }
         let injectionsBefore = try requirePlayerState().inlinePiPCommands ?? 0
         injection.tap()
         let before = try requirePlayerState()
         XCTAssertEqual(before.inlinePiPCommands, injectionsBefore + 1,
                        "The production PiP command handler was exercised while merely armed")
+        attachShortPlaybackSample(before, phase: "start")
         let deadline = Date().addingTimeInterval(5.5)
         var unexpectedPauseOrSelection = false
         try waitFor("The short keeps playing beyond the first second without play/pause taps", timeout: 13) {
@@ -952,6 +962,24 @@ final class AIDramaUITests: XCTestCase {
                        "Inline PiP preparation changed pause intent, decoder ownership or foreground GPU output")
         XCTAssertEqual(try requirePlayerState().controllerIdentity, before.controllerIdentity,
                        "Preparing an inline PiP source retains the visible decoder")
+        attachShortPlaybackSample(try requirePlayerState(), phase: "end")
+    }
+
+    private func attachShortPlaybackSample(_ state: PlayerState, phase: String) {
+        let fields: [String: Any] = [
+            "selectedEpisodeID": state.selectedEpisodeID ?? "", "phase": phase,
+            "currentTime": state.currentTime, "manuallyPaused": state.manuallyPaused,
+            "playing": state.playing == true, "ownedPlayers": state.ownedPlayers,
+            "nativeVideoOutput": state.nativeVideoOutput ?? "",
+            "piPActive": state.piPActive == true, "piPPending": state.piPPending == true,
+            "inlinePiPCommands": state.inlinePiPCommands ?? 0
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return }
+        let sample = XCTAttachment(string: text)
+        sample.name = "short-feed-inline-pip-\(phase)-\(state.selectedEpisodeID ?? "unknown")"
+        sample.lifetime = .keepAlways
+        add(sample)
     }
 
     private func assertPausedTimeStable(duration: TimeInterval) throws {
@@ -967,7 +995,7 @@ final class AIDramaUITests: XCTestCase {
     }
 
     private func playerState() -> PlayerState? {
-        let element = app.descendants(matching: .any).matching(identifier: "aidrama.debug.state").firstMatch
+        let element = app.buttons["aidrama.debug.state"]
         guard element.exists else { return nil }
         let raw = element.value as? String ?? element.label
         guard let data = raw.data(using: .utf8) else { return nil }
@@ -1076,7 +1104,7 @@ final class AIDramaUITests: XCTestCase {
     }
 
     private func attachTelemetry(name: String = "ai-drama-player-state") {
-        let element = app.descendants(matching: .any).matching(identifier: "aidrama.debug.state").firstMatch
+        let element = app.buttons["aidrama.debug.state"]
         let state = element.exists ? (element.value as? String ?? element.label) : "Player is not presented"
         let attachment = XCTAttachment(string: state)
         attachment.name = name

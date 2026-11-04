@@ -422,7 +422,7 @@ struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
             session.$controller.receive(on: RunLoop.main).sink { [weak self] _ in self?.mountIfVisible() }.store(in: &observations)
             #if DEBUG
             if AIDramaDebugSupport.enabled {
-                let host = UIHostingController(rootView: AIDramaDebugStateView(session: session))
+                let host = UIHostingController(rootView: AIDramaDebugStateView(session: session, topInset: 0))
                 debugHost = host; addChild(host); host.view.backgroundColor = .clear
                 view.addSubview(host.view); host.didMove(toParent: self)
             }
@@ -463,7 +463,7 @@ struct AIDramaShortsFullscreenPresenter: UIViewControllerRepresentable {
             exit.frame = CGRect(x: view.safeAreaInsets.left + 12, y: 8, width: 48, height: 48)
             pause.frame = CGRect(x: view.bounds.width - view.safeAreaInsets.right - 60, y: 8, width: 48, height: 48)
             #if DEBUG
-            debugHost?.view.frame = CGRect(x: view.safeAreaInsets.left, y: max(0, view.bounds.height - 120), width: 48, height: 120)
+            debugHost?.view.frame = CGRect(x: view.safeAreaInsets.left, y: max(0, view.bounds.height - 64), width: 248, height: 60)
             #endif
         }
         func unmount() {

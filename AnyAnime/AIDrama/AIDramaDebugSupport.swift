@@ -48,10 +48,11 @@ struct AIDramaDebugOwnerView: View {
 @MainActor
 struct AIDramaDebugStateView: View {
     @ObservedObject var session: AIDramaPlaybackSession
+    var topInset: CGFloat = 160
     var body: some View {
         Group {
             if let playback = session.playback {
-                AIDramaDebugPlaybackState(session: session, playback: playback)
+                AIDramaDebugPlaybackState(session: session, playback: playback, topInset: topInset)
             } else {
                 snapshot(time: 0, info: "")
             }
@@ -92,21 +93,21 @@ struct AIDramaDebugStateView: View {
             Button("I") {
                 NotificationCenter.default.post(name: UIApplication.willResignActiveNotification, object: nil)
                 session.setSceneActive(false)
-            }.frame(width: 24, height: 20).contentShape(Rectangle())
+            }.frame(width: 44, height: 44).contentShape(Rectangle())
                 .accessibilityIdentifier("aidrama.debug.transientInactive")
             Button("A") {
                 NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
                 session.setSceneActive(true)
-            }.frame(width: 24, height: 20).contentShape(Rectangle())
+            }.frame(width: 44, height: 44).contentShape(Rectangle())
                 .accessibilityIdentifier("aidrama.debug.transientActive")
             Button("P") { session.debugSimulateInlinePiPCommand(playing: false) }
-                .frame(width: 24, height: 20).contentShape(Rectangle())
+                .frame(width: 44, height: 44).contentShape(Rectangle())
                 .accessibilityIdentifier("aidrama.debug.inlinePiPPause")
             Button("R") { session.debugSimulateInlinePiPCommand(playing: true) }
-                .frame(width: 24, height: 20).contentShape(Rectangle())
+                .frame(width: 44, height: 44).contentShape(Rectangle())
                 .accessibilityIdentifier("aidrama.debug.inlinePiPPlay")
         }.font(.system(size: 10)).foregroundColor(.white).buttonStyle(.plain)
-            .padding(.top, 80).padding(.leading, 8)
+            .padding(.top, topInset).padding(.leading, 8)
     }
 }
 
@@ -132,8 +133,9 @@ private struct AIDramaDebugLabel: View {
 private struct AIDramaDebugPlaybackState: View {
     @ObservedObject var session: AIDramaPlaybackSession
     @ObservedObject var playback: PlaybackState
+    let topInset: CGFloat
     var body: some View {
-        AIDramaDebugStateView(session: session).snapshot(time: playback.currentTime, info: playback.mediaInfo)
+        AIDramaDebugStateView(session: session, topInset: topInset).snapshot(time: playback.currentTime, info: playback.mediaInfo)
     }
 }
 #endif

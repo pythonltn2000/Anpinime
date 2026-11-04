@@ -14,7 +14,9 @@ final class AnimeService: ObservableObject {
     @Published private(set) var verificationGeneration = 0
     @Published private(set) var imageGeneration = 0
     @Published private(set) var source: ContentSource = .anime
-    let website = WebsiteSession()
+    // Movie/AI sessions do not need a verification browser. MainActor keeps
+    // the first access and all later verification loads on one stable instance.
+    private(set) lazy var website = WebsiteSession()
 
     @Published private(set) var movieCategories: [AnimeCategory] = []
     var categories: [AnimeCategory] { source.isMovie ? movieCategories : animeCategories }

@@ -1,0 +1,390 @@
+{
+  "runID": 41866403728,
+  "jobID": 126701597287,
+  "applicationCommit": "7be77069a4041df0ab8eba63bab87a2115a65561",
+  "applicationSourceTree": "14fbc6e6c692f63f174a2e7524769a1536e30d83",
+  "artifactID": 13345095039,
+  "artifactSHA256": "94f68e6274cb3a338c973f9a8ca8f695a24127f6bad3cfd7df603c42e6339eb6",
+  "downloadedArtifactSHA256Verified": true,
+  "homeFixture": {
+    "assertionsPassed": 21,
+    "coldContentMilliseconds": 17,
+    "warmContentMilliseconds": 3,
+    "coldRequests": 1,
+    "warmRequests": 1,
+    "timingScope": "Controlled URLProtocol local fixture, not live AnimeVietsub latency."
+  },
+  "protectedBaseline": "a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a",
+  "protectedSources": [
+    {
+      "path": "AnyAnime/MovieProvider.swift",
+      "sha256": "40a9ca83ecb7fdbc9ee8d6871de9963a29c4dfe221000c093f34eea43d7f8d93",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/MovieCatalog.swift",
+      "sha256": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/MovieBrowseCatalog.swift",
+      "sha256": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/FilmMediaRelay.swift",
+      "sha256": "e7f645c93d195a5057b7b05eaa38bdea96fac5867e317620cdb684ce1f3bbbaa",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/FilmMediaTransform.swift",
+      "sha256": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/HTMLParser.swift",
+      "sha256": "d8d4a7512bb0737b4954b53f58a2768728c146580786ee7baa952bd2da18a6bb",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "AnyAnime/Phim4KCatalog.swift",
+      "sha256": "8fa7b95cdcbbab2fe9b67d78494dacf0369977100af936fcc5321446128c0178",
+      "identicalToBaseline": true
+    }
+  ],
+  "observations": {
+    "anime-native-fallback/playback-anime-native-fallback-diagnostics.json": {
+      "eventCount": 7,
+      "failureEvents": [
+        {
+          "elapsedSeconds": 0,
+          "event": "failure",
+          "message": "Không mở được luồng video: loading failed"
+        }
+      ],
+      "http404Events": 0,
+      "successFileExists": true
+    },
+    "anime-native-fallback/playback-anime-native-fallback.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 1,
+      "backend": "web",
+      "episodeCount": 1,
+      "height": 402,
+      "landscape": true,
+      "loadingClearedVerified": true,
+      "mediaInfo": "0 × 0",
+      "nativeFailureRecoveryVerified": true,
+      "qualityChoices": 1,
+      "sameWebsiteRestoredVerified": true,
+      "sample": "Decoded WebKit blob → native HTTP 403 → same WebKit video resumes",
+      "selectedEpisodeNumber": 1,
+      "subtitleChoices": 1,
+      "time": 7.952310395666625,
+      "videoHeight": 180,
+      "videoWidth": 320,
+      "width": 874
+    },
+    "playback-anime-live-diagnostics.json": {
+      "eventCount": 1,
+      "failureEvents": [
+        {
+          "elapsedSeconds": 0,
+          "event": "failure",
+          "stage": "anime-episodes",
+          "message": "Website yêu cầu xác minh trình duyệt."
+        }
+      ],
+      "http404Events": 0,
+      "successFileExists": false
+    },
+    "playback-anime-provider-diagnostics.json": {
+      "eventCount": 19,
+      "failureEvents": [],
+      "http404Events": 0,
+      "successFileExists": true
+    },
+    "playback-anime-provider.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 1,
+      "backend": "mpv",
+      "cancelledEpisodeLoadVerified": true,
+      "episodeCount": 2,
+      "height": 402,
+      "landscape": true,
+      "mediaInfo": "mov,mp4,m4a,3gp,3g2,mj2 · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 320 × 180 · AAC (Advanced Audio Coding)",
+      "qualityChoices": 1,
+      "sample": "Local anime metadata → dynamic episodes → player",
+      "selectedEpisodeNumber": 1,
+      "subtitleChoices": 1,
+      "time": 4.416666666666666,
+      "videoHeight": 180,
+      "videoWidth": 320,
+      "width": 874
+    },
+    "playback-mpv-diagnostics.json": {
+      "eventCount": 20,
+      "failureEvents": [],
+      "http404Events": 0,
+      "successFileExists": true
+    },
+    "playback-mpv.json": {
+      "audioChoices": 2,
+      "autoplayVerified": true,
+      "backend": "mpv",
+      "height": 402,
+      "landscape": true,
+      "mkvAudioAndDualSubtitlesVerified": true,
+      "pipSeekPauseRestoreVerified": true,
+      "pipSoftwareVisibleFrames": 8,
+      "pipSystemWindowOnDeviceVerified": false,
+      "qualityChoices": 1,
+      "subtitleChoices": 3,
+      "time": 14.708,
+      "width": 874
+    },
+    "playback-phim4k-gateway-diagnostics.json": {
+      "eventCount": 17,
+      "failureEvents": [],
+      "http404Events": 0,
+      "successFileExists": true
+    },
+    "playback-phim4k-gateway.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 2,
+      "backend": "mpv",
+      "coreMetadataReplayed": true,
+      "fileLoadedElapsedSeconds": 3.7282329999998183,
+      "firstDecodedVideoElapsedSeconds": 3.869030124999881,
+      "height": 402,
+      "landscape": true,
+      "liveGateway": true,
+      "mediaInfo": "mkv · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 1920 × 1080 · ATSC A/52A (AC-3)",
+      "metadataServerCount": 5,
+      "qualityChoices": 1,
+      "replayedCoreServerIDs": [
+        "31937",
+        "33090",
+        "27463",
+        "31938",
+        "31939"
+      ],
+      "sample": "Replayed Core metadata / Wakanda 10403 / server 31937 / live gateway and media",
+      "selectedServerID": "31937",
+      "startupTimingResolutionSeconds": 0.25,
+      "subtitleChoices": 3,
+      "time": 16.224999999999998,
+      "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+      "videoHeight": 1080,
+      "videoWidth": 1920,
+      "width": 874
+    },
+    "playback-phim4k-hls-diagnostics.json": {
+      "eventCount": 14,
+      "failureEvents": [],
+      "http404Events": 0,
+      "successFileExists": true
+    },
+    "playback-phim4k-hls.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 1,
+      "backend": "mpv",
+      "fileLoadedElapsedSeconds": 1.9086224583332978,
+      "firstDecodedVideoElapsedSeconds": 1.9086224583332978,
+      "height": 402,
+      "landscape": true,
+      "mediaInfo": "hls · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 640 × 360 · AAC (Advanced Audio Coding)",
+      "qualityChoices": 1,
+      "sample": "Local source-2 HLS through relay",
+      "startupTimingResolutionSeconds": 0.25,
+      "subtitleChoices": 1,
+      "time": 6.106,
+      "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+      "videoHeight": 360,
+      "videoWidth": 640,
+      "width": 874
+    },
+    "playback-phim4k-live-diagnostics.json": {
+      "eventCount": 120,
+      "failureEvents": [
+        {
+          "elapsedSeconds": 39.758314833333316,
+          "event": "failure",
+          "message": "Máy chủ chưa trả dữ liệu video. Hãy thử lại hoặc chọn máy chủ khác."
+        }
+      ],
+      "http404Events": 22,
+      "successFileExists": false
+    },
+    "playback-phim4k-vip-diagnostics.json": {
+      "eventCount": 15,
+      "failureEvents": [],
+      "http404Events": 0,
+      "successFileExists": true
+    },
+    "playback-phim4k-vip-spiderman-34793-diagnostics.json": {
+      "eventCount": 14,
+      "failureEvents": [],
+      "http404Events": 0,
+      "successFileExists": true
+    },
+    "playback-phim4k-vip-spiderman-34793.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 1,
+      "backend": "mpv",
+      "coreMetadataReplayed": false,
+      "fileLoadedElapsedSeconds": 7.112510208333333,
+      "firstDecodedVideoElapsedSeconds": 7.112510208333333,
+      "fullCoreLive": true,
+      "height": 402,
+      "landscape": true,
+      "mediaInfo": "mkv · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 1920 × 800 · ATSC A/52B (AC-3, E-AC-3)",
+      "qualityChoices": 1,
+      "sample": "Core movie 17997 / server 34793",
+      "selectedCoreMovieID": "17997",
+      "selectedServerID": "34793",
+      "startupTimingResolutionSeconds": 0.25,
+      "subtitleChoices": 40,
+      "time": 22.773,
+      "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+      "videoHeight": 800,
+      "videoWidth": 1920,
+      "width": 874
+    },
+    "playback-phim4k-vip-spiderman-34794-diagnostics.json": {
+      "eventCount": 15,
+      "failureEvents": [],
+      "http404Events": 0,
+      "successFileExists": true
+    },
+    "playback-phim4k-vip-spiderman-34794.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 1,
+      "backend": "mpv",
+      "coreMetadataReplayed": false,
+      "fileLoadedElapsedSeconds": 8.293763791666606,
+      "firstDecodedVideoElapsedSeconds": 11.474886083333331,
+      "fullCoreLive": true,
+      "height": 402,
+      "landscape": true,
+      "mediaInfo": "mkv · H.265 / HEVC (High Efficiency Video Coding) · 3832 × 1600 · ATSC A/52B (AC-3, E-AC-3)",
+      "qualityChoices": 1,
+      "sample": "Core movie 17997 / server 34794",
+      "selectedCoreMovieID": "17997",
+      "selectedServerID": "34794",
+      "startupTimingResolutionSeconds": 0.25,
+      "subtitleChoices": 39,
+      "time": 23.814999999999998,
+      "videoCodec": "H.265 / HEVC (High Efficiency Video Coding)",
+      "videoHeight": 1600,
+      "videoWidth": 3832,
+      "width": 874
+    },
+    "playback-phim4k-vip.json": {
+      "advancingVideoVerified": true,
+      "audioChoices": 2,
+      "backend": "mpv",
+      "coreMetadataReplayed": false,
+      "fileLoadedElapsedSeconds": 10.42213566666669,
+      "firstDecodedVideoElapsedSeconds": 10.676171041666521,
+      "fullCoreLive": true,
+      "height": 402,
+      "landscape": true,
+      "mediaInfo": "mkv · H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 · 1920 × 1080 · ATSC A/52A (AC-3)",
+      "qualityChoices": 1,
+      "sample": "Core movie 10403 / server 31937",
+      "selectedCoreMovieID": "10403",
+      "selectedServerID": "31937",
+      "startupTimingResolutionSeconds": 0.25,
+      "subtitleChoices": 3,
+      "time": 4.420999999999999,
+      "videoCodec": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+      "videoHeight": 1080,
+      "videoWidth": 1920,
+      "width": 874
+    },
+    "automatic-pip-events.json": [
+      {
+        "active": false,
+        "applicationState": 0,
+        "automatic": true,
+        "event": "outputPrimed",
+        "paused": false,
+        "pending": true,
+        "possible": false,
+        "time": 2.2079999999999997,
+        "videoOutput": "gpu-next"
+      },
+      {
+        "active": false,
+        "applicationState": 0,
+        "automatic": true,
+        "event": "outputActivated",
+        "paused": false,
+        "pending": true,
+        "possible": false,
+        "time": 2.2079999999999997,
+        "videoOutput": "libmpv"
+      },
+      {
+        "active": false,
+        "applicationState": 0,
+        "automatic": true,
+        "event": "armedWithDecodedFrame",
+        "paused": false,
+        "pending": true,
+        "possible": false,
+        "time": 2.2079999999999997,
+        "videoOutput": "libmpv"
+      }
+    ],
+    "anime-native-fallback/server-stats.json": {
+      "service": "anpinime-native-fallback",
+      "nativeRejectedRequests": 1,
+      "validWebMediaRequests": 1,
+      "nestedAdFrameRequests": 1,
+      "embedRequests": 2,
+      "embedRequestsAtFailure": 2
+    },
+    "source2-live-network.json": {
+      "playbackVerified": false,
+      "requests": [
+        {
+          "label": "Free1 sample detail",
+          "status": 200,
+          "contentType": "application/json;charset=UTF-8"
+        },
+        {
+          "label": "Free1 original manifest",
+          "status": 200,
+          "contentType": "application/vnd.apple.mpegurl; charset=utf-8"
+        },
+        {
+          "label": "Free1 segment 0",
+          "status": 404,
+          "contentType": "text/html; charset=utf-8"
+        },
+        {
+          "label": "Free1 segment 1",
+          "status": 404,
+          "contentType": "text/html; charset=utf-8"
+        },
+        {
+          "label": "Core Wakanda detail",
+          "status": 200,
+          "contentType": "application/json; charset=UTF-8"
+        },
+        {
+          "label": "Core virtual URL before gateway exchange (not resolved playback)"
+        }
+      ]
+    }
+  },
+  "limits": [
+    "System PiP window/first-Home automatic activation remains unverified on physical iPhone; software renderer checks are distinct.",
+    "Native automatic-pip events are generated by explicit software fixture; primed while gpu-next but pending is already true and possible=false, not evidence automatic PiP became eligible.",
+    "Anime live is blocked by browser verification; no live success JSON.",
+    "Free1 live segments returned HTTP404 and no playback success JSON; optional step success is not playback proof.",
+    "Source-2 live sample times are bounded observations, not universal startup benchmarks."
+  ]
+}

@@ -11,7 +11,9 @@ protocol ObservableObject: AnyObject {}
     init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
 }
 @MainActor final class WebsiteSession {
+    private(set) static var initializationCount = 0
     var loadCount = 0
+    init() { Self.initializationCount += 1 }
     func load(_ url: URL, waitForEpisodes: Bool = false) async throws -> (String, URL) {
         loadCount += 1
         throw AnimeServiceError.verificationRequired(url)
@@ -93,12 +95,13 @@ final class HomeProtocol: URLProtocol {
         let store = AnimeHomeStore(directory: directory)
         HomeProtocol.reset(html: card("First catalog"))
         let first = AnimeService(session: session, resolver: resolver, homeStore: store)
+        check(WebsiteSession.initializationCount == 0, "Creating an anime/movie service does not create a verification browser")
         let coldStart = Date()
         await first.loadHome()
         let coldMS = Int(Date().timeIntervalSince(coldStart) * 1000)
         check(first.homeSections.first?.items.first?.title == "First catalog", "Cold Home returns parsed cards")
         check(HomeProtocol.captured().map(\.path) == ["/"], "Cold Home makes one catalog request, with zero shortlink or legacy detail probes")
-        check(first.website.loadCount == 0, "An ordinary Home does not instantiate the WebKit verification path")
+        check(WebsiteSession.initializationCount == 0, "An ordinary cold Home never instantiates the WebKit verification path")
         check(defaults.string(forKey: "AnyAnime.VerifiedBaseURL.v2")?.contains("animevietsub.news") == true,
               "Only successful parsed Home becomes a verified domain")
         let snapshot = await store.load(configuration: nil)
@@ -118,10 +121,12 @@ final class HomeProtocol: URLProtocol {
         let warmMS = Int(Date().timeIntervalSince(warmStart) * 1000)
         check(second.homeSections.first?.items.first?.title == "First catalog" && !second.homeLoading,
               "Warm Home is usable while its refresh response remains gated")
+        check(WebsiteSession.initializationCount == 0, "Displaying warm cached cards does not instantiate a verification browser")
         HomeProtocol.release()
         await refresh.value
         check(second.homeSections.first?.items.first?.title == "Fresh catalog", "The real network response replaces the cached cards")
         check(HomeProtocol.captured().count == 1, "Warm refresh also avoids duplicate domain/catalog requests")
+        check(WebsiteSession.initializationCount == 0, "Refreshing ordinary warm Home still does not instantiate a verification browser")
 
         let manual = URL(string: "https://custom.example")!
         check(await store.load(configuration: manual) == nil, "A manual catalog never displays the automatic catalog snapshot")
@@ -152,8 +157,11 @@ final class HomeProtocol: URLProtocol {
         defer { challengeDefaults.removePersistentDomain(forName: defaultsName + ".challenge") }
         let challenge = AnimeService(session: session, resolver: DomainResolver(defaultsSuiteName: defaultsName + ".challenge"), homeStore: challengeStore)
         await challenge.loadHome()
-        check(challenge.homeSections.isEmpty && challenge.website.loadCount == 1,
-              "A challenged Home still uses the existing verification flow")
+        check(challenge.homeSections.isEmpty && WebsiteSession.initializationCount == 1 && challenge.website.loadCount == 1,
+              "A challenged Home lazily creates exactly one browser and uses the existing verification flow")
+        let challengeBrowser = challenge.website
+        check(challenge.website === challengeBrowser && WebsiteSession.initializationCount == 1,
+              "Repeated access preserves the same verification browser instance")
         check(await challengeStore.load(configuration: nil) == nil && challengeDefaults.object(forKey: "AnyAnime.VerifiedBaseURL.v2") == nil,
               "A challenge is never persisted as cards or a verified domain")
         let discoveryName = defaultsName + ".discovery"
@@ -202,6 +210,14 @@ final class HomeProtocol: URLProtocol {
         await manualService.loadHome()
         check(manualService.homeSections.isEmpty && HomeProtocol.captured().allSatisfy { $0.host == manual.host },
               "A selected manual Home cannot silently redirect to the automatic catalog")
+        HomeProtocol.reset(html: "<title>Just a moment...</title><form id='challenge-form'></form>")
+        let manualChallenge = AnimeService(session: session, resolver: DomainResolver(defaultsSuiteName: manualDefaultsName),
+                                            homeStore: AnimeHomeStore(directory: directory.appendingPathComponent("manual-challenge")))
+        let browserCountBeforeManualChallenge = WebsiteSession.initializationCount
+        await manualChallenge.loadHome()
+        check(manualChallenge.homeSections.isEmpty && WebsiteSession.initializationCount == browserCountBeforeManualChallenge + 1 &&
+              manualChallenge.website.loadCount == 1 && HomeProtocol.captured().allSatisfy { $0.host == manual.host },
+              "A manual-source challenge creates its browser on demand without switching catalogs")
         print("ANIME_HOME_FIXTURE cold_content_ms=\(coldMS) warm_content_ms=\(warmMS) cold_requests=1 warm_requests=1; local fixture timings only")
     }
 }

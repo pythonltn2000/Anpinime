@@ -17,6 +17,11 @@ tối đa 24 giờ, tách đúng cấu hình tự động/thủ công; ảnh, HT
 video không được tải trước hàng loạt. Mở lại app hiện thẻ cũ ngay trong lúc
 request mới còn đang chờ, rồi thay bằng kết quả mới.
 
+Browser xác minh được khởi tạo lazy và giữ một instance trên main actor. Mở
+Movie/AI không còn khởi tạo WKWebView của anime khi chưa có nhu cầu. Đây là
+giảm tài nguyên khởi động thực; chưa coi nó là bằng chứng nguyên nhân duy nhất
+của việc tải AI live chậm.
+
 Phim ngắn có một đường gây dừng gần giây đầu: callback PiP khi controller mới
 được chuẩn bị ghi vào `userPaused`, rồi session lưu thành `manuallyPaused`.
 Lệnh Play/Pause/Seek từ PiP giờ chỉ hợp lệ khi đúng controller và cửa sổ đang
@@ -62,10 +67,12 @@ cũng do người dùng quản lý, theo
 
 ## Kiểm chứng
 
-- Local: 21 kiểm tra Home đạt, gồm một request catalog ở cold start, thẻ cache
+- Local: 26 kiểm tra Home đạt, gồm một request catalog ở cold start, thẻ cache
   hiện trước phản hồi refresh đang bị giữ lại, đổi host lỗi DNS, cache hết hạn,
   URL thủ công, challenge và redirect sai nguồn. Mẫu local cold 6 ms / warm
   1 ms chỉ là timing fixture; không phải số đo tốc độ website live trên iPhone.
+  Kiểm tra thêm xác nhận không tạo browser khi chỉ tải Home và giữ cùng browser
+  khi cần xác minh thật.
 - Bảy nhóm JavaScript player đạt; Swift parse, shell syntax và diff check đạt.
 - Thêm XCTest bắt buộc cho phim ngắn: phát qua ít nhất 5,5 giây / tiến hơn 4,5
   giây sau mỗi lần lướt đầu → tiếp → tiếp → ngược; giữ prefetch, đúng một player,
@@ -78,3 +85,25 @@ cũng do người dùng quản lý, theo
   được ghi SKIP, không chuyển thành PASS.
 
 Không có khẳng định phát live anime hoặc PiP máy thật từ các kiểm tra local này.
+
+## Lần CI đầu: chưa đạt đầy đủ
+
+[Run 41866403728](https://github.com/letunam2k/anpinime/actions/runs/41866403728),
+source `7be77069`, đạt toàn bộ job native: Home 21 kiểm tra, MKV/audio/phụ đề,
+8 frame PiP software, HLS relay, tập anime động và phục hồi cùng WebKit. Anime
+live vẫn bị xác minh; Free1 vẫn có segment 404. Không tính các bước optional
+màu xanh là phát live thành công.
+
+Job AI có 4 fixture PASS, 1 SKIP, 2 FAIL; live 1 PASS/1 FAIL, nên cổng phát hành
+IPA đã chặn đúng. Phim ngắn ở lỗi nút kiểm thử vẫn phát ở giây 7, một owner và
+`gpu-next`; nút DEBUG bị che khi chuyển sang phim kế. Bài prefetch dùng nhầm
+bộ đếm của bài trước. Đã sửa vùng bấm DEBUG và tách toàn bộ thống kê theo từng
+testcase, thêm mẫu thời gian trước/sau từng phim và dọn trạng thái pause.
+
+AI live tập đầu có state resolving ở deadline rồi giải mã HEVC 540×960 ở giây
+3,167 lúc teardown. Đây vẫn là FAIL; không nới giới hạn 25 giây, không đổi phim
+và không gọi đó là kiểm tra trọn bộ đạt. Cùng với browser lazy, truy vấn telemetry
+dùng đúng Button theo ID để giảm công việc AX thừa. Cần kết quả lần CI tiếp.
+
+Bằng chứng được lược bỏ URL/cookie/token trong
+[Tools/evidence/2026-11-04-home-shorts-pip](Tools/evidence/2026-11-04-home-shorts-pip/).
