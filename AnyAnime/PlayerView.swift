@@ -1087,6 +1087,9 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           }
           window.addEventListener('message',function(event){
             var c=event.data;if(!c||c.type!=='AnPinimeCommand')return;
+            // The player container can be ready before its video is created.
+            // Retain the preference for that later video instead of dropping it.
+            if(c.name==='automaticPiP')automaticPiP=c.value===1;
             var v=activeVideo;
             if(v&&isAdvertisement(v))v=null;
             if(v){
@@ -1094,7 +1097,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                 switch(c.name){
                   case 'pip':requestPiP(v);break;
                   case 'pipStop':stopPiP(v);break;
-                  case 'automaticPiP':automaticPiP=c.value===1;v.autoPictureInPicture=automaticPiP;break;
+                  case 'automaticPiP':v.autoPictureInPicture=automaticPiP;break;
                   case 'track':chooseTrack(v,c.kind,c.id);break;
                   case 'subtitleStyle':styleSubtitles(v,c.style);break;
                   case 'play':v.__aaUserPaused=false;tryPlay(v);break;
@@ -1144,7 +1147,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           function watch(v){
             if(!v||isAdvertisement(v))return false;
             activeVideo=v;
-            if(pipActive(v)){state();return true;}
+            if(pipActive(v)||pipPending(v)){state();return true;}
             var jw=v.closest('.jwplayer');
             if(jw){
               isolate(jw);hidePauseOverlays(jw);
@@ -1169,7 +1172,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           }
           function focus(){
             if(!window.document||!document.documentElement)return false;
-            if(activeVideo&&pipActive(activeVideo)){state();return true;}
+            if(activeVideo&&(pipActive(activeVideo)||pipPending(activeVideo))){state();return true;}
             if(challenge())return false;
             // Read the content playlist before filtering ad-marked video elements.
             // A preroll may use the same element, or the movie video may not exist yet.

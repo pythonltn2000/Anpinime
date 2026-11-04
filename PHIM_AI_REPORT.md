@@ -1,4 +1,29 @@
-# AnPinime 2.9.0 (19) — sửa player và bộ đệm Phim AI
+# AnPinime 2.9.1 (20) — khắc phục hồi quy anime và PiP
+
+Kho hiện tại: `letunam2k/anpinime`, nhánh `feature/ai-drama`,
+[PR #1](https://github.com/letunam2k/anpinime/pull/1). Bản 2.9.0 người dùng đã
+báo lỗi nghiêm trọng; không dùng Candidate của bản đó làm bản đã xác minh.
+
+- Bỏ suy đoán manifest từ thời lượng video blob. Khi thử player native thất bại,
+  quay về đúng video WebKit, vị trí và ý định tạm dừng; không tải lại trang.
+  Iframe quảng cáo không được ghi đè trạng thái phát của video chính.
+- PiP chỉ chuẩn bị khi app tạm mất hoạt động; giữ owner/layer đến khi hệ thống
+  hoàn tất dừng. Phim AI giữ player khi PiP đang bắt đầu hoặc đang phát.
+  WebKit nhớ cài đặt PiP kể cả khi trang chưa tạo video.
+- Sửa vùng bấm của nút danh sách tập AI để toàn bộ nút nhận thao tác.
+
+[Kiểm tra iOS tại b208461](https://github.com/letunam2k/anpinime/actions/runs/41798383187):
+anime fixture, lỗi native HTTP 403 → phục hồi cùng WebKit, hết loading, MKV,
+PiP phần mềm, cache 5/10 video, lướt/toàn màn hình AI và tạm mất hoạt động đều đạt.
+Chưa phát hành IPA đã qua toàn bộ kiểm tra: bảng tập và kiểm tra chuyển thư viện
+AI cần chạy lại với sửa đổi tiếp theo. Anime live còn bị xác minh trình duyệt;
+Free1 trả segment HTTP 404. Chưa xác nhận cửa sổ PiP hệ thống trên iPhone thật.
+
+Chi tiết nguyên nhân và giới hạn: [PLAYER_REGRESSION_REPAIR.md](PLAYER_REGRESSION_REPAIR.md).
+
+---
+
+## Lịch sử bản 2.9.0 (19) — sửa player và bộ đệm Phim AI
 
 **Đã sửa mã, chưa có IPA 2.9 đã kiểm chứng.** Mã ứng dụng:
 [`6c6f548`](https://github.com/thuyan1510/AnPinime/commit/6c6f548f30b26a5432a72ae3a1811fc2afcaebee),

@@ -114,6 +114,7 @@ struct AIDramaPlayerView: View {
                         Text("Tập \(session.selectedEpisode?.number ?? 1)/\(session.playlist.episodes.count)").font(.subheadline.bold())
                         Spacer(minLength: 0); Image(systemName: "chevron.up").font(.caption.bold())
                     }.padding(12).cinemaGlass(cornerRadius: 24, interactive: true)
+                        .contentShape(Rectangle())
                 }.accessibilityIdentifier("aidrama.playlist.open")
                 if let playback = session.playback {
                     AIDramaSpeedControl(playback: playback)

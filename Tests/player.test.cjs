@@ -226,12 +226,41 @@ const pendingPiP = fixture('<video src="blob:movie"></video>', w => {
 pendingPiP.command('pip'); pendingPiP.command('pip');
 assert.equal(pendingPiP.w.requests, 1, 'An asynchronous WebKit PiP request is coalesced');
 assert(pendingPiP.messages.filter(m => m.name === 'mediaState').at(-1).value.pipPending);
+pendingPiP.video.style.width = '40px';
+const originalParent = pendingPiP.video.parentElement;
+pendingPiP.w.__anyanimeFocusPlayer();
+assert.equal(pendingPiP.video.style.width, '40px', 'The page does not resize a video while WebKit PiP is starting');
+assert.equal(pendingPiP.video.parentElement, originalParent, 'The PiP transition keeps the same inline container');
 pendingPiP.w.Date.now = () => 3000;
+pendingPiP.w.__anyanimeFocusPlayer();
+assert.equal(pendingPiP.video.style.width, '100vw', 'Inline layout resumes after a failed PiP request expires');
 pendingPiP.command('pip');
 assert.equal(pendingPiP.w.requests, 2, 'A failed request can be retried after its bounded pending interval');
 pendingPiP.command('pipStop');
 assert(!pendingPiP.messages.filter(m => m.name === 'mediaState').at(-1).value.pipPending);
+pendingPiP.video.style.width = '40px';
+pendingPiP.w.__anyanimeFocusPlayer();
+assert.equal(pendingPiP.video.style.width, '100vw', 'Stopping a pending PiP request restores ordinary inline layout');
 pendingPiP.dom.window.close();
+for (const enabled of [true, false]) {
+  const delayedVideo = fixture('<div id="player"></div>');
+  assert(delayedVideo.messages.some(m => m.name === 'playerReady'), 'The empty container can report readiness before a video exists');
+  delayedVideo.command('automaticPiP', enabled ? 1 : 0);
+  const v = delayedVideo.w.document.createElement('video');
+  v.src = 'blob:late-movie';
+  Object.defineProperties(v, {
+    paused: {get: () => false}, duration: {get: () => 180}, readyState: {get: () => 4},
+    videoWidth: {get: () => 640}, videoHeight: {get: () => 360}
+  });
+  let presentations = 0;
+  v.webkitSupportsPresentationMode = () => true;
+  v.webkitSetPresentationMode = () => { presentations++; };
+  delayedVideo.w.document.querySelector('#player').appendChild(v);
+  delayedVideo.w.__anyanimeFocusPlayer();
+  assert.equal(v.autoPictureInPicture, enabled, 'A video created after readiness inherits the app automatic-PiP preference');
+  assert.equal(presentations, 0, 'Retaining the preference never forces a PiP start');
+  delayedVideo.dom.window.close();
+}
 console.log('PASS: WebKit PiP single ownership, actual commands, preference, pause, pending retry and inline layout');
 (async () => {
   const manifest = '#EXTM3U\n#EXT-X-TARGETDURATION:60\n#EXTINF:60,\na.ts\n#EXTINF:60,\nb.ts\n#EXTINF:60,\nc.ts\n#EXT-X-ENDLIST';

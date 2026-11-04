@@ -51,6 +51,36 @@ of this report. Only the run for the published revision can establish its result
 Fresh anime behind browser verification and real iPhone PiP window behavior must
 remain explicitly unverified until observed.
 
+## iOS evidence at b208461
+
+[Run 41798383187](https://github.com/letunam2k/anpinime/actions/runs/41798383187)
+passed the native build/playback job. The generated anime fixture produced
+advancing decoded video. The native-failure case received an actual HTTP 403,
+restored the same retained WebKit video, advanced to 7.74 seconds and cleared
+loading. Server counters confirm one document load and that the nested ad frame
+was exercised without taking playback ownership. MKV software PiP produced
+11 visible frames and passed pause/seek/GPU restoration.
+
+The AI job passed actual five/ten-file prefetch, shorts/swipe/fullscreen, player
+inactivity and movie artwork/title hit checks. Book episode-drawer taps missed
+the empty center of the glass pill; the label now defines its entire hit shape.
+The library-choice check reached the real Movie library and timed out while
+waiting for its tabs. This check includes live Movie network I/O; the evidence
+does not identify a production navigation bug. It remains a required rerun,
+with its existing assertions and time limit retained.
+The release gate correctly withheld the verified IPA while these checks failed.
+
+Fresh Core MKV decoded exact selected servers: Wakanda 31937, Spider-Man 34793
+and 34794. This does not establish universal startup improvement. Anime live was
+blocked by browser verification before episode playback. Free1's manifest was
+HTTP 200 but its first segments were HTTP 404, with no decoded-playback success.
+Automatic PiP telemetry only shows a prepared frame, not an AVKit didStart;
+unsupported Simulator system PiP was explicitly skipped.
+
+The follow-up also retains WebKit's automatic-PiP preference before a delayed
+video exists. JavaScript tests exercise both enabled and disabled preferences
+and require that configuring either never forces a PiP start.
+
 ## Harness corrections
 
 The delayed episode response is explicitly gated until the next episode request,
