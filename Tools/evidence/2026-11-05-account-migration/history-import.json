@@ -1,0 +1,47 @@
+{
+  "status": "history-restored-one-light-build-queued",
+  "destination": "pythonltn2000/Anpinime",
+  "originalRefsModified": false,
+  "applicationWorkflowDispatched": true,
+  "source": "letunam2k/anpinime",
+  "expectedBranches": [
+    {
+      "ref": "refs/heads/main",
+      "sha": "04c09c4c455517be12eecf0e1d39a604afca3daa"
+    },
+    {
+      "ref": "refs/heads/feature/ai-drama",
+      "sha": "04c09c4c455517be12eecf0e1d39a604afca3daa"
+    },
+    {
+      "ref": "refs/heads/archive/main-before-budget",
+      "sha": "8acf5c0c9c316a16ac0e406ead1f4dcde1a3c2da"
+    },
+    {
+      "ref": "refs/heads/feature/pinedrama-web-studio",
+      "sha": "3c92a58c757abe365cdbc39a8d33ec574ce78fd2"
+    },
+    {
+      "ref": "refs/heads/pinedrama-ipa-audit-20261101",
+      "sha": "ba28a961b8dacf1ee679a91c57ff83b86e0ecd38"
+    },
+    {
+      "ref": "refs/heads/repair/source2-live-playback",
+      "sha": "a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a"
+    }
+  ],
+  "bundleIntegrity": "PASS",
+  "method": "git-push-bridge",
+  "bridgeCommit": "336a52632e921e555c7bbd16ca24a240acc74bdd",
+  "bridgeTree": "7a781113d06d88032e813920689ef9228833cba3",
+  "bootstrapTreeUnchanged": true,
+  "originalCommitsVerified": 129,
+  "elapsedSeconds": 7.57,
+  "expectedApplicationCommit": "04c09c4c455517be12eecf0e1d39a604afca3daa",
+  "applicationWorkflow": "build-ipa-light.yml",
+  "applicationWorkflowDispatchAttempted": true,
+  "applicationWorkflowDispatchOutcome": "accepted",
+  "simulatorWorkflowDispatched": false,
+  "observedMainCommit": "04c09c4c455517be12eecf0e1d39a604afca3daa",
+  "applicationBuildAlreadyExists": false
+}

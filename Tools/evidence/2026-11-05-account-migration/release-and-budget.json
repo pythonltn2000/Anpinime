@@ -1,0 +1,31 @@
+{
+  "repository": "pythonltn2000/Anpinime",
+  "applicationCommit": "04c09c4c455517be12eecf0e1d39a604afca3daa",
+  "applicationTree": "3b0ae2c03e928b75cfd1e55afc834dc92db5631a",
+  "originalApplicationCommitsPreserved": 129,
+  "lightBuildRun": 41969406418,
+  "lightBuildJob": 127053890758,
+  "buildConclusion": "success",
+  "artifactID": 13389037658,
+  "artifactBytes": 30631082,
+  "artifactSHA256": "1cb52a347ae75b528549b4d9257302c591dd6fd301e61c4ea80418daf6ea238f",
+  "ipaSHA256": "847154f6e56b088e501dd571cfed76dd9fa265b9ab2121a63a69435874220754",
+  "version": "2.9.2",
+  "build": "21",
+  "retentionDays": 3,
+  "actualRunnerUse": {
+    "migrationLinuxJobSeconds": 50,
+    "macOSBuildJobSeconds": 208,
+    "macOSJobCount": 1,
+    "iOSSimulatorJobs": 0,
+    "fullPlaybackWorkflows": 0,
+    "automaticRetries": 0
+  },
+  "validation": "Local Linux checks and independent downloaded package identity verified. No fresh iOS runtime tests in this build.",
+  "limitations": [
+    "Physical first-Home automatic PiP remains unverified.",
+    "Sealed WebKit automatic PiP remains best effort.",
+    "Latest corrected UI harness was not rerun on iOS.",
+    "No new live AnimeVietsub or Free1 success claimed."
+  ]
+}

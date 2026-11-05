@@ -33,3 +33,30 @@ có giới hạn tự động PiP. Bằng chứng native trước đó ở `7be7
 tra bắt buộc; các FAIL AI trước đó vẫn được ghi nhận trong
 [báo cáo sửa lỗi](HOME_SHORTS_PIP_REPAIR.md). IPA mới là bản để kiểm tra tiếp trên
 iPhone, không phải bằng chứng những giới hạn này đã biến mất.
+
+## Kết quả hoàn tất
+
+Kho mới: [pythonltn2000/Anpinime](https://github.com/pythonltn2000/Anpinime).
+Giữ nguyên 129 commit ứng dụng; kiểm tra bằng clone/fetch độc lập từ kho đích,
+SHA từng nhánh và `git fsck`. Nhánh `main` lịch sử ở `archive/main-before-budget`;
+`main` và `feature/ai-drama` dùng bản mới. Remotes trong workspace đã chuyển sang
+kho mới, kho trước được giữ ở `previous-origin`.
+
+[Nhập lịch sử](https://github.com/pythonltn2000/Anpinime/actions/runs/41969325461)
+đạt bằng Git bridge, phần nhập dữ liệu mất 7,57 giây; toàn job Linux 50 giây.
+[Build IPA only](https://github.com/pythonltn2000/Anpinime/actions/runs/41969406418)
+đạt, đúng một job macOS 208 giây (3 phút 28 giây). Không chạy Simulator, bộ live
+hoặc retry. Source được build: `04c09c4c455517be12eecf0e1d39a604afca3daa`;
+cây ứng dụng `3b0ae2c03e928b75cfd1e55afc834dc92db5631a`, giống mã app `21456fb`.
+Commit báo cáo sau đó không thay đổi app hoặc workflow đã build.
+
+**[Tải IPA 2.9.2 (21) chưa ký](https://github.com/pythonltn2000/Anpinime/actions/runs/41969406418/artifacts/13389037658)**,
+artifact 13389037658, giữ 3 ngày. Đã tải lại artifact, xác minh digest, mở IPA
+kiểm tra Info.plist/bundle ID/background audio/framework/executable và đối chiếu
+manifest với commit/cây nguồn. SHA-256 IPA:
+`847154f6e56b088e501dd571cfed76dd9fa265b9ab2121a63a69435874220754`.
+
+Bản này chứa sửa Home, callback dừng phim ngắn và chuẩn bị PiP native. Điều kiện
+xem trên iPhone, đặc biệt tự bật PiP ngay lần Home đầu và các luồng sealed WebKit,
+vẫn cần kiểm chứng thực tế; không gọi build thành công là sửa triệt để.
+Kết quả/hash/ngân sách nằm trong thư mục bằng chứng cùng báo cáo này.

@@ -1,0 +1,27 @@
+{
+  "independent": {
+    "artifactZipSHA256": "1cb52a347ae75b528549b4d9257302c591dd6fd301e61c4ea80418daf6ea238f",
+    "ipaSHA256": "847154f6e56b088e501dd571cfed76dd9fa265b9ab2121a63a69435874220754",
+    "ipaBytes": 30686050,
+    "version": "2.9.2",
+    "build": "21",
+    "bundleID": "com.xemphim.aipinime",
+    "minimumOS": "15.0",
+    "backgroundModes": [
+      "audio"
+    ],
+    "unsigned": true
+  },
+  "workflow": {
+    "sourceCommit": "04c09c4c455517be12eecf0e1d39a604afca3daa",
+    "applicationTree": "3b0ae2c03e928b75cfd1e55afc834dc92db5631a",
+    "version": "2.9.2",
+    "build": "21",
+    "bundleID": "com.xemphim.aipinime",
+    "ipaSHA256": "847154f6e56b088e501dd571cfed76dd9fa265b9ab2121a63a69435874220754",
+    "unsigned": true,
+    "validation": "Compilation and package identity only",
+    "playbackVerifiedByThisWorkflow": false,
+    "physicalIPhoneAutomaticPiPVerifiedByThisWorkflow": false
+  }
+}

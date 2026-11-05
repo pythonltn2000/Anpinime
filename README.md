@@ -68,7 +68,9 @@ Lịch sử tìm kiếm lưu trên thiết bị, riêng cho Anime/NguonC/Phim4K/
 
 ## Build IPA
 
-Kho đang chuyển sang `pythonltn2000/Anpinime`. Chọn workflow **Build IPA only**
+**[Tải IPA 2.9.2 (21) chưa ký](https://github.com/pythonltn2000/Anpinime/actions/runs/41969406418/artifacts/13389037658)** · [Bản chuyển và giới hạn kiểm chứng](MIGRATION_PYTHONLTN2000.md).
+
+Kho chính: [pythonltn2000/Anpinime](https://github.com/pythonltn2000/Anpinime). Chọn workflow **Build IPA only**
 trên nhánh `main`: một job macOS, giới hạn 20 phút, không Simulator và không tự
 chạy khi push. Tải artifact `AnPinime_UNSIGNED`, ký bằng chứng chỉ hợp lệ rồi cài.
 Artifact được giữ 3 ngày. [Chính sách tiết kiệm Actions](Tools/build-cost-policy.md).

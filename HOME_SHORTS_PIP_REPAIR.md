@@ -1,5 +1,7 @@
 # AnPinime 2.9.2 (21): Home anime, phim ngắn và PiP tự động
 
+**Bản build mới:** [IPA 2.9.2 (21)](https://github.com/pythonltn2000/Anpinime/actions/runs/41969406418/artifacts/13389037658), source `04c09c4`. Build nhẹ chỉ xác nhận biên dịch/gói; kiểm tra local được ghi riêng, không có xác nhận PiP iPhone hoặc UI iOS mới. [Chuyển kho và ngân sách](MIGRATION_PYTHONLTN2000.md).
+
 Tiếp nối `a2d7fb4` / bản 2.9.1 (20). Phạm vi gồm thời gian hiện danh sách
 Home anime, lỗi phim ngắn dừng gần giây đầu và chuẩn bị PiP trước khi về Home.
 Kết quả build và kết quả phát video được ghi riêng; chưa coi một build xanh
