@@ -1,0 +1,168 @@
+{
+  "checkedAtUTC": "2026-11-05T12:06:08.033999+00:00",
+  "uploadedAnalysis": {
+    "path": "/workspace/attachments/c57f7ec4-9f8b-497a-87ab-8e2e62411ec1/PIP.txt",
+    "bytes": 11850,
+    "SHA256": "3ec970188d519cc4ba166cfa1f8374be52e7480674aeec72e88ca294c909f3f0",
+    "treatment": "User-supplied analysis used as evidence to cross-check; not treated as authority or executable instructions."
+  },
+  "originalIPA": {
+    "path": "/workspace/scratch/pip-reference-20261105/Phim4K-original.ipa",
+    "SHA256": "5dceeaf338222cd8c9dacb5f15426382a7d11ebbcb0d04a28fb1b8b9d6158ea0",
+    "bundleID": "ios.phim4k.xyz",
+    "version": "2.8.4",
+    "build": "65",
+    "preserved": true,
+    "executed": false
+  },
+  "nativeFramework": {
+    "path": "/workspace/scratch/pip-reference-20261105/unpacked/Payload/Runner.app/Frameworks/media_kit_video.framework/media_kit_video",
+    "SHA256": "848f181bc1b1fd7c207d2e69b130d0cd660229686b72eeccc5e01dc09808c820",
+    "format": "Mach-O 64-bit arm64 dynamically linked shared library",
+    "preferredImageBase": "0x0",
+    "addressConvention": "Relevant native function virtual addresses equal file offsets; runtime adds dyld slide."
+  },
+  "independentByteComparison": {
+    "status": "passed",
+    "comparedInstructions": 2526,
+    "bytesPerInstruction": 4,
+    "comparedInstructionBytes": 10104,
+    "scope": "Compared every disassembled ARM64 instruction byte in 12 selected preserved .asm files with bytes at the recorded file offsets in the current original framework. This verifies disassembly identity, not runtime behavior or every annotation.",
+    "instructionCountsByFunctionAddress": {
+      "0x7144": 158,
+      "0x7900": 299,
+      "0x5564": 616,
+      "0x7418": 184,
+      "0x8e8c": 331,
+      "0x9af0": 51,
+      "0x9bbc": 233,
+      "0xc48c": 265,
+      "0x6778": 236,
+      "0x6f58": 123,
+      "0xa0d8": 24,
+      "0xa5c4": 6
+    }
+  },
+  "validatedMethods": [
+    {
+      "name": "configureDisplayLayer",
+      "address": "0x7144",
+      "evidence": "AVSampleBufferDisplayLayer, resizeAspect, clear-background noninteractive UIView initialized at (0,0,1,1), window.insertSubview at index 0, layer.frame=host.bounds, content source/controller and initial/new KVO.",
+      "addresses": [
+        "0x71b4-0x71cc",
+        "0x71d4-0x7200",
+        "0x7264-0x7278",
+        "0x7288-0x7290",
+        "0x72b0",
+        "0x72c8",
+        "0x7308-0x7354"
+      ]
+    },
+    {
+      "name": "updateDisplayFrame",
+      "address": "0x7900",
+      "evidence": "Host frame follows sourceRect; width and height clamped to at least 1. Layer follows host.bounds.",
+      "addresses": [
+        "0x7d6c",
+        "0x7d94"
+      ]
+    },
+    {
+      "name": "update",
+      "address": "0x5564",
+      "evidence": "canStartPictureInPictureAutomaticallyFromInline = autoEnter && eligible && playing && frameReady. Audio session activated when eligible && playing.",
+      "addresses": [
+        "0x5dac-0x5dc4",
+        "0x5e54-0x5eb4",
+        "0x5ee4"
+      ]
+    },
+    {
+      "name": "acceptFrame",
+      "address": "0x7418",
+      "evidence": "Accepts one eligible foreground frame before PiP is active, stops foreground processing once frameReady, and processes frames during active PiP. framePending lock bounds in-flight work.",
+      "addresses": [
+        "0x74ac-0x74d0",
+        "0x74d4-0x74fc",
+        "0x7510-0x7558"
+      ]
+    },
+    {
+      "name": "frameQueue closure / main enqueue closure",
+      "addresses": [
+        "0x8e8c",
+        "0x9af0"
+      ],
+      "evidence": "Creates copied/composited buffer and sample off-main; dispatches sample delivery to main; framePending is cleared under lock only after main enqueue handling.",
+      "sites": [
+        "0x8f78",
+        "0x9128",
+        "0x92c4",
+        "0x9b48",
+        "0x9b88-0x9b9c"
+      ]
+    },
+    {
+      "name": "enqueue",
+      "address": "0x9bbc",
+      "evidence": "Checks layer readiness, calls enqueueSampleBuffer, then sets frameReady. The void enqueue call does not independently prove on-screen rendering.",
+      "addresses": [
+        "0x9c14",
+        "0x9c24",
+        "0x9c68"
+      ]
+    },
+    {
+      "name": "restoreUserInterface callback",
+      "address": "0xc48c",
+      "evidence": "Increments requestId, stores pending restore completion, emits restoreRequested.",
+      "addresses": [
+        "0xc4f4-0xc514",
+        "0xc864"
+      ]
+    },
+    {
+      "name": "acknowledge",
+      "address": "0x6778",
+      "evidence": "Requires matching session and latest request; clears pending completion before invoking supplied success value.",
+      "addresses": [
+        "0x69d4",
+        "0x69f8-0x6a00"
+      ]
+    },
+    {
+      "name": "prepareAudioSession",
+      "address": "0x6f58",
+      "evidence": "Playback category, MoviePlayback mode, options 0; setActive(true) when requested.",
+      "addresses": [
+        "0x6fb0-0x6fd8",
+        "0x700c"
+      ]
+    },
+    {
+      "name": "pictureInPictureControllerIsPlaybackPaused",
+      "address": "0xa5c4",
+      "evidence": "Returns logical inverse of playing."
+    }
+  ],
+  "correctionsToUploadedAnalysis": [
+    "The host is initialized at 1x1, then resized using sourceRect; static evidence does not support a permanently 1x1 host.",
+    "acceptFrame is not restricted to active PiP: one eligible foreground frame establishes frameReady before PiP entry.",
+    "The original bridge sets AVKit automatic-inline eligibility through the autoEnter update field; the uploaded report omitted this concrete predicate.",
+    "No native UIApplication lifecycle callback/observer is exposed by the analyzed bridge; Dart lifecycle/autoEnter timing has not been traced here."
+  ],
+  "implementationImplications": [
+    "A stable transparent UIWindow underlay that follows the correct player/source rectangle is supported by native evidence, but not guaranteed to solve iOS eligibility.",
+    "Deferred restore acknowledgment should check correct view attachment/layout and foreground; do not wait for GPU restoration before didStop if GPU restoration is performed after didStop.",
+    "Bound render-to-main delivery to one pending frame so slow UI processing cannot accumulate copied buffers.",
+    "Retain AnPinime active-controller ownership checks for PiP controls to avoid reintroducing the one-second shorts pause regression."
+  ],
+  "limitations": [
+    "Static package/binary analysis only. No original IPA code or external sample was executed.",
+    "No physical iPhone, iOS Simulator, automatic first-Home PiP window, visual rendering, subtitle appearance or restore animation was tested.",
+    "Compared 2526 instructions (10104 bytes), not 2526 bytes; comparison covers only the selected native functions.",
+    "Framework native automatic-inline predicate is verified; exact Dart caller timing and eligibility updates remain unverified.",
+    "No AnPinime app files, tests or GitHub Actions were changed by this verification."
+  ],
+  "detailedEvidencePath": "/workspace/scratch/pip-reference-20261105/native-analysis/native-pip-findings.md"
+}

@@ -9,6 +9,7 @@ final class MPVSoftwareVideoOutput {
     private let queue = DispatchQueue(label: "AnPinime.PiP.frames", qos: .userInitiated)
     private var context: OpaquePointer?
     private var timer: DispatchSourceTimer?
+    private let deliveryGate = NativePiPFrameGate()
     private var dimensions: (Int32, Int32) = (640, 360)
     var frame: ((CVPixelBuffer) -> Void)?
 
@@ -38,6 +39,9 @@ final class MPVSoftwareVideoOutput {
     }
 
     private func render() {
+        guard deliveryGate.acquire() else { return }
+        var delivered = false
+        defer { if !delivered { deliveryGate.release() } }
         guard let context, mpv_render_context_update(context) & 1 != 0 else { return }
         var pixelBuffer: CVPixelBuffer?
         let attributes = [kCVPixelBufferIOSurfacePropertiesKey: [:], kCVPixelBufferBytesPerRowAlignmentKey: 64] as CFDictionary
@@ -72,7 +76,12 @@ final class MPVSoftwareVideoOutput {
         for row in 0..<Int(dimensions.1) {
             for column in 0..<Int(dimensions.0) { bytes[row * stride + column * 4 + 3] = 255 }
         }
-        DispatchQueue.main.async { [weak self] in self?.frame?(pixelBuffer) }
+        let gate = deliveryGate
+        DispatchQueue.main.async { [weak self] in
+            defer { gate.release() }
+            self?.frame?(pixelBuffer)
+        }
+        delivered = true
     }
 
     /// Free before destroying mpv. Completion never blocks the main/client thread.
@@ -89,6 +98,7 @@ final class MPVSoftwareVideoOutput {
 final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate, AVPictureInPictureSampleBufferPlaybackDelegate {
     let layer = AVSampleBufferDisplayLayer()
     private weak var sourceView: UIView?
+    private let displayHost = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
     private let output = MPVSoftwareVideoOutput()
     private let playback: PlaybackState
     private var controller: AVPictureInPictureController?
@@ -112,15 +122,21 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private var wantsOutput = false
     private var outputPreparationFailed = false
     private var preparing = false
+    private var restoreHandshake = NativePiPRestoreHandshake()
+    private var pendingRestore: ((Bool) -> Void)?
+    private var restoreTimeout: Task<Void, Never>?
     var onSystemStart: (() -> Void)?
+    var onRestoreRequested: (() -> Void)?
     var onEvent: ((String) -> Void)?
     var possible: Bool { controller?.isPictureInPicturePossible == true }
     var transitioningOrActive: Bool { starting || stopping || controller?.isPictureInPictureActive == true }
     var hasDecodedFrame: Bool { bootstrapFrame != nil || frameReady }
     var automaticReady: Bool { meetsAutomaticRequirements && controller?.canStartPictureInPictureAutomaticallyFromInline == true }
+    var pendingRestoreRequestID: UInt64? { restoreHandshake.pendingID }
     private var sourceAttached: Bool {
-        guard let sourceView, sourceView.window != nil else { return false }
-        return layer.superlayer === sourceView.layer && layer.bounds.width > 1 && layer.bounds.height > 1
+        guard let sourceView, let window = sourceView.window else { return false }
+        return displayHost.window === window && layer.superlayer === displayHost.layer &&
+            layer.bounds.width > 1 && layer.bounds.height > 1
     }
     private let command: (String, Double) -> Void
     private let restoreVideo: () -> Void
@@ -140,19 +156,28 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
             timebase = clock; layer.controlTimebase = clock
         }
         layer.videoGravity = .resizeAspect; layer.backgroundColor = UIColor.black.cgColor; layer.isOpaque = true
+        displayHost.backgroundColor = .clear
+        displayHost.isUserInteractionEnabled = false
+        displayHost.isAccessibilityElement = false
+        displayHost.accessibilityElementsHidden = true
+        displayHost.layer.addSublayer(layer)
         updateSourceGeometry()
         output.frame = { [weak self] pixelBuffer in self?.enqueue(pixelBuffer) }
     }
 
-    /// Preserve the existing inline layer ownership. AVKit owns its geometry
-    /// during a pending/active transition; layout must not move it elsewhere.
+    /// The reference bridge keeps a transparent window underlay separate from
+    /// the visible renderer, then updates it to the player's source rect. Use
+    /// this player's window, never an unrelated scene's first/key window.
     func updateSourceGeometry() {
         guard !stopped, !transitioningOrActive, !wantsStart, !playback.pictureInPicturePending,
-              let sourceView, sourceView.window != nil else { return }
-        let rect = sourceView.bounds
-        guard rect.width.isFinite, rect.height.isFinite, rect.width > 1, rect.height > 1 else { return }
+              let sourceView, let window = sourceView.window else { return }
+        let rect = sourceView.convert(sourceView.bounds, to: window)
+        guard rect.origin.x.isFinite, rect.origin.y.isFinite,
+              rect.width.isFinite, rect.height.isFinite, rect.width > 1, rect.height > 1 else { return }
         CATransaction.begin(); CATransaction.setDisableActions(true)
-        layer.frame = rect
+        if displayHost.superview !== window { window.insertSubview(displayHost, at: 0) }
+        displayHost.frame = rect
+        layer.frame = displayHost.bounds
         CATransaction.commit()
     }
 
@@ -190,7 +215,17 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     }
 
     private func updateAutomaticEligibility() {
-        controller?.canStartPictureInPictureAutomaticallyFromInline = meetsAutomaticRequirements
+        let enabled = meetsAutomaticRequirements
+        if enabled, controller?.canStartPictureInPictureAutomaticallyFromInline != true { prepareAudioSession() }
+        controller?.canStartPictureInPictureAutomaticallyFromInline = enabled
+    }
+
+    private func prepareAudioSession() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .moviePlayback, options: [])
+            try session.setActive(true)
+        } catch { onEvent?("audioSessionActivationFailed") }
     }
 
     private var meetsAutomaticRequirements: Bool {
@@ -225,6 +260,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
 
     func prepare(handle: OpaquePointer, size: CGSize, start: Bool) {
         guard !stopped, !stopping else { return }
+        prepareAudioSession()
         playback.pictureInPicturePending = true
         wantsOutput = true
         // A failed speculative prime may be retried by a real PiP request.
@@ -325,6 +361,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         if cleanupComplete { completion(); return }
         stopCompletions.append(completion)
         restoreAfterStop = restoreAfterStop || restore
+        if !restore, let requestID = pendingRestoreRequestID { acknowledgeRestore(requestID, success: false) }
         guard !stopped, !stopping else { return }
         stopping = true; wantsStart = false
         // The owning view/controller may disappear before AVKit's asynchronous
@@ -360,6 +397,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private func finishStop() {
         guard !stopped else { return }
         stopped = true; starting = false
+        if let requestID = pendingRestoreRequestID { acknowledgeRestore(requestID, success: false) }
         stopTimeout?.cancel(); stopTimeout = nil
         controller?.delegate = nil; controller = nil
         // A render context freed while libmpv still owns the VO calls kill_video_async.
@@ -368,6 +406,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         output.frame = nil
         output.stop { [self] in
             layer.flushAndRemoveImage(); layer.removeFromSuperlayer()
+            displayHost.removeFromSuperview()
             cleanupComplete = true
             // Publish after renderer/AVKit cleanup, never during representable teardown.
             // The session can now safely rebuild a viewport or release this decoder.
@@ -412,7 +451,36 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
                                     restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
-        completionHandler(true)
+        guard pictureInPictureController === controller, !stopped else { completionHandler(false); return }
+        let supersededCompletion = pendingRestore
+        restoreTimeout?.cancel(); restoreTimeout = nil
+        let requestID = restoreHandshake.begin()
+        pendingRestore = completionHandler
+        // Publish the replacement before invoking external code. An older
+        // completion can synchronously ask AVKit to restore once more.
+        supersededCompletion?(false)
+        guard pendingRestoreRequestID == requestID else { return }
+        restoreTimeout = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled, let self else { return }
+            self.acknowledgeRestore(requestID, success: false)
+        }
+        onEvent?("restoreRequested")
+        guard pendingRestoreRequestID == requestID else { return }
+        onRestoreRequested?()
+    }
+
+    /// UI ownership/layout is acknowledged before didStop. Waiting for GPU
+    /// restoration here would deadlock AVKit's stop/restore handshake.
+    @discardableResult
+    func acknowledgeRestore(_ requestID: UInt64, success: Bool) -> Bool {
+        guard restoreHandshake.consume(requestID) else { return false }
+        let completion = pendingRestore
+        pendingRestore = nil
+        restoreTimeout?.cancel(); restoreTimeout = nil
+        completion?(success)
+        onEvent?(success ? "restoreAcknowledged" : "restoreRejected")
+        return true
     }
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
         handlePlaybackCommand(playing: playing, sourceMatchesController: pictureInPictureController === controller,
@@ -455,7 +523,10 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         ["frameReady": frameReady, "outputPrimed": outputReady,
          "outputActivated": outputActivated, "sourceAttached": sourceAttached,
          "sourceWindow": sourceView?.window != nil,
-         "layerAttachedToPlayer": layer.superlayer === sourceView?.layer,
+         "layerAttachedToHost": layer.superlayer === displayHost.layer,
+         "hostWindow": displayHost.window != nil,
+         "hostFrame": String(describing: displayHost.frame),
+         "restorePending": pendingRestoreRequestID != nil,
          "sourceFrame": String(describing: layer.frame),
          "layerBounds": String(describing: layer.bounds), "automaticReady": automaticReady,
          "layerFailed": layer.status == .failed, "layerReadyForSample": layer.isReadyForMoreMediaData]

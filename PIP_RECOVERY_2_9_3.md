@@ -1,5 +1,7 @@
 # AnPinime 2.9.3 (22): phục hồi trạng thái PiP
 
+Phần tiếp theo: [Anime từ đầu và PiP theo REA — 2.9.4 (23)](ANIME_START_PIP_REA_2_9_4.md).
+
 **[Tải IPA 2.9.3 (22)](https://github.com/pythonltn2000/Anpinime/actions/runs/42009981972/artifacts/13406846480)**,
 source `2cb9096`. Gói unsigned đã được tải về và kiểm tra độc lập đúng phiên
 bản, source commit, cây ứng dụng, mpv, background audio và checksum. Artifact

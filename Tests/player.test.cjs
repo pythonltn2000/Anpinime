@@ -422,3 +422,123 @@ assert.equal(replacementRequests, 1);
 assert.equal(lastState(rejected).pipRequestID, 'replacement-command');
 rejected.dom.window.close();
 console.log('PASS: Swift/WebKit PiP session/request protocol, native payloads, presentation events, timeout/retry, rejection and stale-completion isolation');
+
+// The modal shape and original button side effects match the public reconstructed
+// AVS v1.3.1 init_final.js at 38c9e7d640c1487df55bce79a0db20ef4783b652.
+// This is a deterministic page fixture, not evidence of live-site playback.
+function animeResumePrompt(f, renamed = false) {
+  const w = f.w, overlay = w.document.createElement('div');
+  overlay.id = renamed ? 'changed-resume-dialog' : 'avs-resume-overlay';
+  overlay.innerHTML = '<div id="avs-resume-box"><div>Hệ thống ghi nhận bạn đã từng xem anime này trước đó! Bạn có muốn xem tiếp từ đoạn:</div>' +
+    '<button id="avs-resume-btn-yes">Xem tiếp</button><button id="avs-resume-btn-no">Từ đầu</button></div>';
+  const yes = overlay.querySelector('#avs-resume-btn-yes'), no = overlay.querySelector('#avs-resume-btn-no');
+  if (renamed) { yes.removeAttribute('id'); no.removeAttribute('id'); no.textContent = 'TỪ ĐẦU'; }
+  const clicks = {yes:0, no:0};
+  yes.onclick = () => { clicks.yes++; f.video.currentTime = 93; overlay.remove(); };
+  no.onclick = () => { clicks.no++; w.localStorage.removeItem('resumevideodata-selected'); overlay.remove(); };
+  w.document.querySelector('.jw-wrapper').appendChild(overlay);
+  return {overlay, clicks};
+}
+
+(async () => {
+  const flushDOM = () => new Promise(resolve => setImmediate(resolve));
+  const animeHTML = '<div class="jwplayer"><div class="jw-wrapper"><video src="blob:anime-episode"></video></div></div>';
+  const anime = fixture(animeHTML, w => {
+    w.__anpinimeAnimePlayback = {episodeID:'anime:selected-episode', initialPosition:0};
+    const v = w.document.querySelector('video');
+    v.currentTime = 81;
+    Object.defineProperty(v, 'readyState', {get:()=>0, configurable:true});
+    v.webkitSupportsPresentationMode = () => true;
+    v.webkitSetPresentationMode = mode => { v.webkitPresentationMode = mode; };
+    w.localStorage.setItem('resumevideodata-selected', '93:180');
+    w.localStorage.setItem('resumevideodata-other', '67:180');
+    w.localStorage.setItem('unrelated-setting', 'keep');
+    w.sessionStorage.setItem('avs_resume_selected', '48');
+  });
+  assert.equal(anime.video.currentTime, 81, 'Initialization waits until media can seek');
+  Object.defineProperty(anime.video, 'readyState', {get:()=>4, configurable:true});
+  anime.video.dispatchEvent(new anime.w.Event('loadedmetadata'));
+  assert.equal(anime.video.currentTime, 0, 'A newly selected anime starts at zero once metadata arrives');
+  assert.equal(lastState(anime).time, 0, 'Native receives the initialized anime time');
+  anime.video.currentTime = 12;
+  anime.video.dispatchEvent(new anime.w.Event('timeupdate'));
+  anime.w.__anyanimeFocusPlayer();
+  assert.equal(anime.video.currentTime, 12, 'Normal playback and repeated focus do not restart the episode');
+  const popup = animeResumePrompt(anime);
+  await flushDOM();
+  assert.deepEqual(popup.clicks, {yes:0, no:1}, 'Late DOM selects the original From Beginning action without tapping Continue');
+  assert.equal(popup.overlay.isConnected, false, 'The website action releases its blocking overlay');
+  assert.equal(anime.w.localStorage.getItem('resumevideodata-selected'), null, 'The original handler removes its exact selected-media key');
+  assert.equal(anime.w.localStorage.getItem('resumevideodata-other'), '67:180');
+  assert.equal(anime.w.localStorage.getItem('unrelated-setting'), 'keep');
+  assert.equal(anime.w.sessionStorage.getItem('avs_resume_selected'), '48', 'Token-renewal recovery storage is preserved');
+  assert.equal(anime.video.currentTime, 12, 'A late prompt cannot rewind already initialized playback');
+  anime.command('seek', 48); anime.command('pause');
+  anime.video.dispatchEvent(new anime.w.Event('loadedmetadata'));
+  const afterSeek = animeResumePrompt(anime, true);
+  await flushDOM();
+  assert.deepEqual(afterSeek.clicks, {yes:0, no:1}, 'Known resume wording still resolves a changed modal layout');
+  assert.equal(anime.video.currentTime, 48);
+  assert.equal(anime.video.paused, true, 'Prompt resolution and metadata retain explicit pause intent');
+  anime.command('play');
+  anime.command('pip', 0, {sessionID:lastState(anime).pipSessionID, requestID:'anime-resume-pip'});
+  anime.video.dispatchEvent(new anime.w.Event('webkitpresentationmodechanged'));
+  anime.video.currentTime = 56;
+  anime.command('pipStop');
+  anime.w.__anyanimeFocusPlayer();
+  assert.equal(anime.video.currentTime, 56, 'PiP return retains this viewing session');
+  anime.command('seek', 72); anime.command('play');
+  anime.w.__anyanimeFocusPlayer();
+  assert.equal(anime.video.currentTime, 72, 'Native-failure restoration seek is not overridden by focus');
+  assert.equal(anime.video.paused, false);
+  const afterRecovery = animeResumePrompt(anime);
+  await flushDOM();
+  assert.deepEqual(afterRecovery.clicks, {yes:0, no:1});
+  assert.equal(anime.video.currentTime, 72, 'A late prompt after PiP/native recovery preserves the same-session position');
+  const unrelated = anime.w.document.createElement('div');
+  unrelated.innerHTML = '<p>Chọn chương</p><button>Từ đầu</button>';
+  let unrelatedClicks = 0;
+  unrelated.querySelector('button').onclick = () => { unrelatedClicks++; };
+  anime.w.document.querySelector('.jw-wrapper').appendChild(unrelated);
+  await flushDOM();
+  assert.equal(unrelatedClicks, 0, 'A From Beginning label outside the known resume prompt is not activated');
+  assert.equal(unrelated.isConnected, true);
+  anime.video.setAttribute('src', 'blob:refreshed-same-episode');
+  anime.video.dispatchEvent(new anime.w.Event('loadedmetadata'));
+  assert.equal(anime.video.currentTime, 72, 'Refreshing a source within the episode does not reinitialize its position');
+  anime.dom.window.close();
+
+  const recovered = fixture(animeHTML, w => {
+    w.__anpinimeAnimePlayback = {episodeID:'anime:same-session-recovery', initialPosition:44};
+    w.document.querySelector('video').currentTime = 93;
+  });
+  assert.equal(recovered.video.currentTime, 44, 'A recreated website can honor native-failure same-session position');
+  recovered.command('seek', 66); recovered.w.__anyanimeFocusPlayer();
+  assert.equal(recovered.video.currentTime, 66);
+  recovered.dom.window.close();
+
+  const earlySeek = fixture(animeHTML, w => {
+    w.__anpinimeAnimePlayback = {episodeID:'anime:early-seek', initialPosition:0};
+    Object.defineProperty(w.document.querySelector('video'), 'readyState', {get:()=>0, configurable:true});
+  });
+  earlySeek.command('seek', 32);
+  Object.defineProperty(earlySeek.video, 'readyState', {get:()=>4});
+  earlySeek.video.dispatchEvent(new earlySeek.w.Event('loadedmetadata'));
+  assert.equal(earlySeek.video.currentTime, 32, 'An explicit seek before metadata wins over automatic initialization');
+  earlySeek.dom.window.close();
+
+  const nextEpisode = fixture(animeHTML, w => {
+    w.__anpinimeAnimePlayback = {episodeID:'anime:next-episode', initialPosition:0};
+    w.document.querySelector('video').currentTime = 91;
+  });
+  assert.equal(nextEpisode.video.currentTime, 0, 'Opening another episode initializes its independent playback');
+  nextEpisode.dom.window.close();
+
+  const movie = fixture(animeHTML, w => { w.document.querySelector('video').currentTime = 87; });
+  const moviePopup = animeResumePrompt(movie);
+  await flushDOM();
+  assert.equal(movie.video.currentTime, 87, 'Movie providers do not receive anime startup resets');
+  assert.deepEqual(moviePopup.clicks, {yes:0, no:0}, 'Anime prompt handling is inactive without native anime context');
+  movie.dom.window.close();
+  console.log('PASS: anime episode-scoped start, original late resume action, storage isolation, pause/seek and PiP/native recovery preservation');
+})().catch(error => { console.error(error); process.exitCode = 1; });

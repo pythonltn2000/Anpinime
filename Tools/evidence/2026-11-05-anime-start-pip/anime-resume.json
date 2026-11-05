@@ -1,0 +1,105 @@
+{
+  "checkedAtUTC": "2026-11-05T12:10:32.325513+00:00",
+  "baseCommit": "fe8cc90ab2f35295d4a758f9cf05e8de80d2974b",
+  "editedFilesSHA256": {
+    "AnyAnime/PlayerView.swift": "1e12ee4fbcf92c98b8929b140635e04defdb2bfb0ba3341891424a1b7f841a5e",
+    "Tests/player.test.cjs": "6ca6a756f8ce00abc2ab8c6d68f1ffbbbcf24eed7ca36364c0f2e8261116ebdb"
+  },
+  "scope": "Anime-scoped initial playback position and original resume-prompt action only; existing PiP protocol unchanged",
+  "reference": {
+    "publicSource": "https://github.com/shizunavn/avs-extension/blob/38c9e7d640c1487df55bce79a0db20ef4783b652/avs-files/init_final.js",
+    "SHA256": "b80e486e0ec0b5123d87fc871c22cea6287a2c3016dd89df4f7f41a2c7d76190",
+    "kind": "Third-party reconstructed AVS v1.3.1 source, not a current live-site capture",
+    "observedSelectors": [
+      "#avs-resume-overlay",
+      "#avs-resume-btn-no"
+    ],
+    "originalFromBeginningAction": "Removes the selected media resume key and its own overlay; no seek or play",
+    "storedStatePolicy": "Invoke original per-media From Beginning action; do not clear storage globally or touch session token-renewal recovery"
+  },
+  "checks": {
+    "javascript": {
+      "status": "passed",
+      "command": [
+        "node",
+        "Tests/player.test.cjs"
+      ],
+      "environment": {
+        "NODE_PATH": "/workspace/scratch/anpinime-web-qa/node_modules"
+      },
+      "exitCode": 0,
+      "groups": 9,
+      "newRegressionCoverage": [
+        "one-time zero initialization after metadata",
+        "late DOM modal original handler execution",
+        "unrelated media/settings/session-recovery storage preservation",
+        "normal progression and repeated focus",
+        "pause and explicit seek preservation",
+        "late modal after seek",
+        "PiP return and native-failure restoration position",
+        "late modal after PiP and native recovery",
+        "source refresh within the same episode",
+        "fresh episode initialization",
+        "early explicit seek before metadata",
+        "movie scope isolation",
+        "unrelated From Beginning button isolation"
+      ]
+    },
+    "swiftSyntax": {
+      "status": "passed",
+      "command": [
+        "/workspace/scratch/swift-local/swift-6.0.3-RELEASE-ubuntu24.04/usr/bin/swiftc",
+        "-frontend",
+        "-parse",
+        "AnyAnime/PlayerView.swift"
+      ],
+      "exitCode": 0
+    },
+    "diffCheck": {
+      "status": "passed",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0
+    }
+  },
+  "protectedSourceBaseline": "a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a",
+  "protectedSources": {
+    "AnyAnime/MovieProvider.swift": {
+      "SHA256": "40a9ca83ecb7fdbc9ee8d6871de9963a29c4dfe221000c093f34eea43d7f8d93",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/MovieCatalog.swift": {
+      "SHA256": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/MovieBrowseCatalog.swift": {
+      "SHA256": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/FilmMediaRelay.swift": {
+      "SHA256": "e7f645c93d195a5057b7b05eaa38bdea96fac5867e317620cdb684ce1f3bbbaa",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/FilmMediaTransform.swift": {
+      "SHA256": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/HTMLParser.swift": {
+      "SHA256": "d8d4a7512bb0737b4954b53f58a2768728c146580786ee7baa952bd2da18a6bb",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/Phim4KCatalog.swift": {
+      "SHA256": "8fa7b95cdcbbab2fe9b67d78494dacf0369977100af936fcc5321446128c0178",
+      "identicalToBaseline": true
+    }
+  },
+  "newRemoteJobsStarted": 0,
+  "limitations": [
+    "No Xcode/Apple SDK typecheck, Simulator, IPA build or device run performed.",
+    "Current live anime script is unconfirmed because bounded public GETs return 403.",
+    "JSDOM tests verify injected production JavaScript against deterministic page fixtures; they do not prove live playback."
+  ]
+}

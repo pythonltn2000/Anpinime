@@ -137,6 +137,13 @@ final class MPVPlaybackController: UIViewController {
         pictureInPicture?.updateSourceGeometry()
         CATransaction.commit()
         resizeEmbeddedRendererIfNeeded()
+        acknowledgePiPRestoreIfReady()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        pictureInPicture?.updateSourceGeometry()
+        acknowledgePiPRestoreIfReady()
     }
 
     private func resizeEmbeddedRendererIfNeeded() {
@@ -255,8 +262,6 @@ final class MPVPlaybackController: UIViewController {
             self?.finishedPictureInPicture(generation: generation)
         })
         pictureInPicture = pip
-        pip.layer.frame = view.bounds
-        view.layer.insertSublayer(pip.layer, below: surface)
         pip.onSystemStart = { [weak self] in
             guard let self, self.piPGeneration == generation else { return }
             if !self.manuallyRequestedPiP, !self.automaticPiPEnabled {
@@ -270,9 +275,30 @@ final class MPVPlaybackController: UIViewController {
             }
             self.preparePictureInPicture(start: false)
         }
+        pip.onRestoreRequested = { [weak self] in
+            Task { @MainActor [weak self] in
+                await Task.yield()
+                guard let self, self.piPGeneration == generation else { return }
+                self.viewIfLoaded?.setNeedsLayout()
+                self.viewIfLoaded?.layoutIfNeeded()
+                self.acknowledgePiPRestoreIfReady()
+            }
+        }
         pip.onEvent = { [weak self] event in
             guard let self, self.piPGeneration == generation else { return }
             if event == "firstFrameReady" || event == "outputPrimed" { self.updateAutomaticPiPReadiness() }
+            if event == "restoreRejected", UIApplication.shared.applicationState == .active {
+                // The callback was already resolved false (timeout/teardown).
+                // A foreground player can now close PiP without waiting on it.
+                Task { @MainActor [weak self] in
+                    await Task.yield()
+                    guard let self, self.piPGeneration == generation,
+                          UIApplication.shared.applicationState == .active,
+                          let current = self.pictureInPicture,
+                          current.pendingRestoreRequestID == nil else { return }
+                    self.foreground()
+                }
+            }
             #if DEBUG
             if event == "didStart" { self.systemPiPStartCount += 1 }
             if event == "didStop" { self.systemPiPStopCount += 1 }
@@ -351,7 +377,11 @@ final class MPVPlaybackController: UIViewController {
     @objc private func foreground() {
         let returnedFromBackground = wasInBackground
         wasInBackground = false
-        if let pip = pictureInPicture,
+        if pictureInPicture?.pendingRestoreRequestID != nil {
+            // AVKit may wait for its restore completion before didStop. Do not
+            // stop/detach the source while the original UI is being attached.
+            acknowledgePiPRestoreIfReady()
+        } else if let pip = pictureInPicture,
            NativePiPPolicy.shouldStopOnForeground(returnedFromBackground: returnedFromBackground,
                 transitioningOrActive: pip.transitioningOrActive || playback.pictureInPicturePending || playback.pictureInPictureActive) {
             let generation = piPGeneration
@@ -362,6 +392,22 @@ final class MPVPlaybackController: UIViewController {
         } else { updateAutomaticPiPReadiness() }
         if backgroundPaused && !userPaused { set("pause", "no") }
         backgroundPaused = false
+    }
+
+    private func acknowledgePiPRestoreIfReady() {
+        guard let pip = pictureInPicture, let requestID = pip.pendingRestoreRequestID else { return }
+        let source = viewIfLoaded
+        let window = source?.window
+        let activation = window?.windowScene?.activationState
+        let bounds = source?.bounds ?? .zero
+        let ready = NativePiPPolicy.canAcknowledgeRestore(
+            ownerAlive: handle != nil && loaded && !preloading && !isBeingDismissed && !isMovingFromParent,
+            applicationForeground: UIApplication.shared.applicationState != .background,
+            sceneForeground: activation == .foregroundActive || activation == .foregroundInactive,
+            sourceAttached: window != nil && window?.isHidden == false && source?.isHidden == false,
+            layoutReady: bounds.width.isFinite && bounds.height.isFinite && bounds.width > 1 && bounds.height > 1)
+        guard ready else { return }
+        pip.acknowledgeRestore(requestID, success: true)
     }
 
     private func finishedPictureInPicture(generation: UUID) {

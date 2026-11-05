@@ -1,0 +1,156 @@
+{
+  "checkedAtUTC": "2026-11-05T12:13:33.635742+00:00",
+  "baseCommit": "fe8cc90ab2f35295d4a758f9cf05e8de80d2974b",
+  "platform": "Linux Swift6.0.3; no Apple SDK",
+  "version": "2.9.4",
+  "build": "23",
+  "checks": [
+    {
+      "check": "nativePiP",
+      "command": "/workspace/scratch/swift-local/swift-6.0.3-RELEASE-ubuntu24.04/usr/bin/swiftc AnyAnime/NativePiPPolicy.swift Tests/NativePiPPolicyTests.swift -o /workspace/scratch/native-pip-policy-294 && /workspace/scratch/native-pip-policy-294",
+      "exitCode": 0,
+      "output": "PASS: all six actual-readiness gates are required across 64 combinations\nPASS: buffering or paused playback disarms automatic entry\nPASS: detaching the real source view disarms automatic entry\nPASS: ineligible decoder state never submits a screenshot\nPASS: waiting for valid dimensions does not spend the burst\nPASS: eligible snapshot attempt 1 is allowed\nPASS: only one screenshot command may be pending\nPASS: eligible snapshot attempt 2 is allowed\nPASS: only one screenshot command may be pending\nPASS: eligible snapshot attempt 3 is allowed\nPASS: only one screenshot command may be pending\nPASS: three failed frames require a full two-second cooldown\nPASS: a fourth attempt can recover in the same playback session\nPASS: only acknowledged frame readiness completes bootstrap\nPASS: a ready foreground sample stops further snapshot requests\nPASS: a command starts pending\nPASS: an expired async command can be replaced\nPASS: unsolicited or duplicate completion cannot invent frame readiness\nPASS: retry remains available after ignored duplicate completion\nPASS: timeout failures count toward burst throttling\nPASS: timeout recovery resumes after cooldown\nPASS: a new playback session has independent retry state\nPASS: Control Center return preserves the armed inline bridge\nPASS: actual background return can release the prior bridge\nPASS: active or pending PiP closes through its asynchronous stop handshake\nPASS: only the live current PiP controller accepts controls across 16 combinations\nPASS: restore success requires owner, foreground app/scene, attached source and layout across 32 combinations\nPASS: a restore acknowledgement cannot invent a request\nPASS: replacement restore requests get a new identity\nPASS: an out-of-order acknowledgement preserves the replacement\nPASS: the current restore completion is consumed exactly once\nPASS: a duplicate restore acknowledgement is ignored\nPASS: restore ownership clears before external completion code runs\nPASS: an old completion cannot clear a reentrant restore request\nPASS: the reentrant request can finish independently\nPASS: timeout or teardown can consume the current restore request\nPASS: a late timeout cannot reject a newer restore request\nPASS: restore remains usable after cancellation and timeout\nPASS: the first rendered frame owns delivery\nPASS: the frame reaches the asynchronous consumer queue\nPASS: the render queue cannot accumulate frames while consumer delivery is pending\nPASS: a cancelled or deallocated frame owner still completes consumer cleanup\nPASS: consumer cleanup releases the gate after owner cancellation\nPASS: an early producer failure does not strand delivery ownership\nPASS: only one of 128 concurrent frame submissions wins delivery in round 1\nPASS: only one of 128 concurrent frame submissions wins delivery in round 2\n46 native PiP policy checks passed\n",
+      "seconds": 1.31000925
+    },
+    {
+      "check": "webPlayer",
+      "command": "NODE_PATH=/workspace/scratch/anpinime-web-qa/node_modules node Tests/player.test.cjs",
+      "exitCode": 0,
+      "output": "PASS: fullscreen isolation, playback commands, access notice filtering, pause preservation, seek limits, fill persistence and challenge visibility\nPASS: ad-before-movie, same-element JW preroll, ad end isolation and unrelated HLS rejection\nPASS: configured movie handoff during preroll and before video creation\nPASS: StreamC ad-free autoplay preserves the sealed decoder and license\nPASS: actual JW audio/caption selection, off, caption visibility and 3x speed\nPASS: WebKit PiP single ownership, actual commands, preference, pause, pending retry and inline layout\nPASS: Swift/WebKit PiP session/request protocol, native payloads, presentation events, timeout/retry, rejection and stale-completion isolation\nPASS: progressing readyState=2, pause-ad isolation, decoder preservation and no speculative blob handoff\nPASS: anime episode-scoped start, original late resume action, storage isolation, pause/seek and PiP/native recovery preservation\n",
+      "seconds": 1.765310107
+    },
+    {
+      "check": "animeHome",
+      "command": "ANPINIME_SWIFTC=/workspace/scratch/swift-local/swift-6.0.3-RELEASE-ubuntu24.04/usr/bin/swiftc bash Tests/anime-home-smoke.sh",
+      "exitCode": 0,
+      "output": "PASS: Creating an anime/movie service does not create a verification browser\nPASS: Cold Home returns parsed cards\nPASS: Cold Home makes one catalog request, with zero shortlink or legacy detail probes\nPASS: An ordinary cold Home never instantiates the WebKit verification path\nPASS: Only successful parsed Home becomes a verified domain\nPASS: Parsed Home survives a new service instance without HTML or cookies\nPASS: Warm Home is usable while its refresh response remains gated\nPASS: Displaying warm cached cards does not instantiate a verification browser\nPASS: The real network response replaces the cached cards\nPASS: Warm refresh also avoids duplicate domain/catalog requests\nPASS: Refreshing ordinary warm Home still does not instantiate a verification browser\nPASS: A manual catalog never displays the automatic catalog snapshot\nPASS: Manual Home persists despite origin trailing-slash differences\nPASS: A manual snapshot is isolated from automatic and other manual catalogs\nPASS: An expired Home snapshot cannot remain visible forever\nPASS: A future-dated snapshot is rejected\nPASS: Movie sources cannot overwrite anime Home\nPASS: A challenged Home lazily creates exactly one browser and uses the existing verification flow\nPASS: Repeated access preserves the same verification browser instance\nPASS: A challenge is never persisted as cards or a verified domain\nPASS: A dead stale automatic host triggers discovery then one request to the new host\nPASS: Domain recovery publishes the current Home and rebases its cards\nPASS: Recovered catalog identities never retain the obsolete hostname\nPASS: An unexpected third-party Home redirect is never shown as anime\nPASS: A selected manual Home cannot silently redirect to the automatic catalog\nPASS: A manual-source challenge creates its browser on demand without switching catalogs\nANIME_HOME_FIXTURE cold_content_ms=6 warm_content_ms=3 cold_requests=1 warm_requests=1; local fixture timings only\n",
+      "seconds": 4.855852508
+    },
+    {
+      "check": "swiftParseDiff",
+      "command": "/workspace/scratch/swift-local/swift-6.0.3-RELEASE-ubuntu24.04/usr/bin/swiftc -frontend -parse $(rg --files AnyAnime -g '*.swift') Tests/NativePiPPolicyTests.swift && git diff --check",
+      "exitCode": 0,
+      "output": "",
+      "seconds": 0.062743962
+    }
+  ],
+  "assertionSummary": {
+    "nativePiP": 46,
+    "nativeBooleanCombinations": 112,
+    "concurrentFrameContendersPerRound": 128,
+    "concurrentFrameRounds": 2,
+    "webPlayerGroups": 9,
+    "animeHome": 26
+  },
+  "sourceSHA256": {
+    "AnyAnime/AIDrama/AIDramaBrowseViews.swift": "6fd1c4edf61de276871280cf4e839e6138ae0ad9b3394778dcd6cb0bf6e55fad",
+    "AnyAnime/AIDrama/AIDramaCatalogStore.swift": "dd2e5714e65257adf3a905acb43c5aebe40aea34322377d0b810e6e77ade7c50",
+    "AnyAnime/AIDrama/AIDramaCatalogViews.swift": "ea5a8c6d9f1550064fa6aaf1a436a2223ab9478c067bf22f43ceb95b80542eaa",
+    "AnyAnime/AIDrama/AIDramaDebugSupport.swift": "449a90080ffac50ed6a0117962394d9b7cdffdfdc1b504d5bd17494b33dae7fb",
+    "AnyAnime/AIDrama/AIDramaHistoryStore.swift": "e5e95b5446c826a3fb9307b3ba8cc44a87d8cd8a97927c9f3bad47053372c958",
+    "AnyAnime/AIDrama/AIDramaLibraryView.swift": "a0cdcaf4235423df29ab707b095b5c433cfc87b7022c399050989fcdd7c7f3f6",
+    "AnyAnime/AIDrama/AIDramaMediaCache.swift": "c9e1de5fef54af653d2c34d1ee632eebcc052cb18e1035f6a977de30c759a341",
+    "AnyAnime/AIDrama/AIDramaModels.swift": "133500b93c2420eb9402d362f5560018bc7b49dfa345f2afff4b0f4041e8b126",
+    "AnyAnime/AIDrama/AIDramaPlaybackSession.swift": "72910474a1771adcbbae50b36044ca334993c4f392bfda1ac3f0c7f8ac347bcb",
+    "AnyAnime/AIDrama/AIDramaPlayerComponents.swift": "3b0fe59bc8f9aeba0ea097a002e2ae9b626f451da83effc8d6cf9b33ba339585",
+    "AnyAnime/AIDrama/AIDramaPlayerView.swift": "e298d71278ca86e526a0af056165ceb5cdeb6029c266185ffbba1e076b67dc77",
+    "AnyAnime/AIDrama/AIDramaShortsView.swift": "e478f2d34aaba07f5a57fc5516c774e592831acce914566f16d3ad3edfe2587a",
+    "AnyAnime/AIDrama/AIDramaTabView.swift": "7d4bf0c0c9ac3260788fd22b60d5fb62bbd46bedbde278d0854401ec79727320",
+    "AnyAnime/AIDrama/PineDramaProvider.swift": "bfce610fd84b4fb01a08eb28bb7d89581e417b29b11dbb8e4455103e8888bdd0",
+    "AnyAnime/AnimeDetailView.swift": "09f3cd3dd11230a73eea8d78f814df8597474829a236b6c8cd76da47b3989275",
+    "AnyAnime/AnimeHomeStore.swift": "0f00132c22f389ffdb79fd22767c97955cbca4dd54713b09a3a99b76e4d53b78",
+    "AnyAnime/AnimeScheduleStore.swift": "04d365b6978a422ff452ce355b1863cc38bbb7fc035b53e8505d501805a74267",
+    "AnyAnime/AnimeScheduleView.swift": "0751117b6839a106c023770a1ebbfdc9d9a198983f34fcb26fa74be399fdbef7",
+    "AnyAnime/AnimeSearchView.swift": "c5107517721be923d58afe86a43835468dec7c71ea9e0e3b1edcd046f5800b3c",
+    "AnyAnime/AnimeService.swift": "e45ad3c705a80198b821a0a2aab1d8a9c5fc14a6d396c4a85c0495ca322d0468",
+    "AnyAnime/AnimeSiteConfiguration.swift": "96250b06e075448e1defa4b207654c7480fdcb4d0b2b19ce5905e1c3c483fd48",
+    "AnyAnime/AnyAnimeApp.swift": "8aa399354892d4e1499af5a0f91bd4bfa5d0ce9438e6f9ab120ca35152950ca3",
+    "AnyAnime/AppSettingsView.swift": "333b99ec81d1d31f9aca39b82f7c14237a2470a7af0abad3b469167bb86d5721",
+    "AnyAnime/ArtworkLoader.swift": "0632bdf50b21dd59ab7e3440fdd8ddb9a24ed774da86620980affe9117bf1006",
+    "AnyAnime/Branding.swift": "2bd472d4b18eece4851eeb9c84c25bf235fdbb89ad7d078e1993e2a8aac3a057",
+    "AnyAnime/CinemaGlass.swift": "26a06fd4166a8f8abffd365c38150878643a89b4634b4d58b19bcb45df0bb240",
+    "AnyAnime/CinemaPlayerView.swift": "ddd88fa68c616987bf6fb64c0e97d053e491970dffa819ea6d383f56ca3b5839",
+    "AnyAnime/DomainResolver.swift": "161b1954d110ed537d0d7db63ccb39005cca9507de63c796aca4f28620a8bd7b",
+    "AnyAnime/FilmMediaRelay.swift": "e7f645c93d195a5057b7b05eaa38bdea96fac5867e317620cdb684ce1f3bbbaa",
+    "AnyAnime/FilmMediaTransform.swift": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9",
+    "AnyAnime/HTMLDocument.swift": "39e85dae4ac259ecccb30d26112c41ab278235123024738d1bf297be37a54a2f",
+    "AnyAnime/HTMLParser.swift": "d8d4a7512bb0737b4954b53f58a2768728c146580786ee7baa952bd2da18a6bb",
+    "AnyAnime/Info.plist": "105f75429ea37a3760f7ae51eac469120a6b7ddc8381e91cc6c9ccc0eea1fd79",
+    "AnyAnime/InterfacePreview.swift": "daf0d9e6bf2d3a4533a98ec5b83130cf6e18484eff7ecdb8429e003bfc8ee24a",
+    "AnyAnime/IntroVideoView.swift": "a7cd6c5e9a578068fa2a02b3b54be879d0248d3c8a455f3d088d0c3a9f41867a",
+    "AnyAnime/LibraryTransition.swift": "4348ed00a4fc06caf7d7cf8416e18532ecdb83dd567d43840ace3098490715d5",
+    "AnyAnime/MPVPictureInPicture.swift": "5fb400de3d044ea7bc2777160c29a7df303a465ef335411f10b9dd1d3d4cea99",
+    "AnyAnime/MPVPlaybackController.swift": "9986aacbe3abe2cb7ad2d44a250339090bb62e4d817b48cf90321037312f8bcd",
+    "AnyAnime/Models.swift": "a3ca5f34ac3b2e069c23c9c94bf34f0fb8f4da4622e84cedf5384f52341ffaf9",
+    "AnyAnime/MorphIcon.swift": "35a6e9142378f816d4f67507af02d0a3b3a04d2a246836d9dc0ae948f27d2075",
+    "AnyAnime/MovieBrowseCatalog.swift": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055",
+    "AnyAnime/MovieCatalog.swift": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da",
+    "AnyAnime/MovieProvider.swift": "40a9ca83ecb7fdbc9ee8d6871de9963a29c4dfe221000c093f34eea43d7f8d93",
+    "AnyAnime/MovieSourceDirectory.swift": "deaf84b5f88ed9603fa459c5432b9f812324376820e66fb6e88ab9b3a9a29159",
+    "AnyAnime/NativePiPPolicy.swift": "cc17fb520266b9a123c4f79a33d155294269abf5d8bc1ed9c798a65a7cab8b76",
+    "AnyAnime/Phim4KCatalog.swift": "8fa7b95cdcbbab2fe9b67d78494dacf0369977100af936fcc5321446128c0178",
+    "AnyAnime/Phim4KMediaProbe.swift": "3b9a6674501c0a6ba1e88a8071f3d08f62e9f7ac6b1278a1f7eaa28e742750b8",
+    "AnyAnime/Phim4KProvider.swift": "13712391278a4b51a38a8b329621de1b2b5c45d9181aa68019c5334ceee46450",
+    "AnyAnime/Phim4KRelayNaming.swift": "ae459d9efb4304ea0e79ce4f722a376308bce5b8eda60ee71ecb1da3350e96d4",
+    "AnyAnime/Phim4KTransportPolicy.swift": "cbcad85fde5a91044d6bb772208e96a4f93052d2ba097ac66405f4ad4c8002c8",
+    "AnyAnime/Phim4KVIPResolver.swift": "b2ace2cd0b60a52e4cfe29ca87d7c2964fdb4f9f5718c8393765f99be7693f55",
+    "AnyAnime/PlaybackSmokeTest.swift": "df96a59506d305c399812701f73863449a4b18eb8394f1c3d46d1bfeaa128233",
+    "AnyAnime/PlayerOrientation.swift": "f86fcd09e9c5e359e231072b999d34f8c0d0dae20edf2a716f32cda112433a5f",
+    "AnyAnime/PlayerSettingsPanel.swift": "d7b49dc5d189e86e7e17cb8a1490dedc71832d527ad7bf604ff2a78ac3d1a11e",
+    "AnyAnime/PlayerView.swift": "1e12ee4fbcf92c98b8929b140635e04defdb2bfb0ba3341891424a1b7f841a5e",
+    "AnyAnime/RootView.swift": "5252ac9acdf3ff213ce717adaa777fe41953376afe2d36fb0eb8a698178d5f73",
+    "AnyAnime/SearchHistory.swift": "3569ae2dc1b920146608b37fbe4b1ad7c241c9f913516c3ed35b3700e63429e2",
+    "AnyAnime/SubtitleStyle.swift": "8fa098f61276ef8309f40deaa2f8f3c4aba7b84028c42bc009b8772efdabe75f",
+    "AnyAnime/VerificationView.swift": "b868b6e6f5b32b6aaac45c100738b8626c39b2ea7944d67b9bdd44f807ffbae0",
+    "Tests/AIDramaMediaCacheTests.swift": "9ef029b5c34245f6e95e20babdcb883d9f55ec8c6e51eacef6e1480dd1ee488c",
+    "Tests/AIDramaProviderTests.swift": "ba8b42fb2ac1c039ff29c7840c74ce0c8a2acf8b05433578ff2f74a42daab7ae",
+    "Tests/AIDramaStoreTests.swift": "7af1a99e1fd3ccde69a974006fd24c644aa0581314e426d187193f523e5f2fb3",
+    "Tests/AIDramaUITests.swift": "183004329480f6601aa9c9f41b0e14fa1b0718220d5a691d29e9419b54e68104",
+    "Tests/AnimeHomeTests.swift": "ed65568af4cf95b9b687f082ae1d826844e6d3a32cf42a00d6d134913ea0a336",
+    "Tests/MovieSearchUITests.swift": "3627dcd70df661f59aecf66c009ec5add235fa741a799cc9e86f335c411abd9e",
+    "Tests/NativePiPPolicyTests.swift": "c0a928209f80db209e13845eeb7a838ffef975bc8c955b3e3a2772bbef9c0396",
+    "Tests/Phim4KResolverTests.swift": "b7d362d1b3fc3f7c472b728c437c0f84bb7828ae6527aec57d534dfdcee681ea",
+    "Tests/ProviderTests.swift": "f7b9b50197ae50b93fe5eb8bbc470278fdaeb735c1d460355a83c33e65a66184",
+    "Tests/RangeProbeTests.swift": "3f97f7cba6fdaced47fe6fb444d2e7ab3ea5cbd41845a1f72a5fce193098783c",
+    "Tests/main.swift": "925ab40728175401d444a40b0df811851c0c50abfc9d4d8ef3d46544e31ac49f",
+    "Tests/player.test.cjs": "6ca6a756f8ce00abc2ab8c6d68f1ffbbbcf24eed7ca36364c0f2e8261116ebdb",
+    "Tests/verify_repairs.cjs": "e352e9e86172c061280346f33acc11be045e7543003ea0a509642038fb2b8856"
+  },
+  "protectedSourceBaseline": "a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a",
+  "protectedSources": {
+    "AnyAnime/MovieProvider.swift": {
+      "SHA256": "40a9ca83ecb7fdbc9ee8d6871de9963a29c4dfe221000c093f34eea43d7f8d93",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/MovieCatalog.swift": {
+      "SHA256": "b8c177b56531da3c27e558087e92933a5f66f145d90141e93b11a53b4776c4da",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/MovieBrowseCatalog.swift": {
+      "SHA256": "cb37ca928251c31e41540eea7c7d18432adc0401a12822ade9c73c5bda085055",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/FilmMediaRelay.swift": {
+      "SHA256": "e7f645c93d195a5057b7b05eaa38bdea96fac5867e317620cdb684ce1f3bbbaa",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/FilmMediaTransform.swift": {
+      "SHA256": "69388559515f1963b75db954201c030291c00e0f0a0c563c9e0af538b43554a9",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/HTMLParser.swift": {
+      "SHA256": "d8d4a7512bb0737b4954b53f58a2768728c146580786ee7baa952bd2da18a6bb",
+      "identicalToBaseline": true
+    },
+    "AnyAnime/Phim4KCatalog.swift": {
+      "SHA256": "8fa7b95cdcbbab2fe9b67d78494dacf0369977100af936fcc5321446128c0178",
+      "identicalToBaseline": true
+    }
+  },
+  "remoteJobsAtLocalCheck": 0,
+  "limitations": [
+    "No UIKit/AVKit runtime execution, iPhone automatic PiP or restore animation verified.",
+    "JavaScript tests use deterministic DOM fixtures; current live anime page/script returns403.",
+    "Swift frontend parse is syntax verification; Apple SDK compilation is separate."
+  ]
+}

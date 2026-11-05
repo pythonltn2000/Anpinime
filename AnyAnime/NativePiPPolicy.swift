@@ -16,6 +16,49 @@ enum NativePiPPolicy {
                                 sourceMatchesController: Bool, sourceIsActive: Bool) -> Bool {
         !stopped && !stopping && sourceMatchesController && sourceIsActive
     }
+
+    static func canAcknowledgeRestore(ownerAlive: Bool, applicationForeground: Bool,
+                                      sceneForeground: Bool, sourceAttached: Bool, layoutReady: Bool) -> Bool {
+        ownerAlive && applicationForeground && sceneForeground && sourceAttached && layoutReady
+    }
+}
+
+/// One AVKit restore request owns one completion. Consume it before invoking
+/// external code, which can synchronously request restoration again.
+struct NativePiPRestoreHandshake {
+    private(set) var pendingID: UInt64?
+    private var sequence: UInt64 = 0
+
+    mutating func begin() -> UInt64 {
+        sequence &+= 1
+        pendingID = sequence
+        return sequence
+    }
+
+    mutating func consume(_ requestID: UInt64) -> Bool {
+        guard pendingID == requestID else { return false }
+        pendingID = nil
+        return true
+    }
+}
+
+/// The render queue must keep ownership until the main queue has consumed the
+/// buffer. A serial render queue alone cannot bound queued main-thread work.
+final class NativePiPFrameGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pending = false
+
+    func acquire() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !pending else { return false }
+        pending = true
+        return true
+    }
+
+    func release() {
+        lock.lock(); defer { lock.unlock() }
+        pending = false
+    }
 }
 
 /// A missing decoder frame may recover later in the same playback session.

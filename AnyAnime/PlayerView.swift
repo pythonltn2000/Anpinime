@@ -481,8 +481,19 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             configuration.userContentController.add(self, name: $0)
         }
         if injectFallbackScript {
+            var source = fallbackJavaScript
+            if episode.source == .anime {
+                // A newly opened episode starts at zero. Recreating its website
+                // after a native decoder failure is the same viewing session.
+                let position = websiteOwnsPlayback ? max(0, playback.currentTime > 0.1 ? playback.currentTime : nativeFallbackPosition) : 0
+                let context: [String: Any] = ["episodeID": episode.id, "initialPosition": position]
+                if let data = try? JSONSerialization.data(withJSONObject: context),
+                   let json = String(data: data, encoding: .utf8) {
+                    source = "window.__anpinimeAnimePlayback=\(json);\n" + source
+                }
+            }
             configuration.userContentController.addUserScript(WKUserScript(
-                source: fallbackJavaScript,
+                source: source,
                 injectionTime: .atDocumentStart,
                 forMainFrameOnly: false
             ))
@@ -1071,6 +1082,36 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           var activeVideo=null;
           var reportedSources={};
           var automaticPiP=false;
+          // Native supplies this context only for anime, once per selected
+          // episode. Movie providers keep their existing startup behavior.
+          var animeContext=window.__anpinimeAnimePlayback;
+          var animeStartPending=!!(animeContext&&typeof animeContext.episodeID==='string'&&animeContext.episodeID);
+          var animeResumeActions=new WeakSet();
+          function initializeAnimePosition(v){
+            if(!animeStartPending||!v||v.readyState<1||isAdvertisement(v)||pipActive(v)||pipPending(v))return;
+            var position=Number(animeContext.initialPosition)||0;
+            try{if(v.currentTime!==position)v.currentTime=Math.max(0,position);animeStartPending=false;}catch(e){}
+          }
+          function resumeText(el){
+            return String(el.textContent||el.value||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/đ/g,'d').replace(/\\s+/g,' ').trim();
+          }
+          function declineAnimeResume(){
+            if(!animeContext||!animeContext.episodeID)return;
+            document.querySelectorAll('#avs-resume-btn-no,button,a,[role="button"],input[type="button"]').forEach(function(button){
+              if(button.disabled||animeResumeActions.has(button)||! /^(?:(?:xem|phat|xem lai) )?tu dau$/.test(resumeText(button)))return;
+              var popup=button.parentElement;
+              for(var depth=0;popup&&popup!==document.body&&depth<7;depth++,popup=popup.parentElement){
+                var text=resumeText(popup);
+                if(text.length>2500)break;
+                if(popup.id!=='avs-resume-overlay'&&!/he thong ghi nhan.*(?:tung|da) xem anime/.test(text))continue;
+                // Use the website's original From Beginning action: it clears
+                // only this video's saved prompt and releases its own overlay.
+                animeResumeActions.add(button);
+                button.click();
+                return;
+              }
+            });
+          }
           function supportsPiP(v){
             if(!v)return false;
             try{return !!((v.webkitSetPresentationMode&&(!v.webkitSupportsPresentationMode||v.webkitSupportsPresentationMode('picture-in-picture')))||(v.requestPictureInPicture&&document.pictureInPictureEnabled&&!v.disablePictureInPicture));}catch(e){return false;}
@@ -1236,6 +1277,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
           }
           function state(){
             var v=activeVideo;if(!v||isAdvertisement(v))return;
+            initializeAnimePosition(v);
             reportSource(v);
             var now=Date.now();if(v.__aaLastTime!==v.currentTime){v.__aaLastTime=v.currentTime;v.__aaAdvancedAt=now;}
             var advancing=now-(v.__aaAdvancedAt||now)<1200;
@@ -1259,7 +1301,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
                   case 'subtitleStyle':styleSubtitles(v,c.style);break;
                   case 'play':v.__aaUserPaused=false;tryPlay(v);break;
                   case 'pause':v.__aaUserPaused=true;v.pause();break;
-                  case 'seek':if(isFinite(v.duration))v.currentTime=Math.max(0,Math.min(Number(c.value)||0,v.duration));break;
+                  case 'seek':if(isFinite(v.duration)){v.currentTime=Math.max(0,Math.min(Number(c.value)||0,v.duration));if(animeContext)animeStartPending=false;}break;
                   case 'rate':v.playbackRate=Math.max(0.25,Math.min(Number(c.value)||1,3));break;
                   case 'volume':v.volume=Math.max(0,Math.min(Number(c.value)||0,1));break;
                   case 'fit':v.__anpinimeFill=c.value===1;important(v,'object-fit',v.__anpinimeFill?'cover':'contain');break;
@@ -1331,6 +1373,7 @@ final class AnimePlayerViewController: UIViewController, WKNavigationDelegate, W
             if(!window.document||!document.documentElement)return false;
             if(activeVideo&&(pipActive(activeVideo)||pipPending(activeVideo))){state();return true;}
             if(challenge())return false;
+            declineAnimeResume();
             // Read the content playlist before filtering ad-marked video elements.
             // A preroll may use the same element, or the movie video may not exist yet.
             var api=playerAPI(null),sources=contentSources(api);
