@@ -1,0 +1,10 @@
+{
+  "source": "ea6242856120579641fad490993447299530c82b",
+  "workflow": "build-ipa-light.yml",
+  "requestedBuild": "2.9.4 (23)",
+  "maximumMacOSJobs": 1,
+  "maximumMacOSMinutes": 20,
+  "simulator": false,
+  "fullSuite": false,
+  "retry": false
+}

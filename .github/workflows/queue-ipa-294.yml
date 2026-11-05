@@ -1,0 +1,30 @@
+name: Queue one reviewed IPA
+on:
+  push:
+    branches: ['automation/ipa-294-20261105']
+    paths: ['.automation/ipa-294-request.json']
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: queue-one-ipa-294
+  cancel-in-progress: false
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const expected = 'ea6242856120579641fad490993447299530c82b';
+            const repo = context.repo;
+            const head = await github.rest.git.getRef({...repo, ref: 'heads/main'});
+            if (head.data.object.sha !== expected) throw new Error('Reviewed main changed; refusing dispatch');
+            const runs = await github.rest.actions.listWorkflowRuns({...repo, workflow_id: 'build-ipa-light.yml', head_sha: expected, event: 'workflow_dispatch', per_page: 100});
+            if (runs.data.workflow_runs.length) {
+              core.info('This source already has an IPA run. No duplicate dispatch.');
+              return;
+            }
+            await github.rest.actions.createWorkflowDispatch({...repo, workflow_id: 'build-ipa-light.yml', ref: 'main'});
+            await core.summary.addRaw('Queued one IPA-only macOS build for ' + expected + '. No tests, Simulator, retry, or history import.').write();
