@@ -1,0 +1,35 @@
+{
+  "source": "letunam2k/anpinime",
+  "destination": "pythonltn2000/Anpinime",
+  "branches": [
+    {
+      "ref": "refs/heads/main",
+      "sha": "04c09c4c455517be12eecf0e1d39a604afca3daa"
+    },
+    {
+      "ref": "refs/heads/feature/ai-drama",
+      "sha": "04c09c4c455517be12eecf0e1d39a604afca3daa"
+    },
+    {
+      "ref": "refs/heads/archive/main-before-budget",
+      "sha": "8acf5c0c9c316a16ac0e406ead1f4dcde1a3c2da"
+    },
+    {
+      "ref": "refs/heads/feature/pinedrama-web-studio",
+      "sha": "3c92a58c757abe365cdbc39a8d33ec574ce78fd2"
+    },
+    {
+      "ref": "refs/heads/pinedrama-ipa-audit-20261101",
+      "sha": "ba28a961b8dacf1ee679a91c57ff83b86e0ecd38"
+    },
+    {
+      "ref": "refs/heads/repair/source2-live-playback",
+      "sha": "a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a"
+    }
+  ],
+  "parts": 62,
+  "bundleBytes": 32078587,
+  "bundleSHA256": "4814500bc904e6bbbaaa49a60243c45fda5dd0e34a62a66f106ba90f6feaf081",
+  "currentDevelopmentCommit": "04c09c4c455517be12eecf0e1d39a604afca3daa",
+  "currentDevelopmentBranch": "main"
+}

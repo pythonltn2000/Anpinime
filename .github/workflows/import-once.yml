@@ -1,0 +1,137 @@
+name: Import history once and queue one IPA build
+
+on:
+  push:
+    branches: [main]
+    paths: [.migration/REQUEST]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: anpinime-one-time-history-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANPINIME_REPOSITORY: pythonltn2000/Anpinime
+      ANPINIME_BOOTSTRAP_SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set bounded migration deadline
+        run: echo "ANPINIME_BOOTSTRAP_DEADLINE=$(( $(date +%s) + 14 * 60 ))" >> "$GITHUB_ENV"
+      - name: Import and verify exact original history
+        run: python3 .migration/import_history.py
+      - name: Wait for exact restored main and queue only the lightweight IPA workflow
+        run: |
+          python3 - <<'PY'
+          import json, os, re, time, urllib.error, urllib.parse, urllib.request
+          from pathlib import Path
+
+          manifest = json.loads(Path('.migration/manifest.json').read_text())
+          result_path = Path('.migration/result.json')
+          result = json.loads(result_path.read_text())
+          repository = os.environ['ANPINIME_REPOSITORY']
+          token = os.environ['GH_TOKEN']
+          expected = manifest['currentDevelopmentCommit']
+          workflow = 'build-ipa-light.yml'
+          if repository.lower() != 'pythonltn2000/anpinime' or manifest['destination'].lower() != repository.lower():
+              raise RuntimeError('Unexpected migration destination')
+          if not re.fullmatch(r'[0-9a-f]{40}', expected):
+              raise RuntimeError('Invalid expected application commit')
+          if result.get('status') != 'original-commits-ready':
+              raise RuntimeError('Original history import was not verified')
+
+          def record():
+              result_path.write_text(json.dumps(result, indent=2) + '\n')
+
+          def api(path, method='GET', body=None, missing_ok=False):
+              request = urllib.request.Request(
+                  'https://api.github.com/repos/' + repository + '/' + path,
+                  data=json.dumps(body).encode() if body is not None else None,
+                  method=method,
+                  headers={'Authorization': 'Bearer ' + token,
+                           'Accept': 'application/vnd.github+json',
+                           'Content-Type': 'application/json',
+                           'X-GitHub-Api-Version': '2022-11-28',
+                           'User-Agent': 'AnPinime-budget-migration'})
+              try:
+                  with urllib.request.urlopen(request, timeout=15) as response:
+                      data = response.read()
+                      return json.loads(data) if data else {}
+              except urllib.error.HTTPError as error:
+                  if error.code == 404 and missing_ok:
+                      return None
+                  raise RuntimeError(f'{method} {path}: HTTP {error.code}; no automatic retry') from None
+
+          result.update({'expectedApplicationCommit': expected,
+                         'applicationWorkflow': workflow,
+                         'applicationWorkflowDispatchAttempted': False,
+                         'applicationWorkflowDispatched': False,
+                         'applicationWorkflowDispatchOutcome': 'not-attempted',
+                         'simulatorWorkflowDispatched': False})
+          record()
+          # The import can use up to thirteen minutes. Preserve a final minute
+          # for artifact upload and never wait longer than three minutes here.
+          deadline = min(time.time() + 180, float(os.environ['ANPINIME_BOOTSTRAP_DEADLINE']))
+          ready = False
+          while time.time() < deadline:
+              main = api('git/ref/heads/main')
+              result['observedMainCommit'] = main['object']['sha']
+              if main['object']['sha'] == expected:
+                  indexed = api('actions/workflows/' + workflow, missing_ok=True)
+                  if indexed and indexed.get('state') == 'active' and indexed.get('path') == '.github/workflows/' + workflow:
+                      ready = True
+                      break
+              time.sleep(min(5, max(0, deadline - time.time())))
+          if not ready:
+              result['status'] = 'history-imported-awaiting-exact-main-or-workflow'
+              record()
+              raise RuntimeError('Bounded wait expired; history retained, no build dispatched')
+
+          # Read-only checks before the only POST: an existing build for this
+          # same commit suppresses dispatch, even if that earlier build failed.
+          commit = api('git/commits/' + expected)
+          if commit.get('sha') != expected:
+              raise RuntimeError('Restored application commit failed exact SHA verification')
+          query = urllib.parse.urlencode({'head_sha': expected, 'event': 'workflow_dispatch', 'per_page': 1})
+          runs = api('actions/workflows/' + workflow + '/runs?' + query).get('workflow_runs', [])
+          matching = [run for run in runs if run.get('head_sha') == expected]
+          if matching:
+              result.update({'status': 'history-restored-existing-light-build',
+                             'applicationBuildAlreadyExists': True,
+                             'existingApplicationRunID': matching[0]['id']})
+              record()
+              print('PASS: exact history/main restored; lightweight build already exists, no duplicate dispatched')
+          else:
+              if api('git/ref/heads/main')['object']['sha'] != expected:
+                  raise RuntimeError('Main changed before dispatch; no build dispatched')
+              result['applicationWorkflowDispatchAttempted'] = True
+              result['applicationWorkflowDispatchOutcome'] = 'attempted-outcome-unknown'
+              result['status'] = 'history-restored-dispatch-attempted'
+              record()
+              # Do not retry this POST, including after a network error: it may
+              # have been accepted already and a retry could spend another build.
+              api('actions/workflows/' + workflow + '/dispatches', method='POST', body={'ref': 'main'})
+              result.update({'status': 'history-restored-one-light-build-queued',
+                             'applicationWorkflowDispatched': True,
+                             'applicationWorkflowDispatchOutcome': 'accepted',
+                             'applicationBuildAlreadyExists': False})
+              record()
+              print('PASS: exact history/main restored; queued one lightweight IPA build, no Simulator suite')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnPinime_history_import_result
+          path: .migration/result.json
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: warn
