@@ -1,5 +1,10 @@
 # AnPinime 2.9.3 (22): phục hồi trạng thái PiP
 
+**[Tải IPA 2.9.3 (22)](https://github.com/pythonltn2000/Anpinime/actions/runs/42009981972/artifacts/13406846480)**,
+source `2cb9096`. Gói unsigned đã được tải về và kiểm tra độc lập đúng phiên
+bản, source commit, cây ứng dụng, mpv, background audio và checksum. Artifact
+giữ đến 08/11/2026 10:24 UTC. Đây là xác nhận biên dịch/đóng gói.
+
 Tiếp nối bản 2.9.2 (21) tại kho `pythonltn2000/Anpinime`. Bản này sửa các
 đường lỗi có thể xác nhận trong mã; không coi build IPA là xác nhận PiP tự
 động trên iPhone. Cải tiến Home anime và chặn lệnh PiP inline làm dừng phim
@@ -72,7 +77,15 @@ Kiểm tra video chạy liên tục và lướt ngược/tiếp trên iOS chưa 
 
 Theo [chính sách build](Tools/build-cost-policy.md), chỉ gửi một lượt **Build
 IPA only** sau kiểm tra local; không Simulator, live test hay full suite trên
-Actions. Artifact và thời gian thực tế sẽ được ghi khi job hoàn thành.
+Actions.
+
+Kết quả: một job macOS **198 giây (3 phút 18 giây)**, thành công; helper Linux
+gửi đúng một lệnh dispatch mất **5 giây**. Không retry, không nhập lại lịch sử,
+không job Simulator/live/full suite. Helper chỉ nằm trên nhánh riêng; hai
+workflow ở main vẫn chạy thủ công. Thời gian trên là thời gian thực thi job,
+không phải hóa đơn GitHub. Bằng chứng:
+[release-and-budget.json](Tools/evidence/2026-11-05-pip-recovery/release-and-budget.json)
+và [ipa-identity.json](Tools/evidence/2026-11-05-pip-recovery/ipa-identity.json).
 
 ## Kiểm tra trên iPhone còn thiếu
 

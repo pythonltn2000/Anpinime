@@ -1,0 +1,60 @@
+{
+  "checkedAtUTC": "2026-11-05T10:25:43.469Z",
+  "repository": "pythonltn2000/Anpinime",
+  "sourceCommit": "2cb909612ffe90ad826bb9515a91dc4582dc1723",
+  "applicationTree": "9bf75a69e17b262ce185d9078509b4c43d3874fd",
+  "version": "2.9.3",
+  "build": "22",
+  "buildRun": {
+    "id": 42009981972,
+    "url": "https://github.com/pythonltn2000/Anpinime/actions/runs/42009981972",
+    "headSHA": "2cb909612ffe90ad826bb9515a91dc4582dc1723",
+    "event": "workflow_dispatch",
+    "conclusion": "success",
+    "jobID": 127186229405,
+    "startedAt": "2026-11-05T10:21:10Z",
+    "completedAt": "2026-11-05T10:24:28Z",
+    "elapsedSeconds": 198
+  },
+  "artifact": {
+    "id": 13406846480,
+    "name": "AnPinime_UNSIGNED",
+    "bytes": 30641441,
+    "zipSHA256": "sha256:7950382b41524cb453e7efab6a0ad77ca823de64b02ae7ef6038c02700979315",
+    "expiresAt": "2026-11-08T10:24:21Z",
+    "url": "https://github.com/pythonltn2000/Anpinime/actions/runs/42009981972/artifacts/13406846480"
+  },
+  "dispatchHelper": {
+    "runID": 42009969363,
+    "jobID": 127186177276,
+    "branch": "automation/ipa-293-20261105",
+    "commit": "71f8f523d8afa680cc0fa63322d0eded0f47dbf5",
+    "conclusion": "success",
+    "elapsedSeconds": 5,
+    "purpose": "Dispatch one reviewed IPA-only workflow; no build/test/history import",
+    "onDefaultBranch": false
+  },
+  "actionsForThisRepair": {
+    "macOSJobs": 1,
+    "macOSElapsedSeconds": 198,
+    "linuxJobs": 1,
+    "linuxElapsedSeconds": 5,
+    "simulatorJobs": 0,
+    "liveTestJobs": 0,
+    "fullSuiteJobs": 0,
+    "retries": 0
+  },
+  "verification": {
+    "localChecks": "local-checks.json",
+    "independentPackageIdentity": "ipa-identity.json",
+    "appleSDKCompilation": true,
+    "physicalIPhoneAutomaticPiP": false,
+    "sustainedShortsPlaybackOnIOS": false,
+    "animeLivePlayback": false
+  },
+  "limitations": [
+    "Compilation and package identity do not prove playback or system PiP.",
+    "WebKit sealed/blob automatic PiP remains best effort; no native auto-inline API exists in WKWebView.",
+    "Runtime SKIP/FAIL evidence from prior builds has not been replaced by local fixture results."
+  ]
+}
