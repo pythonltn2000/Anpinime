@@ -1,0 +1,59 @@
+{
+  "checkedAtUTC": "2026-11-05T04:30:40.201455+00:00",
+  "applicationCommit": "21456fbf1702a3551ef0ea859aa6a9ab7640eb56",
+  "platform": "Linux; no Xcode/UIKit/iOS Simulator",
+  "checks": {
+    "animeHome": {
+      "status": "passed",
+      "assertions": 26,
+      "fixtureColdMilliseconds": 8,
+      "fixtureWarmMilliseconds": 1,
+      "requestsPerLoad": 1,
+      "scope": "controlled local fixture, not live website speed"
+    },
+    "webPlayerJavaScript": {
+      "status": "passed",
+      "groups": 7
+    },
+    "aiProviderContracts": {
+      "status": "passed",
+      "scope": "actual production provider plus wire-format and injected URLSession fixtures"
+    },
+    "aiMediaCache": {
+      "status": "passed",
+      "assertions": 18,
+      "serverConfirmedCompleteMediaFiles": 10,
+      "scope": "actual local MP4 file downloads, previous-clip reuse, cancellation, bounded oversized/error responses"
+    },
+    "rangeProbe": {
+      "status": "passed",
+      "scope": "production bounded media probe; virtual 12 GB local origin; 206, ignored Range, redirect, 403, JSON"
+    },
+    "virtualRangeServer": {
+      "status": "passed",
+      "scope": "open/closed/suffix/out-of-range GET, HEAD and redirect"
+    },
+    "swiftSyntax": {
+      "status": "passed",
+      "scope": "all AnyAnime Swift files plus AIDramaUITests; frontend parse, not UIKit typecheck"
+    },
+    "shellSyntax": {
+      "status": "passed"
+    },
+    "protectedProviderCatalogParserTransport": {
+      "status": "passed",
+      "files": 7,
+      "identicalToBaseline": "a785d35868e5fb7b7f67e5ca04b5be3d005f4d3a"
+    }
+  },
+  "newRemoteJobsStarted": 0,
+  "newApplicationCodeChanges": false,
+  "limitations": [
+    "Physical first-Home automatic PiP has not been verified.",
+    "Sealed inline WebKit auto PiP remains best effort.",
+    "Latest corrected UI harness has not been re-run on iOS after 21456fb; Linux cannot execute it.",
+    "Prior iOS native evidence at 7be7706 passed required playback checks; prior AI run failed and remains recorded as failure.",
+    "No new live AnimeVietsub or Free1 success claimed.",
+    "Combine/SwiftUI and CryptoKit-dependent suites are not reported as executed locally."
+  ]
+}

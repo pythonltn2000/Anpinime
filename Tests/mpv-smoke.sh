@@ -13,7 +13,7 @@ EOF
 ffmpeg -hide_banner -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=24 -f lavfi -i sine=frequency=440 -f lavfi -i sine=frequency=660 -i "$RUNNER_TEMP/mpv-en.srt" -i "$RUNNER_TEMP/mpv-vi.srt" -map 0:v -map 1:a -map 2:a -map 3:s -map 4:s -c:v libx264 -preset ultrafast -pix_fmt yuv420p -c:a aac -c:s srt -metadata:s:a:0 language=eng -metadata:s:a:1 language=vie -metadata:s:s:0 language=eng -metadata:s:s:1 language=vie -t 15 Tests/multitrack.mkv
 xcodebuild -quiet -project AnyAnime.xcodeproj -scheme AnyAnime -configuration Debug -sdk iphonesimulator -derivedDataPath build-simulator CODE_SIGNING_ALLOWED=NO build
 ANPINIME_SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPhone" in d["name"] and d["isAvailable"]))')
-xcrun simctl boot "$ANPINIME_SIMULATOR_ID"
+xcrun simctl boot "$ANPINIME_SIMULATOR_ID" >/dev/null 2>&1 || true
 xcrun simctl bootstatus "$ANPINIME_SIMULATOR_ID" -b
 xcrun simctl install "$ANPINIME_SIMULATOR_ID" build-simulator/Build/Products/Debug-iphonesimulator/anpinime.app
 python3 Tests/serve_player.py > "$RUNNER_TEMP/anpinime-media-server.log" 2>&1 &

@@ -68,12 +68,15 @@ Lịch sử tìm kiếm lưu trên thiết bị, riêng cho Anime/NguonC/Phim4K/
 
 ## Build IPA
 
-Workflow `.github/workflows/build-ipa.yml` tạo IPA chưa ký:
+Kho đang chuyển sang `pythonltn2000/Anpinime`. Chọn workflow **Build IPA only**
+trên nhánh `main`: một job macOS, giới hạn 20 phút, không Simulator và không tự
+chạy khi push. Tải artifact `AnPinime_UNSIGNED`, ký bằng chứng chỉ hợp lệ rồi cài.
+Artifact được giữ 3 ngày. [Chính sách tiết kiệm Actions](Tools/build-cost-policy.md).
 
-1. Mở tab **Actions** của repository.
-2. Chạy **Build AnPinime IPA**, hoặc push vào nhánh `main`.
-3. Tải artifact `AnPinime_UNSIGNED`.
-4. Ký IPA bằng ESign/chứng chỉ hợp lệ trước khi cài.
+Kiểm tra phù hợp chạy trong workspace Linux trước build; Simulator và PiP máy
+thật cần kiểm chứng riêng. Build thành công không có nghĩa mọi nguồn hoặc PiP
+đã được sửa. Workflow **Full playback verification (manual)** chỉ dùng khi được
+người dùng yêu cầu rõ. Không tự retry hoặc chạy song song cả bộ kiểm tra.
 
 Bundle ID: `com.xemphim.aipinime`. Tên hiển thị: `AnPinime`. Gói ứng dụng: `anpinime.app`. Các IPA tham chiếu không được đưa lên Git.
 

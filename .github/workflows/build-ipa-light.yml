@@ -1,0 +1,82 @@
+name: Build IPA only
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ipa-only-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen and generate project
+        run: |
+          set -euo pipefail
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          xcodegen generate
+      - name: Build unsigned iPhone app
+        run: |
+          xcodebuild -quiet -project AnyAnime.xcodeproj -scheme AnyAnime \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          ANPINIME_PACKAGE_DIR=$(mktemp -d "$RUNNER_TEMP/anpinime-ipa.XXXXXX")
+          trap 'rm -rf "$ANPINIME_PACKAGE_DIR"' EXIT
+          mkdir -p "$ANPINIME_PACKAGE_DIR/Payload"
+          ditto build/Build/Products/Release-iphoneos/anpinime.app "$ANPINIME_PACKAGE_DIR/Payload/anpinime.app"
+          ditto -c -k --norsrc --keepParent "$ANPINIME_PACKAGE_DIR/Payload" AnPinime_UNSIGNED.ipa
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, plistlib, subprocess, zipfile
+          ipa = Path('AnPinime_UNSIGNED.ipa')
+          source = plistlib.loads(Path('AnyAnime/Info.plist').read_bytes())
+          with zipfile.ZipFile(ipa) as archive:
+              names = archive.namelist()
+              root = 'Payload/anpinime.app/'
+              built = plistlib.loads(archive.read(root + 'Info.plist'))
+              for key in ('CFBundleShortVersionString', 'CFBundleVersion'):
+                  assert str(built[key]) == str(source[key]), 'Built version differs from selected source'
+              assert built['CFBundleIdentifier'] == 'com.xemphim.aipinime'
+              assert root + built['CFBundleExecutable'] in names, 'Missing app executable'
+              assert 'audio' in built.get('UIBackgroundModes', []), 'Missing background audio mode'
+              assert any('libmpv' in name.lower() for name in names), 'Missing mpv framework'
+              assert not any(name.startswith(root + '_CodeSignature/') or name == root + 'embedded.mobileprovision' for name in names), 'Expected unsigned app'
+          result = {
+              'sourceCommit': os.environ['GITHUB_SHA'],
+              'applicationTree': subprocess.check_output(['git', 'rev-parse', 'HEAD:AnyAnime'], text=True).strip(),
+              'version': built['CFBundleShortVersionString'],
+              'build': str(built['CFBundleVersion']),
+              'bundleID': built['CFBundleIdentifier'],
+              'ipaSHA256': hashlib.sha256(ipa.read_bytes()).hexdigest(),
+              'unsigned': True,
+              'validation': 'Compilation and package identity only',
+              'playbackVerifiedByThisWorkflow': False,
+              'physicalIPhoneAutomaticPiPVerifiedByThisWorkflow': False,
+          }
+          Path('AnPinime_UNSIGNED.identity.json').write_text(json.dumps(result, indent=2) + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('### AnPinime ' + result['version'] + ' (' + result['build'] + ')\n')
+              summary.write('One macOS build job; source commit: `' + result['sourceCommit'] + '`.\n\n')
+              summary.write('IPA compilation and package identity passed. Playback and physical-device PiP were not tested by this workflow.\n')
+          PY
+          shasum -a 256 AnPinime_UNSIGNED.ipa > AnPinime_UNSIGNED.ipa.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnPinime_UNSIGNED
+          path: |
+            AnPinime_UNSIGNED.ipa
+            AnPinime_UNSIGNED.ipa.sha256
+            AnPinime_UNSIGNED.identity.json
+          retention-days: 3
+          if-no-files-found: error

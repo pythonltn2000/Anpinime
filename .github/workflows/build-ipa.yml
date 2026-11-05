@@ -1,4 +1,4 @@
-name: Build AnPinime IPA
+name: Full playback verification (manual)
 
 on:
   workflow_dispatch:
@@ -19,8 +19,6 @@ on:
         description: 'Verify only short-feed gestures, fullscreen and complete-playlist handoff'
         type: boolean
         default: false
-  push:
-    branches: [main]
 
 jobs:
   build-ios:
