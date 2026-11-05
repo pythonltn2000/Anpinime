@@ -88,12 +88,14 @@ final class MPVSoftwareVideoOutput {
 @MainActor
 final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate, AVPictureInPictureSampleBufferPlaybackDelegate {
     let layer = AVSampleBufferDisplayLayer()
+    private weak var sourceView: UIView?
     private let output = MPVSoftwareVideoOutput()
     private let playback: PlaybackState
     private var controller: AVPictureInPictureController?
     private var timebase: CMTimebase?
     private var bootstrapFrame: CVPixelBuffer?
-    private var bootstrapTimer: Timer?
+    private(set) var frameReady = false
+    private var wantsAutomatic = false
     private var possibility: NSKeyValueObservation?
     private var wantsStart = false
     private var starting = false
@@ -114,6 +116,12 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     var onEvent: ((String) -> Void)?
     var possible: Bool { controller?.isPictureInPicturePossible == true }
     var transitioningOrActive: Bool { starting || stopping || controller?.isPictureInPictureActive == true }
+    var hasDecodedFrame: Bool { bootstrapFrame != nil || frameReady }
+    var automaticReady: Bool { meetsAutomaticRequirements && controller?.canStartPictureInPictureAutomaticallyFromInline == true }
+    private var sourceAttached: Bool {
+        guard let sourceView, sourceView.window != nil else { return false }
+        return layer.superlayer === sourceView.layer && layer.bounds.width > 1 && layer.bounds.height > 1
+    }
     private let command: (String, Double) -> Void
     private let restoreVideo: () -> Void
     private let finished: () -> Void
@@ -122,52 +130,74 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private(set) var visibleFrameCount = 0
     #endif
 
-    init(playback: PlaybackState, command: @escaping (String, Double) -> Void,
+    init(playback: PlaybackState, sourceView: UIView, command: @escaping (String, Double) -> Void,
          restoreVideo: @escaping () -> Void, finished: @escaping () -> Void) {
         self.playback = playback; self.command = command; self.restoreVideo = restoreVideo; self.finished = finished
+        self.sourceView = sourceView
         super.init()
         var clock: CMTimebase?
         if CMTimebaseCreateWithSourceClock(allocator: kCFAllocatorDefault, sourceClock: CMClockGetHostTimeClock(), timebaseOut: &clock) == noErr {
             timebase = clock; layer.controlTimebase = clock
         }
         layer.videoGravity = .resizeAspect; layer.backgroundColor = UIColor.black.cgColor; layer.isOpaque = true
+        updateSourceGeometry()
         output.frame = { [weak self] pixelBuffer in self?.enqueue(pixelBuffer) }
+    }
+
+    /// Preserve the existing inline layer ownership. AVKit owns its geometry
+    /// during a pending/active transition; layout must not move it elsewhere.
+    func updateSourceGeometry() {
+        guard !stopped, !transitioningOrActive, !wantsStart, !playback.pictureInPicturePending,
+              let sourceView, sourceView.window != nil else { return }
+        let rect = sourceView.bounds
+        guard rect.width.isFinite, rect.height.isFinite, rect.width > 1, rect.height > 1 else { return }
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        layer.frame = rect
+        CATransaction.commit()
     }
 
     /// Arm AVKit while the app is still foreground, using a real decoded frame.
     /// GPU playback continues normally until background/explicit PiP requests CPU output.
     func arm(snapshot: CVPixelBuffer?, automatic: Bool) {
         guard !stopped, !stopping else { return }
+        updateSourceGeometry()
+        if layer.status == .failed { layer.flush(); frameReady = false }
         if controller == nil {
             let content = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: layer, playbackDelegate: self)
             controller = AVPictureInPictureController(contentSource: content)
             controller?.delegate = self
-            possibility = controller?.observe(\.isPictureInPicturePossible, options: [.new]) { [weak self] _, _ in
+            possibility = controller?.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] _, _ in
                 Task { @MainActor [weak self] in
                     self?.onEvent?("possibilityChanged")
                     self?.startIfPossible()
                 }
             }
         }
-        setAutomatic(automatic)
         invalidatePlaybackState()
-        if let snapshot, !outputActivated {
-            bootstrapFrame = snapshot
-            enqueue(snapshot, rendered: false)
-            if bootstrapTimer == nil {
-                bootstrapTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-                    Task { @MainActor [weak self] in
-                        guard let self, !self.stopped, !self.outputActivated, let frame = self.bootstrapFrame else { return }
-                        self.invalidatePlaybackState()
-                        self.enqueue(frame, rendered: false)
-                    }
-                }
-            }
+        if !outputActivated, !frameReady {
+            if let snapshot { bootstrapFrame = snapshot }
+            // Retry an unaccepted sample on the next foreground poll, then stop
+            // enqueueing once one decoded foreground sample is ready.
+            if let bootstrapFrame { enqueue(bootstrapFrame, rendered: false) }
         }
+        setAutomatic(automatic)
     }
 
     func setAutomatic(_ enabled: Bool) {
-        controller?.canStartPictureInPictureAutomaticallyFromInline = enabled && !stopping && !stopped
+        wantsAutomatic = enabled
+        updateSourceGeometry()
+        updateAutomaticEligibility()
+    }
+
+    private func updateAutomaticEligibility() {
+        controller?.canStartPictureInPictureAutomaticallyFromInline = meetsAutomaticRequirements
+    }
+
+    private var meetsAutomaticRequirements: Bool {
+        NativePiPPolicy.automaticAllowed(
+            preference: wantsAutomatic, eligible: controller != nil && !stopping && !stopped,
+            playing: playback.playing && !playback.userPaused, frameReady: frameReady && layer.status != .failed,
+            outputPrimed: outputReady, sourceAttached: sourceAttached)
     }
 
     /// Allocate the CPU rendering backend before Home, while leaving the active
@@ -186,6 +216,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
                     return
                 }
                 self.outputReady = true
+                self.updateAutomaticEligibility()
                 self.onEvent?("outputPrimed")
                 self.activateOutputIfRequested()
             }
@@ -206,7 +237,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     private func activateOutputIfRequested() {
         guard wantsOutput, outputReady, !outputActivated, !stopped, !stopping else { return }
         outputActivated = true
-        bootstrapTimer?.invalidate(); bootstrapTimer = nil; bootstrapFrame = nil
+        bootstrapFrame = nil
         command("pipOutput", 1)
         invalidatePlaybackState()
         output.start()
@@ -235,8 +266,8 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     }
 
     private func enqueue(_ buffer: CVPixelBuffer, rendered: Bool = true) {
-        guard !stopped else { return }
-        if layer.status == .failed { layer.flush() }
+        guard !stopped, !stopping, rendered || !frameReady else { return }
+        if layer.status == .failed { layer.flush(); frameReady = false; updateAutomaticEligibility() }
         guard layer.isReadyForMoreMediaData else { return }
         var description: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
@@ -251,6 +282,11 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
             CFDictionarySetValue(values, Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(), Unmanaged.passUnretained(kCFBooleanTrue).toOpaque())
         }
         layer.enqueue(sample)
+        if !frameReady {
+            frameReady = true
+            updateAutomaticEligibility()
+            onEvent?("firstFrameReady")
+        }
         #if DEBUG
         if rendered { frameCount += 1 }
         CVPixelBufferLockBaseAddress(buffer, .readOnly)
@@ -271,6 +307,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
 
     private func startIfPossible() {
         guard wantsStart, !starting, !stopping, !stopped,
+              frameReady, outputReady, sourceAttached,
               controller?.isPictureInPictureActive != true,
               controller?.isPictureInPicturePossible == true else { return }
         starting = true; controller?.startPictureInPicture()
@@ -294,7 +331,7 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
         // didStop. Keep its delegate and render context alive until that handshake.
         retainedUntilStopped = self
         startTimeout?.cancel(); startTimeout = nil
-        bootstrapTimer?.invalidate(); bootstrapTimer = nil; bootstrapFrame = nil
+        bootstrapFrame = nil
         possibility = nil
         controller?.canStartPictureInPictureAutomaticallyFromInline = false
         if starting || controller?.isPictureInPictureActive == true {
@@ -409,10 +446,21 @@ final class MPVPictureInPicture: NSObject, AVPictureInPictureControllerDelegate,
     }
 
     private func acceptsControls(sourceMatchesController: Bool, sourceIsActive: Bool) -> Bool {
-        !stopped && !stopping && sourceMatchesController && sourceIsActive
+        NativePiPPolicy.acceptsControls(stopped: stopped, stopping: stopping,
+            sourceMatchesController: sourceMatchesController, sourceIsActive: sourceIsActive)
     }
 
     #if DEBUG
+    var readinessFacts: [String: Any] {
+        ["frameReady": frameReady, "outputPrimed": outputReady,
+         "outputActivated": outputActivated, "sourceAttached": sourceAttached,
+         "sourceWindow": sourceView?.window != nil,
+         "layerAttachedToPlayer": layer.superlayer === sourceView?.layer,
+         "sourceFrame": String(describing: layer.frame),
+         "layerBounds": String(describing: layer.bounds), "automaticReady": automaticReady,
+         "layerFailed": layer.status == .failed, "layerReadyForSample": layer.isReadyForMoreMediaData]
+    }
+
     /// Exercise the production delegate handler even without a system PiP window.
     /// Unsupported devices return nil from AVKit's initializer. Inject the armed
     /// source's inactive state into the same policy; never manufacture an active

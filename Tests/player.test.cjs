@@ -25,7 +25,7 @@ function fixture(html, setup = () => {}) {
   setup(w);
   w.eval(script);
   return {dom, w, messages, video, intervals, get plays(){return plays;},
-    command(name, value = 0) { w.dispatchEvent(new w.MessageEvent('message', {data:{type:'AnPinimeCommand', name, value}})); }};
+    command(name, value = 0, extra = {}) { w.dispatchEvent(new w.MessageEvent('message', {data:{type:'AnPinimeCommand', name, value, ...extra}})); }};
 }
 
 const f = fixture('<title>Xem phim</title><body><header>Navigation</header><main><div id="media-player"><video src="https://cdn.example/movie.mp4"></video><div>Old controls</div></div></main><footer>Ad links</footer></body>');
@@ -263,7 +263,9 @@ for (const enabled of [true, false]) {
   delayedVideo.w.document.querySelector('#player').appendChild(v);
   delayedVideo.w.__anyanimeFocusPlayer();
   assert.equal(presentations, 0, 'Retaining the preference never forces a PiP start');
-  delayedVideo.command('pipAutomatically');
+  const lateSession = delayedVideo.messages.filter(m => m.name === 'mediaState').at(-1).value.pipSessionID;
+  assert.equal(typeof lateSession, 'string', 'A late-created video reports a usable native session ID');
+  delayedVideo.command('pipAutomatically', 0, {sessionID:lateSession, requestID:'late-native-request'});
   assert.equal(presentations, enabled ? 1 : 0, 'A video created after readiness applies the retained preference to an actual background request');
   delayedVideo.dom.window.close();
 }
@@ -291,3 +293,132 @@ console.log('PASS: WebKit PiP single ownership, actual commands, preference, pau
   wrongManifest.dom.window.close();
   console.log('PASS: progressing readyState=2, pause-ad isolation, decoder preservation and no speculative blob handoff');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+
+// Match the Swift bridge payloads: session and request IDs are protocol data,
+// not an assertion that the real iOS presentation API succeeds.
+const bridge = fixture('<video src="blob:bridge-first"></video>', w => {
+  const v = w.document.querySelector('video');
+  w.Date.now = () => 1000;
+  w.presentationCalls = [];
+  v.webkitSupportsPresentationMode = () => true;
+  v.webkitSetPresentationMode = mode => { w.presentationCalls.push(mode); };
+});
+const lastState = f => f.messages.filter(m => m.name === 'mediaState').at(-1).value;
+const notices = f => f.messages.filter(m => m.name === 'pipState').map(m => m.value);
+const spontaneous = fixture('<video src="blob:system-pip"></video>', w => {
+  const v = w.document.querySelector('video');
+  v.webkitSupportsPresentationMode = () => true;
+  v.webkitSetPresentationMode = () => {};
+});
+const spontaneousSession = lastState(spontaneous).pipSessionID;
+spontaneous.video.webkitPresentationMode = 'picture-in-picture';
+spontaneous.video.dispatchEvent(new spontaneous.w.Event('webkitpresentationmodechanged'));
+assert.equal(lastState(spontaneous).pipActive, true);
+assert.equal(lastState(spontaneous).pipRequestID, '', 'System-initiated PiP has no invented native request ID');
+assert.deepEqual({...notices(spontaneous).at(-1)}, {sessionID:spontaneousSession, requestID:'', status:'active', error:''});
+spontaneous.video.webkitPresentationMode = 'inline';
+spontaneous.video.dispatchEvent(new spontaneous.w.Event('webkitpresentationmodechanged'));
+assert.equal(lastState(spontaneous).pipActive, false);
+assert.deepEqual({...notices(spontaneous).at(-1)}, {sessionID:spontaneousSession, requestID:'', status:'stopped', error:''},
+  'System-initiated PiP reports the same empty request identity when returning inline');
+spontaneous.dom.window.close();
+let sid = lastState(bridge).pipSessionID;
+assert.equal(typeof sid, 'string'); assert(sid.length > 0);
+bridge.command('pip', 0, {sessionID:sid, requestID:'native-1'});
+assert.equal(lastState(bridge).pipRequestID, 'native-1');
+assert.equal(lastState(bridge).pipPending, true);
+assert(notices(bridge).some(x => x.sessionID === sid && x.requestID === 'native-1' && x.status === 'pending'));
+bridge.command('pip', 0, {sessionID:sid, requestID:'duplicate'});
+assert.equal(bridge.w.presentationCalls.length, 1);
+assert.equal(lastState(bridge).pipRequestID, 'native-1', 'Coalescing preserves the owner request ID');
+bridge.video.webkitPresentationMode = 'picture-in-picture';
+bridge.video.dispatchEvent(new bridge.w.Event('webkitpresentationmodechanged'));
+assert(notices(bridge).some(x => x.sessionID === sid && x.requestID === 'native-1' && x.status === 'active'));
+assert.equal(lastState(bridge).pipPending, false);
+bridge.video.webkitPresentationMode = 'inline';
+bridge.video.setAttribute('src', 'blob:changed-at-inline-return');
+bridge.video.dispatchEvent(new bridge.w.Event('webkitpresentationmodechanged'));
+assert.equal(notices(bridge).at(-1).status, 'stopped');
+assert.equal(notices(bridge).at(-1).sessionID, sid, 'Source changes while returning inline first close the old active session');
+assert.equal(lastState(bridge).pipActive, false);
+bridge.w.__anyanimeFocusPlayer();
+sid = lastState(bridge).pipSessionID;
+bridge.command('automaticPiP', 0);
+bridge.command('pipAutomatically', 0, {sessionID:sid, requestID:'native-disabled'});
+assert.equal(notices(bridge).at(-1).error, 'automatic-disabled');
+assert.equal(lastState(bridge).pipPending, false);
+bridge.command('pip', 0, {sessionID:sid, requestID:'native-timeout'});
+bridge.w.Date.now = () => 2600;
+bridge.w.__anyanimeFocusPlayer();
+assert(notices(bridge).some(x => x.requestID === 'native-timeout' && x.status === 'error' && x.error === 'timeout'));
+assert.equal(lastState(bridge).pipPending, false);
+bridge.command('pause');
+bridge.command('pip', 0, {sessionID:sid, requestID:'native-paused'});
+assert.equal(notices(bridge).at(-1).error, 'paused');
+bridge.dom.window.close();
+
+const rejected = fixture('<video src="blob:promise-first"></video>', w => {
+  w.Date.now = () => 1000;
+  Object.defineProperty(w.document, 'pictureInPictureEnabled', {value:true});
+  const v = w.document.querySelector('video');
+  w.pendingRequests = [];
+  v.requestPictureInPicture = () => ({then(resolve, reject) { w.pendingRequests.push({resolve, reject}); }});
+});
+const oldSession = lastState(rejected).pipSessionID;
+rejected.command('pip', 0, {sessionID:oldSession, requestID:'rejected-1'});
+rejected.w.pendingRequests[0].reject(new Error('Denied'));
+assert.equal(lastState(rejected).pipPending, false);
+assert.equal(notices(rejected).at(-1).error, 'rejected');
+rejected.command('pip', 0, {sessionID:oldSession, requestID:'old-late'});
+rejected.w.Date.now = () => 3000;
+rejected.w.__anyanimeFocusPlayer();
+rejected.video.setAttribute('src', 'blob:promise-next');
+rejected.w.__anyanimeFocusPlayer();
+const newSession = lastState(rejected).pipSessionID;
+assert.notEqual(newSession, oldSession, 'A new inline media source gets a fresh session');
+const noticesBeforeMismatch = notices(rejected).length;
+rejected.command('pip', 0, {sessionID:oldSession, requestID:'wrong-session'});
+assert.equal(rejected.w.pendingRequests.length, 2, 'A stale native session cannot call presentation APIs');
+assert.equal(notices(rejected).length, noticesBeforeMismatch, 'A broadcast to the wrong frame cannot emit another session\'s terminal notice');
+rejected.command('pip', 0, {sessionID:newSession, requestID:'current-request'});
+const noticesWhilePending = notices(rejected).length;
+rejected.command('pip', 0, {sessionID:oldSession, requestID:'current-request'});
+assert.equal(notices(rejected).length, noticesWhilePending, 'A mismatching session cannot acknowledge the currently pending native request ID');
+assert.equal(lastState(rejected).pipPending, true);
+rejected.w.pendingRequests[1].reject(new Error('Late prior rejection'));
+assert.equal(lastState(rejected).pipRequestID, 'current-request');
+assert.equal(lastState(rejected).pipPending, true, 'A stale rejection cannot clear the newer request');
+rejected.w.document.pictureInPictureElement = rejected.video;
+rejected.video.dispatchEvent(new rejected.w.Event('enterpictureinpicture'));
+assert.equal(notices(rejected).at(-1).requestID, 'current-request');
+assert.equal(notices(rejected).at(-1).status, 'active');
+rejected.w.pendingRequests[1].resolve();
+assert.equal(lastState(rejected).pipActive, true);
+rejected.w.document.pictureInPictureElement = null;
+rejected.video.dispatchEvent(new rejected.w.Event('leavepictureinpicture'));
+assert.equal(notices(rejected).at(-1).status, 'stopped');
+assert.equal(lastState(rejected).pipActive, false);
+const replacement = rejected.video.cloneNode(true);
+Object.defineProperties(replacement, {
+  paused:{get:()=>false},duration:{get:()=>180},readyState:{get:()=>4},
+  videoWidth:{get:()=>640},videoHeight:{get:()=>360}
+});
+replacement.play = () => Promise.resolve();
+let replacementRequests = 0;
+replacement.webkitSupportsPresentationMode = () => true;
+replacement.webkitSetPresentationMode = () => { replacementRequests++; };
+rejected.video.replaceWith(replacement);
+rejected.w.__anyanimeFocusPlayer();
+const replacementSession = lastState(rejected).pipSessionID;
+assert.notEqual(replacementSession, newSession, 'A replacement video has a distinct session even for the same URL');
+rejected.command('pip', 0, {sessionID:newSession, requestID:'old-element-command'});
+assert.equal(replacementRequests, 0);
+rejected.w.pendingRequests[2].reject(new Error('Old element late rejection'));
+assert.equal(lastState(rejected).pipSessionID, replacementSession);
+assert.equal(lastState(rejected).pipPending, false);
+rejected.command('pip', 0, {sessionID:replacementSession, requestID:'replacement-command'});
+assert.equal(replacementRequests, 1);
+assert.equal(lastState(rejected).pipRequestID, 'replacement-command');
+rejected.dom.window.close();
+console.log('PASS: Swift/WebKit PiP session/request protocol, native payloads, presentation events, timeout/retry, rejection and stale-completion isolation');
