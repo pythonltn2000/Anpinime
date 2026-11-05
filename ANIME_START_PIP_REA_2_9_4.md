@@ -1,5 +1,11 @@
 # AnPinime 2.9.4 (23): anime từ đầu và PiP theo đối chiếu REA
 
+**[Tải IPA 2.9.4 (23)](https://github.com/pythonltn2000/Anpinime/actions/runs/42025634087/artifacts/13412879758)**,
+source `ea62428`. Đã tải gói về và kiểm tra độc lập phiên bản, source/cây app,
+mpv, background audio và checksum. Gói unsigned, artifact giữ đến 19:19 ngày
+08/11/2026 (UTC+7). Đây là xác nhận biên dịch/đóng gói, không phải kết quả PiP
+trên máy thật.
+
 Tiếp nối `fe8cc90` / 2.9.3 (22), tại kho `pythonltn2000/Anpinime`.
 Đã đọc lại `REPAIR_REPORT_V3.md`, `Tools/source2-analysis.md` và PIP.txt người
 dùng cung cấp. PIP.txt được đối chiếu như tài liệu phân tích, không được coi
@@ -76,9 +82,13 @@ Có tình huống popup muộn, đổi markup, bảo vệ storage/nút không li
 seek/pause/PiP/native recovery và không ảnh hưởng Movie. Parse Swift và diff
 check đạt. Bảy file provider/catalog/relay/parser được bảo vệ không đổi.
 
-Chỉ chạy một lượt **Build IPA only** sau kiểm tra local, theo
-[chính sách ngân sách](Tools/build-cost-policy.md). Không Simulator/live/full
-suite, không retry tự động. Kết quả gói và thời gian thực sẽ ghi sau build.
+Đã chạy đúng một lượt **Build IPA only** sau kiểm tra local, theo
+[chính sách ngân sách](Tools/build-cost-policy.md): một job macOS thành công,
+208 giây (3 phút 28 giây), helper Linux gửi lệnh 4 giây. Không Simulator/live/
+full suite, không retry. Đây là thời gian thực thi job, không phải hóa đơn.
+Helper ở nhánh riêng; main vẫn chỉ có workflow chạy thủ công. Bằng chứng:
+[release-and-budget.json](Tools/evidence/2026-11-05-anime-start-pip/release-and-budget.json)
+và [ipa-identity.json](Tools/evidence/2026-11-05-anime-start-pip/ipa-identity.json).
 
 Chưa có xác nhận máy thật cho tự động PiP ở lần Home đầu, animation khôi phục,
 hay playback anime live với hộp thoại hiện tại. Build thành công chỉ chứng

@@ -1,0 +1,62 @@
+{
+  "checkedAtUTC": "2026-11-05T12:21:18.446Z",
+  "repository": "pythonltn2000/Anpinime",
+  "sourceCommit": "ea6242856120579641fad490993447299530c82b",
+  "applicationTree": "2a67e027a62a36e6a2bb04df50577b82fb1e7ce4",
+  "version": "2.9.4",
+  "build": "23",
+  "buildRun": {
+    "id": 42025634087,
+    "url": "https://github.com/pythonltn2000/Anpinime/actions/runs/42025634087",
+    "headSHA": "ea6242856120579641fad490993447299530c82b",
+    "event": "workflow_dispatch",
+    "conclusion": "success",
+    "jobID": 127239019561,
+    "startedAt": "2026-11-05T12:15:46Z",
+    "completedAt": "2026-11-05T12:19:14Z",
+    "elapsedSeconds": 208
+  },
+  "artifact": {
+    "id": 13412879758,
+    "name": "AnPinime_UNSIGNED",
+    "bytes": 30647136,
+    "zipSHA256": "sha256:4c1e5a48be3c4f16b2a5d8ba47a733fa410dfce32f35039dfe98121b41d8a9ad",
+    "expiresAt": "2026-11-08T12:19:06Z",
+    "url": "https://github.com/pythonltn2000/Anpinime/actions/runs/42025634087/artifacts/13412879758"
+  },
+  "dispatchHelper": {
+    "runID": 42025619443,
+    "jobID": 127238964996,
+    "branch": "automation/ipa-294-20261105",
+    "commit": "0c7381d94205a963d78b0f578f2028710044423c",
+    "conclusion": "success",
+    "elapsedSeconds": 4,
+    "purpose": "Dispatch one reviewed IPA-only workflow; no tests or history import",
+    "onDefaultBranch": false
+  },
+  "actionsForThisRepair": {
+    "macOSJobs": 1,
+    "macOSElapsedSeconds": 208,
+    "linuxJobs": 1,
+    "linuxElapsedSeconds": 4,
+    "simulatorJobs": 0,
+    "liveTestJobs": 0,
+    "fullSuiteJobs": 0,
+    "retries": 0
+  },
+  "verification": {
+    "localChecks": "local-checks.json",
+    "staticReference": "rea-verification.json",
+    "animeFixtureProvenance": "anime-resume.json",
+    "independentPackageIdentity": "ipa-identity.json",
+    "appleSDKCompilation": true,
+    "physicalIPhoneAutomaticPiP": false,
+    "physicalIPhoneRestoreAnimation": false,
+    "currentAnimeLiveDOMOrPlayback": false
+  },
+  "limitations": [
+    "DOM fixtures and static binary analysis do not establish iPhone runtime results.",
+    "Current live AnimeVietsub page/script was inaccessible behind403.",
+    "WKWebView sealed/blob automatic PiP retains public API restrictions."
+  ]
+}
